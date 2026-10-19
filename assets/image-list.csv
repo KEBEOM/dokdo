@@ -1,0 +1,278 @@
+﻿파일,이름,용도,권장 가로,권장 세로,모티브 또는 비고
+assets/monsters/001.png,갈꼬미,정면 · 도감 / 상대 / 필드,128,128,괭이갈매기
+assets/monsters/back/001.png,갈꼬미,내 동료 · 전투,128,128,괭이갈매기 · 기본 파일은 정면 좌우 반전
+assets/monsters/002.png,갈바람,정면 · 도감 / 상대 / 필드,128,128,괭이갈매기
+assets/monsters/back/002.png,갈바람,내 동료 · 전투,128,128,괭이갈매기 · 기본 파일은 정면 좌우 반전
+assets/monsters/003.png,해풍익,정면 · 도감 / 상대 / 필드,128,128,괭이갈매기
+assets/monsters/back/003.png,해풍익,내 동료 · 전투,128,128,괭이갈매기 · 기본 파일은 정면 좌우 반전
+assets/monsters/004.png,제비콩,정면 · 도감 / 상대 / 필드,128,128,바다제비
+assets/monsters/back/004.png,제비콩,내 동료 · 전투,128,128,바다제비 · 기본 파일은 정면 좌우 반전
+assets/monsters/005.png,밤제비,정면 · 도감 / 상대 / 필드,128,128,바다제비
+assets/monsters/back/005.png,밤제비,내 동료 · 전투,128,128,바다제비 · 기본 파일은 정면 좌우 반전
+assets/monsters/006.png,별제비,정면 · 도감 / 상대 / 필드,128,128,바다제비
+assets/monsters/back/006.png,별제비,내 동료 · 전투,128,128,바다제비 · 기본 파일은 정면 좌우 반전
+assets/monsters/007.png,슴꼬미,정면 · 도감 / 상대 / 필드,128,128,슴새
+assets/monsters/back/007.png,슴꼬미,내 동료 · 전투,128,128,슴새 · 기본 파일은 정면 좌우 반전
+assets/monsters/008.png,슴바람,정면 · 도감 / 상대 / 필드,128,128,슴새
+assets/monsters/back/008.png,슴바람,내 동료 · 전투,128,128,슴새 · 기본 파일은 정면 좌우 반전
+assets/monsters/009.png,너울슴,정면 · 도감 / 상대 / 필드,128,128,슴새
+assets/monsters/back/009.png,너울슴,내 동료 · 전투,128,128,슴새 · 기본 파일은 정면 좌우 반전
+assets/monsters/010.png,매동이,정면 · 도감 / 상대 / 필드,128,128,매
+assets/monsters/back/010.png,매동이,내 동료 · 전투,128,128,매 · 기본 파일은 정면 좌우 반전
+assets/monsters/011.png,절벽매,정면 · 도감 / 상대 / 필드,128,128,매
+assets/monsters/back/011.png,절벽매,내 동료 · 전투,128,128,매 · 기본 파일은 정면 좌우 반전
+assets/monsters/012.png,창공매,정면 · 도감 / 상대 / 필드,128,128,매
+assets/monsters/back/012.png,창공매,내 동료 · 전투,128,128,매 · 기본 파일은 정면 좌우 반전
+assets/monsters/013.png,조롱콩,정면 · 도감 / 상대 / 필드,128,128,황조롱이
+assets/monsters/back/013.png,조롱콩,내 동료 · 전투,128,128,황조롱이 · 기본 파일은 정면 좌우 반전
+assets/monsters/014.png,조롱날,정면 · 도감 / 상대 / 필드,128,128,황조롱이
+assets/monsters/back/014.png,조롱날,내 동료 · 전투,128,128,황조롱이 · 기본 파일은 정면 좌우 반전
+assets/monsters/015.png,노을날,정면 · 도감 / 상대 / 필드,128,128,황조롱이
+assets/monsters/back/015.png,노을날,내 동료 · 전투,128,128,황조롱이 · 기본 파일은 정면 좌우 반전
+assets/monsters/016.png,수리퐁,정면 · 도감 / 상대 / 필드,128,128,물수리
+assets/monsters/back/016.png,수리퐁,내 동료 · 전투,128,128,물수리 · 기본 파일은 정면 좌우 반전
+assets/monsters/017.png,바다수리,정면 · 도감 / 상대 / 필드,128,128,물수리
+assets/monsters/back/017.png,바다수리,내 동료 · 전투,128,128,물수리 · 기본 파일은 정면 좌우 반전
+assets/monsters/018.png,해류익,정면 · 도감 / 상대 / 필드,128,128,물수리
+assets/monsters/back/018.png,해류익,내 동료 · 전투,128,128,물수리 · 기본 파일은 정면 좌우 반전
+assets/monsters/019.png,참새콩,정면 · 도감 / 상대 / 필드,128,128,섬참새
+assets/monsters/back/019.png,참새콩,내 동료 · 전투,128,128,섬참새 · 기본 파일은 정면 좌우 반전
+assets/monsters/020.png,섬참봉,정면 · 도감 / 상대 / 필드,128,128,섬참새
+assets/monsters/back/020.png,섬참봉,내 동료 · 전투,128,128,섬참새 · 기본 파일은 정면 좌우 반전
+assets/monsters/021.png,혹꼬미,정면 · 도감 / 상대 / 필드,128,128,혹돔
+assets/monsters/back/021.png,혹꼬미,내 동료 · 전투,128,128,혹돔 · 기본 파일은 정면 좌우 반전
+assets/monsters/022.png,혹단이,정면 · 도감 / 상대 / 필드,128,128,혹돔
+assets/monsters/back/022.png,혹단이,내 동료 · 전투,128,128,혹돔 · 기본 파일은 정면 좌우 반전
+assets/monsters/023.png,파도장,정면 · 도감 / 상대 / 필드,128,128,혹돔
+assets/monsters/back/023.png,파도장,내 동료 · 전투,128,128,혹돔 · 기본 파일은 정면 좌우 반전
+assets/monsters/024.png,파랑콩,정면 · 도감 / 상대 / 필드,128,128,파랑돔
+assets/monsters/back/024.png,파랑콩,내 동료 · 전투,128,128,파랑돔 · 기본 파일은 정면 좌우 반전
+assets/monsters/025.png,파랑빛,정면 · 도감 / 상대 / 필드,128,128,파랑돔
+assets/monsters/back/025.png,파랑빛,내 동료 · 전투,128,128,파랑돔 · 기본 파일은 정면 좌우 반전
+assets/monsters/026.png,푸른왕,정면 · 도감 / 상대 / 필드,128,128,파랑돔
+assets/monsters/back/026.png,푸른왕,내 동료 · 전투,128,128,파랑돔 · 기본 파일은 정면 좌우 반전
+assets/monsters/027.png,얼룩콩,정면 · 도감 / 상대 / 필드,128,128,독도얼룩망둑
+assets/monsters/back/027.png,얼룩콩,내 동료 · 전투,128,128,독도얼룩망둑 · 기본 파일은 정면 좌우 반전
+assets/monsters/028.png,얼룩돌,정면 · 도감 / 상대 / 필드,128,128,독도얼룩망둑
+assets/monsters/back/028.png,얼룩돌,내 동료 · 전투,128,128,독도얼룩망둑 · 기본 파일은 정면 좌우 반전
+assets/monsters/029.png,독도룩,정면 · 도감 / 상대 / 필드,128,128,독도얼룩망둑
+assets/monsters/back/029.png,독도룩,내 동료 · 전투,128,128,독도얼룩망둑 · 기본 파일은 정면 좌우 반전
+assets/monsters/030.png,돌줄이,정면 · 도감 / 상대 / 필드,128,128,돌돔
+assets/monsters/back/030.png,돌줄이,내 동료 · 전투,128,128,돌돔 · 기본 파일은 정면 좌우 반전
+assets/monsters/031.png,돌무늬,정면 · 도감 / 상대 / 필드,128,128,돌돔
+assets/monsters/back/031.png,돌무늬,내 동료 · 전투,128,128,돌돔 · 기본 파일은 정면 좌우 반전
+assets/monsters/032.png,암초장,정면 · 도감 / 상대 / 필드,128,128,돌돔
+assets/monsters/back/032.png,암초장,내 동료 · 전투,128,128,돌돔 · 기본 파일은 정면 좌우 반전
+assets/monsters/033.png,벵꼬미,정면 · 도감 / 상대 / 필드,128,128,벵에돔
+assets/monsters/back/033.png,벵꼬미,내 동료 · 전투,128,128,벵에돔 · 기본 파일은 정면 좌우 반전
+assets/monsters/034.png,벵물결,정면 · 도감 / 상대 / 필드,128,128,벵에돔
+assets/monsters/back/034.png,벵물결,내 동료 · 전투,128,128,벵에돔 · 기본 파일은 정면 좌우 반전
+assets/monsters/035.png,심해벵,정면 · 도감 / 상대 / 필드,128,128,벵에돔
+assets/monsters/back/035.png,심해벵,내 동료 · 전투,128,128,벵에돔 · 기본 파일은 정면 좌우 반전
+assets/monsters/036.png,볼락콩,정면 · 도감 / 상대 / 필드,128,128,조피볼락
+assets/monsters/back/036.png,볼락콩,내 동료 · 전투,128,128,조피볼락 · 기본 파일은 정면 좌우 반전
+assets/monsters/037.png,볼락돌,정면 · 도감 / 상대 / 필드,128,128,조피볼락
+assets/monsters/back/037.png,볼락돌,내 동료 · 전투,128,128,조피볼락 · 기본 파일은 정면 좌우 반전
+assets/monsters/038.png,바위볼,정면 · 도감 / 상대 / 필드,128,128,조피볼락
+assets/monsters/back/038.png,바위볼,내 동료 · 전투,128,128,조피볼락 · 기본 파일은 정면 좌우 반전
+assets/monsters/039.png,자리퐁,정면 · 도감 / 상대 / 필드,128,128,자리돔
+assets/monsters/back/039.png,자리퐁,내 동료 · 전투,128,128,자리돔 · 기본 파일은 정면 좌우 반전
+assets/monsters/040.png,자리빛,정면 · 도감 / 상대 / 필드,128,128,자리돔
+assets/monsters/back/040.png,자리빛,내 동료 · 전투,128,128,자리돔 · 기본 파일은 정면 좌우 반전
+assets/monsters/041.png,문꼬미,정면 · 도감 / 상대 / 필드,128,128,문어류
+assets/monsters/back/041.png,문꼬미,내 동료 · 전투,128,128,문어류 · 기본 파일은 정면 좌우 반전
+assets/monsters/042.png,문팔이,정면 · 도감 / 상대 / 필드,128,128,문어류
+assets/monsters/back/042.png,문팔이,내 동료 · 전투,128,128,문어류 · 기본 파일은 정면 좌우 반전
+assets/monsters/043.png,문어장,정면 · 도감 / 상대 / 필드,128,128,문어류
+assets/monsters/back/043.png,문어장,내 동료 · 전투,128,128,문어류 · 기본 파일은 정면 좌우 반전
+assets/monsters/044.png,징꼬미,정면 · 도감 / 상대 / 필드,128,128,살오징어
+assets/monsters/back/044.png,징꼬미,내 동료 · 전투,128,128,살오징어 · 기본 파일은 정면 좌우 반전
+assets/monsters/045.png,징반짝,정면 · 도감 / 상대 / 필드,128,128,살오징어
+assets/monsters/back/045.png,징반짝,내 동료 · 전투,128,128,살오징어 · 기본 파일은 정면 좌우 반전
+assets/monsters/046.png,별징어,정면 · 도감 / 상대 / 필드,128,128,살오징어
+assets/monsters/back/046.png,별징어,내 동료 · 전투,128,128,살오징어 · 기본 파일은 정면 좌우 반전
+assets/monsters/047.png,복돌이,정면 · 도감 / 상대 / 필드,128,128,전복류
+assets/monsters/back/047.png,복돌이,내 동료 · 전투,128,128,전복류 · 기본 파일은 정면 좌우 반전
+assets/monsters/048.png,복단이,정면 · 도감 / 상대 / 필드,128,128,전복류
+assets/monsters/back/048.png,복단이,내 동료 · 전투,128,128,전복류 · 기본 파일은 정면 좌우 반전
+assets/monsters/049.png,진주복,정면 · 도감 / 상대 / 필드,128,128,전복류
+assets/monsters/back/049.png,진주복,내 동료 · 전투,128,128,전복류 · 기본 파일은 정면 좌우 반전
+assets/monsters/050.png,소라콩,정면 · 도감 / 상대 / 필드,128,128,소라류
+assets/monsters/back/050.png,소라콩,내 동료 · 전투,128,128,소라류 · 기본 파일은 정면 좌우 반전
+assets/monsters/051.png,소라돌,정면 · 도감 / 상대 / 필드,128,128,소라류
+assets/monsters/back/051.png,소라돌,내 동료 · 전투,128,128,소라류 · 기본 파일은 정면 좌우 반전
+assets/monsters/052.png,너울라,정면 · 도감 / 상대 / 필드,128,128,소라류
+assets/monsters/back/052.png,너울라,내 동료 · 전투,128,128,소라류 · 기본 파일은 정면 좌우 반전
+assets/monsters/053.png,게밤이,정면 · 도감 / 상대 / 필드,128,128,성게류
+assets/monsters/back/053.png,게밤이,내 동료 · 전투,128,128,성게류 · 기본 파일은 정면 좌우 반전
+assets/monsters/054.png,가시밤,정면 · 도감 / 상대 / 필드,128,128,성게류
+assets/monsters/back/054.png,가시밤,내 동료 · 전투,128,128,성게류 · 기본 파일은 정면 좌우 반전
+assets/monsters/055.png,별가시,정면 · 도감 / 상대 / 필드,128,128,성게류
+assets/monsters/back/055.png,별가시,내 동료 · 전투,128,128,성게류 · 기본 파일은 정면 좌우 반전
+assets/monsters/056.png,삼꼬미,정면 · 도감 / 상대 / 필드,128,128,해삼류
+assets/monsters/back/056.png,삼꼬미,내 동료 · 전투,128,128,해삼류 · 기본 파일은 정면 좌우 반전
+assets/monsters/057.png,삼돌이,정면 · 도감 / 상대 / 필드,128,128,해삼류
+assets/monsters/back/057.png,삼돌이,내 동료 · 전투,128,128,해삼류 · 기본 파일은 정면 좌우 반전
+assets/monsters/058.png,바다삼,정면 · 도감 / 상대 / 필드,128,128,해삼류
+assets/monsters/back/058.png,바다삼,내 동료 · 전투,128,128,해삼류 · 기본 파일은 정면 좌우 반전
+assets/monsters/059.png,새우콩,정면 · 도감 / 상대 / 필드,128,128,새우류
+assets/monsters/back/059.png,새우콩,내 동료 · 전투,128,128,새우류 · 기본 파일은 정면 좌우 반전
+assets/monsters/060.png,새우빛,정면 · 도감 / 상대 / 필드,128,128,새우류
+assets/monsters/back/060.png,새우빛,내 동료 · 전투,128,128,새우류 · 기본 파일은 정면 좌우 반전
+assets/monsters/061.png,해광새,정면 · 도감 / 상대 / 필드,128,128,새우류
+assets/monsters/back/061.png,해광새,내 동료 · 전투,128,128,새우류 · 기본 파일은 정면 좌우 반전
+assets/monsters/062.png,합꼬미,정면 · 도감 / 상대 / 필드,128,128,홍합류
+assets/monsters/back/062.png,합꼬미,내 동료 · 전투,128,128,홍합류 · 기본 파일은 정면 좌우 반전
+assets/monsters/063.png,합단이,정면 · 도감 / 상대 / 필드,128,128,홍합류
+assets/monsters/back/063.png,합단이,내 동료 · 전투,128,128,홍합류 · 기본 파일은 정면 좌우 반전
+assets/monsters/064.png,먹빛합,정면 · 도감 / 상대 / 필드,128,128,홍합류
+assets/monsters/back/064.png,먹빛합,내 동료 · 전투,128,128,홍합류 · 기본 파일은 정면 좌우 반전
+assets/monsters/065.png,군소콩,정면 · 도감 / 상대 / 필드,128,128,군소류
+assets/monsters/back/065.png,군소콩,내 동료 · 전투,128,128,군소류 · 기본 파일은 정면 좌우 반전
+assets/monsters/066.png,구름소,정면 · 도감 / 상대 / 필드,128,128,군소류
+assets/monsters/back/066.png,구름소,내 동료 · 전투,128,128,군소류 · 기본 파일은 정면 좌우 반전
+assets/monsters/067.png,해국잎,정면 · 도감 / 상대 / 필드,128,128,해국
+assets/monsters/back/067.png,해국잎,내 동료 · 전투,128,128,해국 · 기본 파일은 정면 좌우 반전
+assets/monsters/068.png,해국송,정면 · 도감 / 상대 / 필드,128,128,해국
+assets/monsters/back/068.png,해국송,내 동료 · 전투,128,128,해국 · 기본 파일은 정면 좌우 반전
+assets/monsters/069.png,해국령,정면 · 도감 / 상대 / 필드,128,128,해국
+assets/monsters/back/069.png,해국령,내 동료 · 전투,128,128,해국 · 기본 파일은 정면 좌우 반전
+assets/monsters/070.png,기린잎,정면 · 도감 / 상대 / 필드,128,128,섬기린초
+assets/monsters/back/070.png,기린잎,내 동료 · 전투,128,128,섬기린초 · 기본 파일은 정면 좌우 반전
+assets/monsters/071.png,기린송,정면 · 도감 / 상대 / 필드,128,128,섬기린초
+assets/monsters/back/071.png,기린송,내 동료 · 전투,128,128,섬기린초 · 기본 파일은 정면 좌우 반전
+assets/monsters/072.png,황금린,정면 · 도감 / 상대 / 필드,128,128,섬기린초
+assets/monsters/back/072.png,황금린,내 동료 · 전투,128,128,섬기린초 · 기본 파일은 정면 좌우 반전
+assets/monsters/073.png,호장콩,정면 · 도감 / 상대 / 필드,128,128,왕호장근
+assets/monsters/back/073.png,호장콩,내 동료 · 전투,128,128,왕호장근 · 기본 파일은 정면 좌우 반전
+assets/monsters/074.png,호장잎,정면 · 도감 / 상대 / 필드,128,128,왕호장근
+assets/monsters/back/074.png,호장잎,내 동료 · 전투,128,128,왕호장근 · 기본 파일은 정면 좌우 반전
+assets/monsters/075.png,왕호장,정면 · 도감 / 상대 / 필드,128,128,왕호장근
+assets/monsters/back/075.png,왕호장,내 동료 · 전투,128,128,왕호장근 · 기본 파일은 정면 좌우 반전
+assets/monsters/076.png,채송콩,정면 · 도감 / 상대 / 필드,128,128,땅채송화
+assets/monsters/back/076.png,채송콩,내 동료 · 전투,128,128,땅채송화 · 기본 파일은 정면 좌우 반전
+assets/monsters/077.png,채송별,정면 · 도감 / 상대 / 필드,128,128,땅채송화
+assets/monsters/back/077.png,채송별,내 동료 · 전투,128,128,땅채송화 · 기본 파일은 정면 좌우 반전
+assets/monsters/078.png,채송화령,정면 · 도감 / 상대 / 필드,128,128,땅채송화
+assets/monsters/back/078.png,채송화령,내 동료 · 전투,128,128,땅채송화 · 기본 파일은 정면 좌우 반전
+assets/monsters/079.png,장대콩,정면 · 도감 / 상대 / 필드,128,128,섬장대
+assets/monsters/back/079.png,장대콩,내 동료 · 전투,128,128,섬장대 · 기본 파일은 정면 좌우 반전
+assets/monsters/080.png,장대잎,정면 · 도감 / 상대 / 필드,128,128,섬장대
+assets/monsters/back/080.png,장대잎,내 동료 · 전투,128,128,섬장대 · 기본 파일은 정면 좌우 반전
+assets/monsters/081.png,섬장군,정면 · 도감 / 상대 / 필드,128,128,섬장대
+assets/monsters/back/081.png,섬장군,내 동료 · 전투,128,128,섬장대 · 기본 파일은 정면 좌우 반전
+assets/monsters/082.png,번행콩,정면 · 도감 / 상대 / 필드,128,128,번행초
+assets/monsters/back/082.png,번행콩,내 동료 · 전투,128,128,번행초 · 기본 파일은 정면 좌우 반전
+assets/monsters/083.png,번행잎,정면 · 도감 / 상대 / 필드,128,128,번행초
+assets/monsters/back/083.png,번행잎,내 동료 · 전투,128,128,번행초 · 기본 파일은 정면 좌우 반전
+assets/monsters/084.png,해풍초,정면 · 도감 / 상대 / 필드,128,128,번행초
+assets/monsters/back/084.png,해풍초,내 동료 · 전투,128,128,번행초 · 기본 파일은 정면 좌우 반전
+assets/monsters/085.png,미역콩,정면 · 도감 / 상대 / 필드,128,128,미역
+assets/monsters/back/085.png,미역콩,내 동료 · 전투,128,128,미역 · 기본 파일은 정면 좌우 반전
+assets/monsters/086.png,미역랑,정면 · 도감 / 상대 / 필드,128,128,미역
+assets/monsters/back/086.png,미역랑,내 동료 · 전투,128,128,미역 · 기본 파일은 정면 좌우 반전
+assets/monsters/087.png,미역숲,정면 · 도감 / 상대 / 필드,128,128,미역
+assets/monsters/back/087.png,미역숲,내 동료 · 전투,128,128,미역 · 기본 파일은 정면 좌우 반전
+assets/monsters/088.png,다시콩,정면 · 도감 / 상대 / 필드,128,128,다시마
+assets/monsters/back/088.png,다시콩,내 동료 · 전투,128,128,다시마 · 기본 파일은 정면 좌우 반전
+assets/monsters/089.png,다시랑,정면 · 도감 / 상대 / 필드,128,128,다시마
+assets/monsters/back/089.png,다시랑,내 동료 · 전투,128,128,다시마 · 기본 파일은 정면 좌우 반전
+assets/monsters/090.png,해초장,정면 · 도감 / 상대 / 필드,128,128,다시마
+assets/monsters/back/090.png,해초장,내 동료 · 전투,128,128,다시마 · 기본 파일은 정면 좌우 반전
+assets/monsters/091.png,모자콩,정면 · 도감 / 상대 / 필드,128,128,모자반류
+assets/monsters/back/091.png,모자콩,내 동료 · 전투,128,128,모자반류 · 기본 파일은 정면 좌우 반전
+assets/monsters/092.png,모자숲,정면 · 도감 / 상대 / 필드,128,128,모자반류
+assets/monsters/back/092.png,모자숲,내 동료 · 전투,128,128,모자반류 · 기본 파일은 정면 좌우 반전
+assets/monsters/093.png,잠콩이,정면 · 도감 / 상대 / 필드,128,128,된장잠자리
+assets/monsters/back/093.png,잠콩이,내 동료 · 전투,128,128,된장잠자리 · 기본 파일은 정면 좌우 반전
+assets/monsters/094.png,잠바람,정면 · 도감 / 상대 / 필드,128,128,된장잠자리
+assets/monsters/back/094.png,잠바람,내 동료 · 전투,128,128,된장잠자리 · 기본 파일은 정면 좌우 반전
+assets/monsters/095.png,노을잠,정면 · 도감 / 상대 / 필드,128,128,된장잠자리
+assets/monsters/back/095.png,노을잠,내 동료 · 전투,128,128,된장잠자리 · 기본 파일은 정면 좌우 반전
+assets/monsters/096.png,노린콩,정면 · 도감 / 상대 / 필드,128,128,독도장님노린재
+assets/monsters/back/096.png,노린콩,내 동료 · 전투,128,128,독도장님노린재 · 기본 파일은 정면 좌우 반전
+assets/monsters/097.png,섬노린,정면 · 도감 / 상대 / 필드,128,128,독도장님노린재
+assets/monsters/back/097.png,섬노린,내 동료 · 전투,128,128,독도장님노린재 · 기본 파일은 정면 좌우 반전
+assets/monsters/098.png,칠성콩,정면 · 도감 / 상대 / 필드,128,128,칠성무당벌레
+assets/monsters/back/098.png,칠성콩,내 동료 · 전투,128,128,칠성무당벌레 · 기본 파일은 정면 좌우 반전
+assets/monsters/099.png,칠성빛,정면 · 도감 / 상대 / 필드,128,128,칠성무당벌레
+assets/monsters/back/099.png,칠성빛,내 동료 · 전투,128,128,칠성무당벌레 · 기본 파일은 정면 좌우 반전
+assets/monsters/100.png,해랑,정면 · 도감 / 상대 / 필드,128,128,강치
+assets/monsters/back/100.png,해랑,내 동료 · 전투,128,128,강치 · 기본 파일은 정면 좌우 반전
+assets/player/down-0.png,주인공,down · 걷기 0,64,64,투명 정사각형. 발은 아래쪽에 맞춰요.
+assets/player/down-1.png,주인공,down · 걷기 1,64,64,투명 정사각형. 발은 아래쪽에 맞춰요.
+assets/player/up-0.png,주인공,up · 걷기 0,64,64,투명 정사각형. 발은 아래쪽에 맞춰요.
+assets/player/up-1.png,주인공,up · 걷기 1,64,64,투명 정사각형. 발은 아래쪽에 맞춰요.
+assets/player/left-0.png,주인공,left · 걷기 0,64,64,투명 정사각형. 발은 아래쪽에 맞춰요.
+assets/player/left-1.png,주인공,left · 걷기 1,64,64,투명 정사각형. 발은 아래쪽에 맞춰요.
+assets/player/right-0.png,주인공,right · 걷기 0,64,64,투명 정사각형. 발은 아래쪽에 맞춰요.
+assets/player/right-1.png,주인공,right · 걷기 1,64,64,투명 정사각형. 발은 아래쪽에 맞춰요.
+assets/npc/01/01.png,한여울 박사,1지역 NPC,64,64,normal
+assets/npc/01/02.png,나루,1지역 NPC,64,64,normal
+assets/npc/01/04.png,백무단 수집원,1지역 NPC,64,64,enemy
+assets/npc/01/05.png,관장 해온,1지역 NPC,64,64,normal
+assets/npc/01/06.png,쉼터지기,1지역 NPC,64,64,normal
+assets/npc/01/07.png,모래 선장,1지역 NPC,64,64,normal
+assets/npc/01/08.png,연구 안내원,1지역 NPC,64,64,normal
+assets/npc/02/01.png,이사부의 기억,2지역 NPC,64,64,history
+assets/npc/02/02.png,나루,2지역 NPC,64,64,normal
+assets/npc/02/04.png,백무단 지도 수집원,2지역 NPC,64,64,enemy
+assets/npc/02/05.png,관장 소라,2지역 NPC,64,64,normal
+assets/npc/02/06.png,쉼터지기,2지역 NPC,64,64,normal
+assets/npc/02/07.png,모래 선장,2지역 NPC,64,64,normal
+assets/npc/02/08.png,연구 안내원,2지역 NPC,64,64,normal
+assets/npc/03/01.png,이규원의 기억,3지역 NPC,64,64,history
+assets/npc/03/02.png,나루,3지역 NPC,64,64,normal
+assets/npc/03/04.png,백무단 조사원,3지역 NPC,64,64,enemy
+assets/npc/03/05.png,관장 단우,3지역 NPC,64,64,normal
+assets/npc/03/06.png,쉼터지기,3지역 NPC,64,64,normal
+assets/npc/03/07.png,모래 선장,3지역 NPC,64,64,normal
+assets/npc/03/08.png,연구 안내원,3지역 NPC,64,64,normal
+assets/npc/04/01.png,안용복의 기억,4지역 NPC,64,64,history
+assets/npc/04/02.png,나루,4지역 NPC,64,64,normal
+assets/npc/04/04.png,간부 먹선,4지역 NPC,64,64,enemy
+assets/npc/04/05.png,관장 윤서,4지역 NPC,64,64,normal
+assets/npc/04/06.png,쉼터지기,4지역 NPC,64,64,normal
+assets/npc/04/07.png,모래 선장,4지역 NPC,64,64,normal
+assets/npc/04/08.png,연구 안내원,4지역 NPC,64,64,normal
+assets/npc/04/09.png,박어둔의 기억,4지역 NPC,64,64,history
+assets/npc/05/01.png,서하,5지역 NPC,64,64,history
+assets/npc/05/02.png,나루,5지역 NPC,64,64,normal
+assets/npc/05/04.png,간부 쇄도,5지역 NPC,64,64,enemy
+assets/npc/05/05.png,관장 초림,5지역 NPC,64,64,normal
+assets/npc/05/06.png,쉼터지기,5지역 NPC,64,64,normal
+assets/npc/05/07.png,모래 선장,5지역 NPC,64,64,normal
+assets/npc/05/08.png,연구 안내원,5지역 NPC,64,64,normal
+assets/npc/06/01.png,심흥택의 기억,6지역 NPC,64,64,history
+assets/npc/06/02.png,나루,6지역 NPC,64,64,normal
+assets/npc/06/04.png,백무단 기록 관리자,6지역 NPC,64,64,enemy
+assets/npc/06/05.png,관장 시온,6지역 NPC,64,64,normal
+assets/npc/06/06.png,쉼터지기,6지역 NPC,64,64,normal
+assets/npc/06/07.png,모래 선장,6지역 NPC,64,64,normal
+assets/npc/06/08.png,연구 안내원,6지역 NPC,64,64,normal
+assets/npc/06/09.png,고종의 기억,6지역 NPC,64,64,history
+assets/npc/06/10.png,이명래의 기억,6지역 NPC,64,64,history
+assets/npc/07/01.png,홍순칠의 기억,7지역 NPC,64,64,history
+assets/npc/07/02.png,나루,7지역 NPC,64,64,normal
+assets/npc/07/04.png,간부 무음,7지역 NPC,64,64,enemy
+assets/npc/07/05.png,관장 도하,7지역 NPC,64,64,normal
+assets/npc/07/06.png,쉼터지기,7지역 NPC,64,64,normal
+assets/npc/07/07.png,모래 선장,7지역 NPC,64,64,normal
+assets/npc/07/08.png,연구 안내원,7지역 NPC,64,64,normal
+assets/npc/07/09.png,최종덕의 기억,7지역 NPC,64,64,history
+assets/npc/08/01.png,서하와 나루,8지역 NPC,64,64,history
+assets/npc/08/02.png,나루,8지역 NPC,64,64,normal
+assets/npc/08/04.png,대표 백무,8지역 NPC,64,64,enemy
+assets/npc/08/05.png,관장 가온,8지역 NPC,64,64,normal
+assets/npc/08/06.png,쉼터지기,8지역 NPC,64,64,normal
+assets/npc/08/07.png,모래 선장,8지역 NPC,64,64,normal
+assets/npc/08/08.png,연구 안내원,8지역 NPC,64,64,normal
+assets/scenery/lab.png,연구소,마을 건물,224,192,출입 위치와 충돌 범위는 기존 지도 유지
+assets/scenery/gym.png,수호관,마을 건물,256,224,출입 위치와 충돌 범위는 기존 지도 유지
+assets/scenery/shop.png,쉼터 · 상점,마을 건물,224,192,출입 위치와 충돌 범위는 기존 지도 유지
+assets/scenery/home.png,집,마을 건물,160,192,출입 위치와 충돌 범위는 기존 지도 유지
+assets/scenery/tree.png,나무,지도 장식,48,64,투명 배경
+assets/characters/girl-sheet.png,여학생 도트 시트,주인공 4×4 시트,1024,1024,첨부 원본. 한 칸은 게임에서 32×32로 표시
+assets/characters/boy-sheet.png,남학생 도트 시트,주인공 4×4 시트,1024,1024,첨부 원본. 왼쪽은 오른쪽 행의 좌우 반전
+assets/characters/girl-portrait.png,여학생 전신,캐릭터 선택창,1024,1024,첨부 원본
+assets/characters/boy-portrait.png,남학생 전신,캐릭터 선택창,512,512,첨부 원본
