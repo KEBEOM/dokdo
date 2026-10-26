@@ -1,6 +1,6 @@
 {
   "name": "dokdomon",
-  "version": "0.30.0",
+  "version": "0.31.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,9 @@
     "test:story": "node tests/story.test.mjs",
     "test:assets": "node tests/assets.test.mjs",
     "test:characters": "node tests/characters.test.mjs",
-    "test:npcs": "node tests/npc-motion.test.mjs"
+    "test:npcs": "node tests/npc-motion.test.mjs",
+    "build:offline": "node scripts/build-offline.mjs",
+    "test:offline": "node scripts/build-offline.mjs && node tests/flow.test.mjs --offline"
   },
   "devDependencies": {
     "playwright": "1.63.0"

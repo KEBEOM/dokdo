@@ -1,7 +1,7 @@
 // Dragon Quest–style battle screen: status window, framed backdrop, command window and a typed message window.
 // The game logic (game.js) drives it with await ui.say(...), await ui.menu(...), await ui.quiz(...).
 import { createTypewriter } from './typewriter.js';
-import { portrait } from './sprites.js';
+import { portrait, battlePortrait } from './sprites.js';
 import { assetImage, drawAsset } from './assets.js';
 import { TERRAIN_ATLAS } from './terrain-atlas.js';
 import { SCENERY_ATLAS } from './scenery-atlas.js';
@@ -77,7 +77,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
       <div class="dq-hp">HP <b>${m.hp}</b> / ${m.maxHp}</div>${bar(m.hp, m.maxHp)}</div></div>
       <div class="dq-party" aria-label="동료 상태">${party.map(p => `<i class="${p.hp <= 0 ? 'down' : p.active ? 'on' : ''}" title="${esc(p.name)}"></i>`).join('')}</div>`;
     portrait(els.status.querySelector('.dq-ally'), m.id);
-    portrait(els.ally, m.id, 0, true); // my 독도몬 is seen from behind
+    battlePortrait(els.ally, m.id, true); // my 독도몬 is seen from behind, looking right
     els.allyWrap.classList.toggle('tired', m.hp <= 0);
   }
   function setFoe(e, info, extra = '') {
@@ -85,7 +85,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
     const r = Math.max(0, e.hp / e.maxHp);
     const gauge = info.dark ? `<div class="dq-gauge-label">${esc(info.gauge)} ${Math.ceil(r * 100)}%</div><div class="dq-bar dark"><i style="width:${r * 100}%"></i></div>` : `<div class="dq-gauge-label">${esc(info.gauge || '기운')}</div>${bar(e.hp, e.maxHp)}`;
     els.foe.innerHTML = `<strong>${info.dark && e.hp > 0 ? '<span class="dq-berserk">사나워짐</span> ' : ''}${esc(info.name)}</strong><span class="dq-lv">Lv ${e.level} · ${esc(info.type)}</span>${gauge}${extra ? `<small>${esc(extra)}</small>` : ''}`;
-    portrait(els.enemy, e.id); paintTrainer(); paintPortrait();
+    battlePortrait(els.enemy, e.id); paintTrainer(); paintPortrait(); // the foe looks left
   }
   function paintPortrait() {
     const c = els.portrait?.querySelector('canvas'); if (!c || !portraitKey) return;

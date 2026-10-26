@@ -17,7 +17,7 @@ test('100 collectible species and real-name roster',()=>{
 test('36 sourced learning questions across 12 concepts',()=>{
   assert.equal(CONCEPTS.length,12);assert.equal(QUESTIONS.length,36);assert.equal(new Set(QUESTIONS.map(q=>q.id)).size,36);
   for(const c of CONCEPTS)assert.equal(QUESTIONS.filter(q=>q.concept===c.id).length,3);
-  for(const q of QUESTIONS){assert.equal(q.options.length,3);assert.ok(q.answer>=0&&q.answer<3);assert.ok(CONCEPTS.some(c=>c.id===q.concept));assert.match(q.source,/^https:/);assert.ok(q.zone>=0&&q.zone<8);}
+  for(const q of QUESTIONS){assert.equal(q.options.length,4,'four choices: one answer and three tempting wrong answers');assert.ok(q.answer>=0&&q.answer<4);assert.equal(new Set(q.options).size,4);assert.ok(CONCEPTS.some(c=>c.id===q.concept));assert.match(q.source,/^https:/);assert.ok(q.zone>=0&&q.zone<8);}
 });
 test('every map: people on land, arrivals free, everyone and every exit reachable',()=>{
   const sides=[[1,0],[-1,0],[0,1],[0,-1]];
@@ -77,7 +77,7 @@ test('combat question selection spaces repeats and revisits missed concepts',()=
   recordAnswer(s,QUESTIONS.find(q=>q.concept==='N3'),true);
   const next=selectBattleQuestion(s,()=>.5);assert.equal(next.concept,'H3');assert.ok(next.zone<=s.zone);
   recordAnswer(s,next,true);assert.notEqual(selectBattleQuestion(s,()=>.5).id,next.id);
-  const order=shuffledChoices(next,()=>.5);assert.deepEqual([...order].sort(),[0,1,2]);
+  const order=shuffledChoices(next,()=>.5);assert.deepEqual([...order].sort(),[0,1,2,3]);
   assert.equal(s.answerLog[0].mode,'battle');assert.equal(s.answerLog[0].phase,'attack');
 });
 

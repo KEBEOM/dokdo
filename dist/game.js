@@ -1,4 +1,4 @@
-// 독도 탐험대 v0.30 — screens, movement between maps, story cutscenes and Dragon Quest–style quiz battles.
+// 독도 탐험대 v0.31 — screens, movement between maps, story cutscenes and Dragon Quest–style quiz battles.
 import { MONSTERS, ZONES, TYPES, STARTERS, getSpecies, isUnique } from './data.js';
 import { CONCEPTS, QUESTIONS, SOURCES } from './learning.js';
 import { newState, validateSave, createMonster, damage, enemyHit, healAll, gainXP, captureChance, addMonster, recordAnswer, knownSkills, learnedBetween } from './engine.js';
@@ -16,7 +16,7 @@ import { OPENING, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.30';
+const VERSION = '0.31';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));

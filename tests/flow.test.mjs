@@ -6,7 +6,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { QUESTIONS } from '../dist/learning.js';
 
 const require = createRequire(import.meta.url);
@@ -18,7 +18,9 @@ const server = http.createServer((req, res) => {
   if (!file.startsWith(root) || !fs.existsSync(file)) { res.writeHead(404); res.end(); return; }
   res.writeHead(200, { 'content-type': types[path.extname(file)] || 'application/octet-stream' }); fs.createReadStream(file).pipe(res);
 }).listen(0);
-const url = `http://127.0.0.1:${server.address().port}/dist/?test`;
+// --offline: play the one-file build (dokdo-explorers-offline.html) opened straight from disk, like a double-click
+const offline = process.argv.includes('--offline');
+const url = offline ? `${pathToFileURL(path.join(root, 'dokdo-explorers-offline.html')).href}?test` : `http://127.0.0.1:${server.address().port}/dist/?test`;
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 const errors = []; page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
@@ -32,13 +34,13 @@ async function answerStudy(makeMistake = false) {
   let first = true;
   for (let i = 0; i < 12 && await page.$('[data-answer]'); i++) {
     const a = answerOf(await page.textContent('.question-title'));
-    if (first && makeMistake) { await page.click(`[data-answer="${(a + 1) % 3}"]`); assert.match(await page.textContent('#nextQuestion'), /다시/); await page.click('#nextQuestion'); }
+    if (first && makeMistake) { await page.click(`[data-answer="${(a + 1) % 4}"]`); assert.match(await page.textContent('#nextQuestion'), /다시/); await page.click('#nextQuestion'); }
     await page.click(`[data-answer="${answerOf(await page.textContent('.question-title'))}"]`); await page.click('#nextQuestion'); first = false;
   }
 }
 async function battleState() { return G(() => { const b = window.__dokdo.battle; if (!b) return 'none'; if (document.querySelector('#dqCommand:not([hidden]) .dq-option')) return 'cmd'; if (document.querySelector('.dq-answer:not(.locked)')) return 'quiz'; return 'msg'; }); }
 async function toMenu() { for (let i = 0; i < 40; i++) { const s = await battleState(); if (s === 'cmd' || s === 'quiz' || s === 'none') return s; await page.click('#dqMessage'); } throw new Error('no menu'); }
-async function answer(correct) { const a = await G(() => window.__dokdo.battle.quiz.q.answer); await page.click(`[data-battle-answer="${correct ? a : (a + 1) % 3}"]`); await until(() => !!document.querySelector('.dq-result')); }
+async function answer(correct) { const a = await G(() => window.__dokdo.battle.quiz.q.answer); await page.click(`[data-battle-answer="${correct ? a : (a + 1) % 4}"]`); await until(() => !!document.querySelector('.dq-result')); }
 // 정화하기 → the first attack skill that still has uses (or '있는 힘껏').
 async function purifyAttack() {
   await page.click('[data-cmd="purify"]');
