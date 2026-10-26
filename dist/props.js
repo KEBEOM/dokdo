@@ -1,0 +1,217 @@
+// Small map props drawn as pixel bitmaps (2 world-pixels per dot, matching the village atlas).
+// Edit a bitmap below to change a prop. '.' is transparent.
+import { assetImage } from './assets.js';
+import { SCENERY_ATLAS } from './scenery-atlas.js';
+
+const PALETTE = {
+  o: '#232634', O: '#3a3f52',
+  w: '#8f5d35', W: '#c07f45', d: '#6a4126', y: '#e0a965',
+  p: '#f1e4c2', P: '#d6c49a', t: '#7a6448',
+  T: '#3f8189', g: '#e2b84f', G: '#a37a26', k: '#2a1c18',
+  s: '#77727e', S: '#a29daa', l: '#cdc9d2', m: '#7f9a4a', M: '#a7bd61',
+  c: '#7fe3ea', C: '#c8fbff',
+  b: '#9fd0e6', B: '#5e9fbe', L: '#e7ebe9', r: '#c75b4a', R: '#e9a08f',
+  n: '#3f5f73', N: '#6f97ad', f: '#e9f3ee'
+};
+
+const SPRITES = {
+  sign: [
+    '..oooooooooo..',
+    '.oWWWWWWWWWWo.',
+    '.oWppppppppWo.',
+    '.oWpttttttpWo.',
+    '.oWppppppppWo.',
+    '.oWptttttPpWo.',
+    '.oWppppppppWo.',
+    '.owwwwwwwwwwo.',
+    '..ooooowwooo..',
+    '.....owwdo....',
+    '.....owwdo....',
+    '.....owwdo....',
+    '.....owwdo....',
+    '....oowwdoo...'
+  ],
+  box: [
+    '..oooooooooo..',
+    '.oyWWWWWWWWyo.',
+    '.oWwwwwwwwwWo.',
+    'ooTTTTggTTTToo',
+    'owTTTogGoTTTwo',
+    'owwwwwggwwwwwo',
+    'owwwwwwwwwwwwo',
+    'odddddddddddddo'.slice(0, 14),
+    '.oooooooooooo.'
+  ],
+  boxOpen: [
+    '.oyWWWWWWWWyo.',
+    '.oWwwwwwwwwWo.',
+    '.oTTTTTTTTTTo.',
+    '..oooooooooo..',
+    'oookkkkkkkkooo',
+    'owTkkkkkkkkTwo',
+    'owwwwwwwwwwwwo',
+    'owwwwwwwwwwwwo',
+    'oddddddddddddo',
+    '.oooooooooooo.'
+  ],
+  trash: [
+    '.......oo.....',
+    '......obbo....',
+    '...oo.oBBo.oo.',
+    '..oLLoobbooRRo',
+    '.oLLLLobbborro',
+    'oLLPLLobbborRo',
+    'oLLLLLobbborro',
+    '.oLLLooBBoorro',
+    '..ooo..oo..oo.'
+  ],
+  observe: [
+    '.oooo..oooo...',
+    'oNNNNooNNNNo..',
+    'onnnnNNnnnno..',
+    'onfnnoonfnno..',
+    'onnnnoonnnno..',
+    '.oooo..oooo...',
+    '.....oo.......',
+    '....owdo......',
+    '....owdo......',
+    '....owdo......',
+    '...owwddo.....',
+    '..ow.oo.do....',
+    '.ow..oo..do...',
+    'oo...oo...oo..'
+  ],
+  stone: [
+    '...oooooo...',
+    '..oSSSSSSo..',
+    '.oSllllllSo.',
+    '.oSlccccsSo.',
+    '.oSllcclsSo.',
+    '.oSsccccssSo'.slice(0, 12),
+    '.oSlllcclSo.',
+    '.oSlccccsSo.',
+    '.oSlllllsSo.',
+    '.oSsssssssSo'.slice(0, 12),
+    'ooSSSSSSSSoo',
+    'osssmmmssssO'.slice(0, 12),
+    'oooooooooooo'
+  ],
+  rock: [
+    '....oooo......',
+    '..ooSlllo.....',
+    '.oSSllllSoooo.',
+    '.oSlllSSSlllSo',
+    'oSSSSSssSSllSo',
+    'oSssSSsssSSSso',
+    'osmmsssssssmso',
+    '.ossssmmssssso',
+    '..oooooooooooo'
+  ],
+  pillar: [
+    '....oooo....',
+    '...oSlMMo...',
+    '...oSllSo...',
+    '..oSSlSSso..',
+    '..oSllSsso..',
+    '..oSSlSsso..',
+    '..oSllssso..',
+    '..oSSlSsso..',
+    '..oSlSSsso..',
+    '..oSSlSsso..',
+    '.ooSllssssoo',
+    '.oSSSlSsssSo',
+    'oSSlllSssssO'.slice(0, 12),
+    'osssmmsssmso',
+    'oooooooooooo'
+  ],
+  arch: [
+    '.......oooooo...........',
+    '.....ooSlMMMSoo.........',
+    '....oSSlllllSSSoooo.....',
+    '...oSSllllSSSSSSlMMoo...',
+    '..oSSllSSSSssSSSllllSo..',
+    '..oSllSSSoooooossSSlSSo.',
+    '.oSSlSSoo......oosSSlSo.',
+    '.oSllSo..........osSSSo.',
+    '.oSlSSo...........osSSo.',
+    'oSSlSo.............osSo.',
+    'oSlSSo.............osso.',
+    'oSSSso.............osso.',
+    'oSlSso..............oso.',
+    'oSSsso..............oso.',
+    'osmsmo..............omo.',
+    'oooooo..............ooo.'
+  ]
+};
+// Pad rows so every bitmap is rectangular.
+for (const rows of Object.values(SPRITES)) { const w = Math.max(...rows.map(r => r.length)); rows.forEach((r, i) => { rows[i] = r.padEnd(w, '.'); }); }
+
+const cache = new Map();
+function bitmap(name, dot = 2) {
+  const key = name + dot;
+  if (cache.has(key)) return cache.get(key);
+  const rows = SPRITES[name];
+  let canvas = null;
+  if (typeof document !== 'undefined') {
+    canvas = document.createElement('canvas'); canvas.width = rows[0].length * dot; canvas.height = rows.length * dot;
+    const c = canvas.getContext('2d');
+    rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ch !== '.' && PALETTE[ch]) { c.fillStyle = PALETTE[ch]; c.fillRect(x * dot, y * dot, dot, dot); } }));
+  }
+  const out = { canvas, w: rows[0].length * dot, h: rows.length * dot };
+  cache.set(key, out); return out;
+}
+export function spriteSize(name, dot = 2) { const rows = SPRITES[name]; return { w: rows[0].length * dot, h: rows.length * dot }; }
+
+function blit(ctx, name, cx, bottom, dot = 2) {
+  const b = bitmap(name, dot);
+  if (b.canvas) ctx.drawImage(b.canvas, Math.round(cx - b.w / 2), Math.round(bottom - b.h));
+  else ctx.fillRect(Math.round(cx - b.w / 2), Math.round(bottom - b.h), b.w, b.h); // node tests
+}
+function shadow(ctx, cx, bottom, w) { ctx.fillStyle = '#1d3a3a33'; ctx.fillRect(Math.round(cx - w / 2), Math.round(bottom - 3), Math.round(w), 4); }
+
+// Crops of the two-islands artwork, used for real-place landmarks.
+const PEAKS = { peaks: [110, 185, 1130, 575], peak: [110, 185, 590, 575] };
+function drawPeaks(ctx, kind, cx, bottom, width) {
+  const sheet = assetImage(SCENERY_ATLAS.monument.key), [sx, sy, sw, sh] = PEAKS[kind];
+  const h = Math.round(width * sh / sw);
+  if (!sheet) { blit(ctx, 'rock', cx, bottom, 4); return; }
+  ctx.save(); ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(sheet, sx, sy, sw, sh, Math.round(cx - width / 2), Math.round(bottom - h), width, h); ctx.restore();
+}
+
+// Draw a prop whose tile is (tx,ty). `state` carries open/used flags and time for glow.
+export function drawProp(ctx, kind, tx, ty, opts = {}) {
+  const cx = tx * 32 + 16, bottom = ty * 32 + 30, t = opts.time || 0;
+  ctx.save(); ctx.imageSmoothingEnabled = false;
+  switch (kind) {
+    case 'sign': shadow(ctx, cx, bottom, 20); blit(ctx, 'sign', cx, bottom); break;
+    case 'box': shadow(ctx, cx, bottom, 26); blit(ctx, opts.open ? 'boxOpen' : 'box', cx, bottom); break;
+    case 'trash': blit(ctx, 'trash', cx, bottom); break;
+    case 'observe': shadow(ctx, cx, bottom, 22); blit(ctx, 'observe', cx + 4, bottom); break;
+    case 'stone': {
+      shadow(ctx, cx, bottom, 22); blit(ctx, 'stone', cx, bottom);
+      if (!opts.open) { ctx.globalAlpha = .25 + .2 * Math.sin(t / 300); ctx.fillStyle = '#9ff6ff'; ctx.fillRect(cx - 7, bottom - 22, 14, 12); }
+      break;
+    }
+    case 'rock': {
+      if (opts.water) { ctx.fillStyle = '#d5e0bb'; ctx.fillRect(cx - 15, bottom - 4, 30, 2); ctx.fillRect(cx - 12, bottom - 1, 24, 2); }
+      blit(ctx, 'rock', cx + ((tx * 7 + ty * 3) % 5) - 2, bottom - 2); break;
+    }
+    case 'crag': {
+      // A peak rising from a large rock outcrop (x,y = bottom-left tile of the cluster).
+      const w = Math.min(opts.w, 7) * 32, left = tx * 32 + (opts.w * 32 - w) / 2, base = (ty - Math.floor(opts.h / 2) + 1) * 32 + 8;
+      drawPeaks(ctx, 'peaks', left + w / 2, base, w); break;
+    }
+    case 'landmark': {
+      const art = opts.art || 'peak';
+      if (opts.water) { ctx.fillStyle = '#d5e0bb'; ctx.fillRect(cx - 26, bottom - 3, 52, 2); }
+      if (art === 'peaks') drawPeaks(ctx, 'peaks', cx, bottom + 2, 104);
+      else if (art === 'peak') drawPeaks(ctx, 'peak', cx, bottom + 2, 58);
+      else if (art === 'pillar') { shadow(ctx, cx, bottom, 22); blit(ctx, 'pillar', cx, bottom, 3); }
+      else if (art === 'arch') { shadow(ctx, cx, bottom, 60); blit(ctx, 'arch', cx, bottom, 3); }
+      else { shadow(ctx, cx, bottom, 34); blit(ctx, 'rock', cx, bottom, 3); }
+      break;
+    }
+  }
+  ctx.restore();
+}

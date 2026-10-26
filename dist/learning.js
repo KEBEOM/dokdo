@@ -1,0 +1,61 @@
+// Elementary learning content. NPC dialogue and memory-realm scenes are fictional reconstructions.
+export const SOURCES = [
+  {title:'외교부 독도 — 자주 묻는 질문',url:'https://dokdo.mofa.go.kr/kor/dokdo/faq.jsp'},
+  {title:'국사편찬위원회 우리역사넷 — 이사부: 우산국과 가야를 정벌한 신라의 장군',url:'https://contents.history.go.kr/mobile/kc/view.do?levelId=kc_n101600'},
+  {title:'한국해양과학기술원 독도전문연구센터',url:'https://www.dokdo.re.kr/'},
+  {title:'해양수산부 — 독도 옛 주인 ‘독도 강치’ 멸종 원인 과학적으로 입증',url:'https://www.mof.go.kr/doc/ko/selectDoc.do?bbsSeq=10&docSeq=45126&menuSeq=971'},
+  {title:'외교부 독도 — 구성 및 위치',url:'https://dokdo.mofa.go.kr/kor/introduce/location.jsp'}
+];
+const FAQ = SOURCES[0].url, HIST = SOURCES[1].url, ECO = SOURCES[2].url, GANGCHI = SOURCES[3].url, GEO = SOURCES[4].url;
+export const CONCEPTS = [
+ {id:'G1',title:'울릉도와 독도의 위치',standard:'사회 [6사01-02]'},
+ {id:'G2',title:'동도와 서도',standard:'사회 [6사01-02]'},
+ {id:'N3',title:'생물과 서식 환경',standard:'사회 [6사01-02] 연계'},
+ {id:'N4',title:'관찰과 추측 구별',standard:'국어 [6국06-02] 연계'},
+ {id:'E3',title:'강치와 남획',standard:'사회 [6사01-02] 연계'},
+ {id:'E4',title:'독도의 자연 보호',standard:'사회 [6사01-02] 연계'},
+ {id:'H1',title:'시대와 인물 구별',standard:'사회 [6사01-02]'},
+ {id:'H3',title:'안용복의 활동',standard:'사회 [6사01-02]'},
+ {id:'H4',title:'칙령과 보고서',standard:'사회 [6사01-02]'},
+ {id:'S3',title:'출처와 맥락 확인',standard:'국어 [6국06-02]'},
+ {id:'S4',title:'주장과 근거 연결',standard:'국어 [6국06-02] 연계'},
+ {id:'V1',title:'독도의 중요성 설명',standard:'사회 [6사01-02]'}
+];
+export const QUESTIONS = [
+ {id:'G1-1',concept:'G1',zone:0,prompt:'지도에서 독도는 울릉도의 어느 쪽에 있을까?',options:['동남쪽','서쪽','북서쪽'],answer:0,explanation:'독도는 울릉도 동남쪽에 있어. 지도에서는 방위표도 함께 살펴봐.',source:GEO},
+ {id:'G1-2',concept:'G1',zone:1,prompt:'북쪽이 위인 지도에서 울릉도 오른쪽 아래에 표시할 섬은?',options:['제주도','독도','백령도'],answer:1,explanation:'북쪽이 위라면 오른쪽 아래는 동남쪽이야. 독도는 울릉도 동남쪽에 있어.',source:GEO},
+ {id:'G1-3',concept:'G1',zone:6,prompt:'친구에게 독도의 위치를 설명하려면?',options:['우리 동네 바로 앞이야.','울릉도 서쪽에 있어.','울릉도 동남쪽에 있어.'],answer:2,explanation:'기준이 되는 울릉도와 방향을 함께 말하면 위치가 분명해져.',source:GEO},
+ {id:'G2-1',concept:'G2',zone:0,prompt:'독도의 주요 두 섬 이름은?',options:['동도와 서도','남도와 북도','울릉도와 제주도'],answer:0,explanation:'독도는 동도와 서도, 그리고 주변의 작은 바위섬들로 이루어져 있어.',source:GEO},
+ {id:'G2-2',concept:'G2',zone:2,prompt:'독도를 가장 알맞게 소개한 말은?',options:['큰 섬 하나뿐이야.','동도·서도와 주변 바위섬이 있어.','울릉도와 같은 섬이야.'],answer:1,explanation:'동도와 서도가 주요 두 섬이며, 주변에 작은 바위섬들도 있어.',source:GEO},
+ {id:'G2-3',concept:'G2',zone:7,prompt:'게임 속 지역 이름은 실제 독도 지명이야. 지도 모양과 마을도 실제와 같을까?',options:['이름이 같으니 모두 실제야.','역사 기록에 나오는 마을이야.','이름만 빌린 창작 지도야.'],answer:2,explanation:'지명은 실제지만 게임 속 마을과 지도 모양은 창작이야. 실제 지형은 공식 지도와 사진으로 확인해.',source:GEO},
+ {id:'N3-1',concept:'N3',zone:1,prompt:'독도의 생물을 조사할 때 함께 적을 것은?',options:['친구가 좋아하는 색','발견한 장소와 주변 환경','게임 속 공격력'],answer:1,explanation:'생물의 이름뿐 아니라 어디에서 어떤 환경에 살았는지도 기록해.',source:ECO},
+ {id:'N3-2',concept:'N3',zone:4,prompt:'바닷가 생물의 집을 지키려면 무엇을 살펴야 할까?',options:['그 생물이 사는 바다와 바위 환경','게임 속 레벨만','캐릭터의 별명만'],answer:0,explanation:'생물은 주변 환경과 관계를 맺으며 살아. 서식 환경도 함께 지켜야 해.',source:ECO},
+ {id:'N3-3',concept:'N3',zone:6,prompt:'새를 한 번 보았어. 조사 수첩에는 어떻게 적을까?',options:['이 새는 언제나 여기 산다.','이 새는 다른 곳에 가지 않는다.','오늘 이 장소에서 새를 보았다.'],answer:2,explanation:'한 번 본 사실만으로 늘 산다고 할 수 없어. 관찰한 때와 장소를 적어.',source:ECO},
+ {id:'N4-1',concept:'N4',zone:1,prompt:'직접 관찰한 사실에 해당하는 말은?',options:['새가 슬퍼하는 것 같아.','사진에 새 두 마리가 보여.','새가 내일도 올 거야.'],answer:1,explanation:'사진에서 확인한 두 마리는 관찰이야. 감정과 미래 행동은 추측이야.',source:ECO},
+ {id:'N4-2',concept:'N4',zone:3,prompt:'게임 속 강치를 보고 실제 강치의 모습을 알려면?',options:['게임 기술을 그대로 적는다.','마법 설정을 사실로 적는다.','실제 사진과 조사 자료를 확인한다.'],answer:2,explanation:'게임 속 강치는 창작 독도몬이야. 실제 생물의 특징은 신뢰할 만한 자료로 확인해.',source:ECO},
+ {id:'N4-3',concept:'N4',zone:5,prompt:'오늘 새를 못 봤어. 확실하게 말할 수 있는 것은?',options:['오늘 조사 중에는 새를 보지 못했다.','독도에는 새가 한 마리도 없다.','독도의 모든 새가 사라졌다.'],answer:0,explanation:'못 봤다는 관찰과 존재하지 않는다는 결론은 달라. 더 조사해야 해.',source:ECO},
+ {id:'E3-1',concept:'E3',zone:2,prompt:'강치가 사라진 원인으로 배워야 할 것은?',options:['달빛이 약해져서','지나친 사냥인 남획','마법을 잃어서'],answer:1,explanation:'강치는 인간의 남획으로 멸종했어. 강치의 마법 이야기는 창작이야.',source:GANGCHI},
+ {id:'E3-2',concept:'E3',zone:4,prompt:'강치 이야기가 오늘의 우리에게 주는 교훈은?',options:['생물은 많을 때 모두 잡아도 된다.','기록만 남기면 생물은 없어도 된다.','생물이 사라지기 전에 보호해야 한다.'],answer:2,explanation:'남획의 피해를 기억하고, 지금 살아 있는 생물과 서식지를 보호해야 해.',source:GANGCHI},
+ {id:'E3-3',concept:'E3',zone:7,prompt:'전설 독도몬 강치를 만났어. 실제 강치도 돌아왔을까?',options:['아니, 기억 세계의 강치는 창작이야.','응, 게임에서 만났으니까.','응, 모든 멸종 생물이 돌아왔어.'],answer:0,explanation:'게임 속 강치는 강치의 기억을 표현한 창작 캐릭터야. 실제 강치는 멸종했어.',source:GANGCHI},
+ {id:'E4-1',concept:'E4',zone:2,prompt:'독도의 자연을 지키는 행동은?',options:['새를 가까이서 쫓아가기','식물을 기념으로 뽑기','정해진 길을 따르고 쓰레기 되가져오기'],answer:2,explanation:'생물과 서식지를 건드리지 않고 방문 규칙을 지키는 것이 보호에 도움이 돼.',source:ECO},
+ {id:'E4-2',concept:'E4',zone:4,prompt:'새의 둥지를 발견했어. 어떻게 관찰할까?',options:['거리를 두고 방해하지 않는다.','알을 손에 들고 확인한다.','둥지를 보기 좋은 곳으로 옮긴다.'],answer:0,explanation:'가까이 가거나 둥지를 옮기면 생물에게 피해를 줄 수 있어. 거리를 두자.',source:ECO},
+ {id:'E4-3',concept:'E4',zone:6,prompt:'생물 보호 안내문에 넣을 말은?',options:['예쁜 생물은 가져가세요.','자연은 제자리에 두고 관찰하세요.','먹이를 많이 주면 항상 좋아요.'],answer:1,explanation:'함부로 채집하거나 먹이를 주지 않고, 자연 상태를 지키며 관찰하자.',source:ECO},
+ {id:'H1-1',concept:'H1',zone:2,prompt:'512년 우산국을 복속한 신라의 인물은?',options:['이사부','안용복','심흥택'],answer:0,explanation:'이사부는 신라 때 우산국을 복속했어. 이를 독도 직접 상륙으로 바꾸면 안 돼.',source:HIST},
+ {id:'H1-2',concept:'H1',zone:3,prompt:'이사부와 안용복을 바르게 구별한 것은?',options:['둘 다 대한제국 사람이야.','이사부는 신라, 안용복은 조선 때 사람이야.','두 사람은 같은 배를 탔어.'],answer:1,explanation:'두 인물은 서로 다른 시대에 활동했어. 게임에서 함께 만나는 장면은 창작이야.',source:FAQ},
+ {id:'H1-3',concept:'H1',zone:7,prompt:'이사부의 활동을 자료에 맞게 설명하면?',options:['512년 독도에 상륙한 장면이 기록돼 있다.','1900년에 칙령을 내렸다.','512년 우산국을 복속했다.'],answer:2,explanation:'기록에 근거한 활동은 우산국 복속이야. 직접 독도에 상륙했다고 단정하지 않아.',source:HIST},
+ {id:'H3-1',concept:'H3',zone:3,prompt:'안용복의 활동을 소개한 것은?',options:['신라의 장군으로 우산국을 복속했다.','일본에서 울릉도·독도 관련 조선의 입장을 주장했다.','대한제국의 황제로 칙령을 내렸다.'],answer:1,explanation:'안용복은 조선 시대 어민으로, 일본에서 울릉도·독도 관련 활동을 했어.',source:FAQ},
+ {id:'H3-2',concept:'H3',zone:5,prompt:'안용복의 두 차례 일본행과 관련된 해는?',options:['512년과 513년','1900년과 1906년','1693년과 1696년'],answer:2,explanation:'안용복의 일본행은 1693년과 1696년이야. 조선 시대의 사건으로 연결하자.',source:FAQ},
+ {id:'H3-3',concept:'H3',zone:7,prompt:'안용복 NPC의 대사를 보고 보고서를 쓸 때는?',options:['실제 기록을 확인하고 창작 대사와 구별한다.','모든 게임 대사를 실제 발언으로 적는다.','이사부의 이야기로 바꾸어 적는다.'],answer:0,explanation:'게임 대사는 재구성이야. 실제 활동은 역사 자료를 확인해 설명해야 해.',source:FAQ},
+ {id:'H4-1',concept:'H4',zone:4,prompt:'대한제국 칙령 제41호가 반포된 해는?',options:['512년','1696년','1900년'],answer:2,explanation:'대한제국은 1900년 칙령 제41호를 반포했어. 관할 관련 내용을 확인할 수 있어.',source:FAQ},
+ {id:'H4-2',concept:'H4',zone:5,prompt:'1906년 독도 관련 소식을 보고한 울도 군수는?',options:['심흥택','이사부','안용복'],answer:0,explanation:'울도 군수 심흥택은 1906년 독도 관련 소식을 보고했어. 인물과 문서를 연결하자.',source:FAQ},
+ {id:'H4-3',concept:'H4',zone:7,prompt:'칙령 제41호와 심흥택 보고의 시간 순서는?',options:['심흥택 보고 → 칙령 제41호','칙령 제41호 → 심흥택 보고','두 기록은 같은 해에 작성'],answer:1,explanation:'칙령은 1900년, 심흥택 보고는 1906년이야. 두 기록의 시대와 성격을 구별하자.',source:FAQ},
+ {id:'S3-1',concept:'S3',zone:0,prompt:'독도에 관한 글을 믿기 전에 확인할 것은?',options:['글의 길이만','누가 언제 어떤 자료를 바탕으로 썼는지','글자 색이 예쁜지'],answer:1,explanation:'작성자·작성 시기·출처를 살펴보자. 공식 자료와 비교하면 판단에 도움이 돼.',source:FAQ},
+ {id:'S3-2',concept:'S3',zone:3,prompt:'문서에서 한 문장만 잘라 보여 줬어. 다음 행동은?',options:['바로 전체 뜻이라고 믿는다.','친구 수가 많은 글만 믿는다.','앞뒤 문장과 원문을 확인한다.'],answer:2,explanation:'일부만 보면 뜻이 달라질 수 있어. 원문과 앞뒤 맥락을 함께 읽자.',source:FAQ},
+ {id:'S3-3',concept:'S3',zone:5,prompt:'서로 다른 설명을 발견했어. 어떻게 확인할까?',options:['출처와 원자료를 찾아 비교한다.','먼저 본 설명을 무조건 믿는다.','더 큰 글씨의 설명을 고른다.'],answer:0,explanation:'내용이 다르면 누가 어떤 근거로 썼는지 살펴보고 원자료를 비교해.',source:FAQ},
+ {id:'S4-1',concept:'S4',zone:1,prompt:'“독도는 울릉도 동남쪽에 있다”의 알맞은 근거는?',options:['친구가 좋아하는 캐릭터','출처를 밝힌 위치 지도','게임 속 전투 기록'],answer:1,explanation:'위치를 설명하는 주장에는 방향과 섬의 위치를 확인할 수 있는 지도가 알맞아.',source:GEO},
+ {id:'S4-2',concept:'S4',zone:5,prompt:'“1900년에 칙령이 반포되었다”를 확인할 자료는?',options:['현대의 바닷새 사진','독도몬 능력치표','칙령 제41호 관련 원문과 해설'],answer:2,explanation:'역사적 사건을 확인하려면 그 사건과 관련된 기록을 찾아야 해.',source:FAQ},
+ {id:'S4-3',concept:'S4',zone:6,prompt:'조사 발표에서 가장 설득력 있는 방법은?',options:['주장에 맞는 자료를 제시하고 출처를 밝힌다.','크게 말하고 자료는 생략한다.','게임 이야기를 모두 역사로 소개한다.'],answer:0,explanation:'주장과 관련된 근거를 제시하고, 어디에서 얻은 자료인지 알려 주자.',source:GEO},
+ {id:'V1-1',concept:'V1',zone:0,prompt:'독도의 중요성을 알아보려면 무엇을 함께 살필까?',options:['게임 속 보물 가격만','캐릭터의 승률만','지리적 특성과 역사 기록'],answer:2,explanation:'위치와 자연환경, 역사 기록을 함께 살펴보며 독도의 중요성을 이해하자.',source:FAQ},
+ {id:'V1-2',concept:'V1',zone:6,prompt:'독도를 소개하는 전시판의 좋은 구성은?',options:['위치 지도·역사 자료·자연 보호 설명','독도몬 공격력 순위만','근거 없는 소문 모음'],answer:0,explanation:'지리·역사·자연을 연결하면 독도를 더 넓고 정확하게 설명할 수 있어.',source:FAQ},
+ {id:'V1-3',concept:'V1',zone:7,prompt:'수호사가 배운 내용을 실천하는 방법은?',options:['출처 없는 말을 그대로 퍼뜨린다.','근거를 확인해 설명하고 자연을 지킨다.','게임의 가상 마을을 실제라고 소개한다.'],answer:1,explanation:'정확한 자료로 설명하고 자연을 보호하는 행동이 배움을 실천하는 방법이야.',source:FAQ}
+];

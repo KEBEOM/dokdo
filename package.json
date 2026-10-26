@@ -1,0 +1,18 @@
+{
+  "name": "dokdomon",
+  "version": "0.22.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/engine.test.mjs && node tests/maps.test.mjs && node tests/story.test.mjs && node tests/assets.test.mjs && node tests/characters.test.mjs && node tests/depth.test.mjs && node tests/npc-motion.test.mjs",
+    "test:flow": "node tests/flow.test.mjs",
+    "test:maps": "node tests/maps.test.mjs",
+    "test:story": "node tests/story.test.mjs",
+    "test:assets": "node tests/assets.test.mjs",
+    "test:characters": "node tests/characters.test.mjs",
+    "test:npcs": "node tests/npc-motion.test.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

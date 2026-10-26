@@ -1,0 +1,84 @@
+{
+  "format": "4 columns × 4 rows; displayed at 32 × 32 per frame",
+  "sheets": {
+    "girl-sheet.png": "image(20261019-104021).png",
+    "boy-sheet.png": "image(20261019-104033).png",
+    "child-boy-sheet.png": "image(20261019-104258).png",
+    "child-girl-sheet.png": "image(20261019-104248).png",
+    "child-girl-ribbon-sheet.png": "image(20261019-104252).png",
+    "man-sheet.png": "image(20261019-104448).png",
+    "woman-sheet.png": "image(20261019-104451).png"
+  },
+  "explorers": {
+    "format": "Transparent PNG 1024x1536; 5 columns x 6 rows; exact crops and anchors in explorer-atlas.js",
+    "file": "explorers-atlas-v17.png",
+    "generation": "Built-in imagegen, reference-based artwork with idle and walk refinement",
+    "rows": [
+      "boy down",
+      "boy right",
+      "boy up",
+      "girl down",
+      "girl right",
+      "girl up"
+    ],
+    "columns": [
+      "idle",
+      "contact A",
+      "passing A",
+      "contact B",
+      "passing B"
+    ],
+    "playback": "Whole drawn frames only; mirror right for left; distance-synchronized 4-frame walk; separate upright idle",
+    "references": [
+      "boy-original.jpg",
+      "girl-original.jpg"
+    ]
+  },
+  "explorers_reference": {
+    "format": "Original 1024x1024 JPG; 256x256 cells, 4 columns x 4 rows; rendered directly without palette replacement",
+    "files": {
+      "boy-original.jpg": "Boy_explorer_standing_pose_20261020210347.jpg",
+      "girl-original.jpg": "Pixel_art_sprite_sheet_20261020210353.jpg"
+    },
+    "rows": [
+      "front idle/expressions",
+      "front walk",
+      "right walk (mirrored for left)",
+      "back walk"
+    ],
+    "note": "Back column 4 is not used. White background and border guides are masked only during rendering. The uploaded file bytes are unchanged.",
+    "side_walk": "v0.16: thicker sleeve/forearm radii 16/12; intact head translated back by 24 source pixels only during side idle, mirrored in left view. Preserves v0.15 limb motion, straight idle limbs, original JPG bytes and head pixel colors."
+  },
+  "npc_atlases": {
+    "generation": "Built-in imagegen reference-based generation; PNG bytes unchanged",
+    "files": [
+      "child-boy-atlas-v18.png",
+      "child-girl-atlas-v18.png",
+      "child-girl-ribbon-atlas-v18.png",
+      "man-atlas-v18.png",
+      "woman-atlas-v18.png"
+    ],
+    "reference_files": [
+      "child-boy-sheet.png",
+      "child-girl-sheet.png",
+      "child-girl-ribbon-sheet.png",
+      "man-sheet.png",
+      "woman-sheet.png"
+    ],
+    "style_reference": "explorers-atlas-v17.png",
+    "format": "1536x1024 transparent PNG, 5 columns x 3 rows; precise crops in npc-atlases.js",
+    "rows": [
+      "down",
+      "right",
+      "up"
+    ],
+    "columns": [
+      "idle",
+      "contact A",
+      "passing A",
+      "contact B",
+      "passing B"
+    ],
+    "scope": "All human NPCs; names and roles unchanged"
+  }
+}
