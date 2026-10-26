@@ -14,9 +14,9 @@ test('100 collectible species and real-name roster',()=>{
   for(const m of MONSTERS){assert.ok(m.zone>=0&&m.zone<8);if(m.source)assert.match(m.source,/^https:/);assert.equal(m.evolvesTo,null);if(m.evolvesTo){const to=getSpecies(m.evolvesTo);assert.equal(to.family,m.family);assert.equal(to.stage,m.stage+1);}}
   const obtainable=new Set(MONSTERS.filter(m=>m.stage===1).map(m=>m.id));for(const m of MONSTERS)if(m.evolvesTo&&obtainable.has(m.id))obtainable.add(m.evolvesTo);assert.equal(obtainable.size,100);
 });
-test('36 sourced learning questions across 12 concepts',()=>{
-  assert.equal(CONCEPTS.length,12);assert.equal(QUESTIONS.length,36);assert.equal(new Set(QUESTIONS.map(q=>q.id)).size,36);
-  for(const c of CONCEPTS)assert.equal(QUESTIONS.filter(q=>q.concept===c.id).length,3);
+test('108 sourced learning questions across 12 concepts',()=>{
+  assert.equal(CONCEPTS.length,12);assert.equal(QUESTIONS.length,108);assert.equal(new Set(QUESTIONS.map(q=>q.id)).size,108);assert.equal(new Set(QUESTIONS.map(q=>q.prompt)).size,108);
+  for(const c of CONCEPTS){const cq=QUESTIONS.filter(q=>q.concept===c.id);assert.equal(cq.length,9);assert.ok(new Set(cq.map(q=>q.zone)).size>=4,'questions spread over the journey');}
   for(const q of QUESTIONS){assert.equal(q.options.length,4,'four choices: one answer and three tempting wrong answers');assert.ok(q.answer>=0&&q.answer<4);assert.equal(new Set(q.options).size,4);assert.ok(CONCEPTS.some(c=>c.id===q.concept));assert.match(q.source,/^https:/);assert.ok(q.zone>=0&&q.zone<8);}
 });
 test('every map: people on land, arrivals free, everyone and every exit reachable',()=>{
