@@ -39,18 +39,24 @@ async function answerStudy(makeMistake = false) {
 async function battleState() { return G(() => { const b = window.__dokdo.battle; if (!b) return 'none'; if (document.querySelector('#dqCommand:not([hidden]) .dq-option')) return 'cmd'; if (document.querySelector('.dq-answer:not(.locked)')) return 'quiz'; return 'msg'; }); }
 async function toMenu() { for (let i = 0; i < 40; i++) { const s = await battleState(); if (s === 'cmd' || s === 'quiz' || s === 'none') return s; await page.click('#dqMessage'); } throw new Error('no menu'); }
 async function answer(correct) { const a = await G(() => window.__dokdo.battle.quiz.q.answer); await page.click(`[data-battle-answer="${correct ? a : (a + 1) % 3}"]`); await until(() => !!document.querySelector('.dq-result')); }
+// 정화하기 → the first attack skill that still has uses (or '있는 힘껏').
+async function purifyAttack() {
+  await page.click('[data-cmd="purify"]');
+  const pick = await G(() => ['skill-0', 'skill-1', 'skill-last'].find(c => { const b = document.querySelector(`#dqCommand [data-cmd="${c}"]`); return b && !b.disabled; }));
+  await page.click(`#dqCommand [data-cmd="${pick}"]`);
+}
 async function fight() {
   let turns = 0;
   for (let i = 0; i < 600; i++) {
     const s = await battleState();
     if (s === 'none') { await dismiss(); return turns; }
-    if (s === 'cmd') { await page.click('[data-cmd="fight"]'); turns++; }
+    if (s === 'cmd') { await purifyAttack(); turns++; }
     else if (s === 'quiz') await answer(true);
     else await page.click('#dqMessage');
   }
   throw new Error('battle did not finish');
 }
-async function skipCutscene() { await until(() => !!window.__dokdo.cutscene(), 10000); await page.click('.cs-skip'); await until(() => !window.__dokdo.cutscene(), 10000); }
+async function skipCutscene() { await until(() => !!window.__dokdo.cutscene(), 15000); const id = await G(() => window.__dokdo.cutscene()); for (let i = 0; i < 60 && await G(() => !!window.__dokdo.cutscene()) && await page.evaluate(id => window.__dokdo.cutscene() === id, id); i++) { await page.click('.cs-skip').catch(() => { }); await page.waitForTimeout(250); } }
 async function walkTo(target) {
   // guide() walks to the next exit (or quest person); keep going until the map changes.
   const from = await G(() => window.__dokdo.map.id);
@@ -111,25 +117,29 @@ await dismiss(); assert.equal(await G(() => window.__dokdo.state.progress[0].met
 
 // ── 4. Dragon Quest battle mechanics ──
 await G(() => { Math.random = () => .5; window.__dokdo.startBattle('wild', 21); });
+assert.equal(await page.$('.dq-trainer'), null, 'wild battles show no 백무단 member');
 await page.click('#dqMessage'); assert.match(await page.textContent('.dq-text'), /나타났다/);
-assert.equal(await toMenu(), 'cmd'); assert.deepEqual(await page.$$eval('#dqCommand .dq-option', b => b.map(x => x.dataset.cmd)), ['fight', 'skill', 'item', 'party', 'run']);
+assert.equal(await toMenu(), 'cmd'); assert.deepEqual(await page.$$eval('#dqCommand .dq-option', b => b.map(x => x.dataset.cmd)), ['purify', 'item', 'party', 'run'], '정화하기 replaces the plain attack');
+assert.ok(await G(() => { const c = document.querySelector('#allySprite'); return !!c && c.getContext('2d').getImageData(0, 0, c.width, c.height).data.some((v, i) => i % 4 === 3 && v > 0); }), 'my 독도몬 is drawn (from behind)');
+await page.click('[data-cmd="purify"]'); assert.deepEqual(await page.$$eval('#dqCommand .dq-option[data-cmd]', b => b.map(x => x.dataset.cmd)), ['skill-0', 'skill-3'], 'two skills at first');
+await page.click('#dqCommand .dq-option.back');
 const hp = () => G(() => ({ me: window.__dokdo.state.party[window.__dokdo.state.active].hp, foe: window.__dokdo.battle?.enemies[window.__dokdo.battle.index].hp, log: window.__dokdo.state.answerLog.length, pp: window.__dokdo.state.party[0].pp.slice() }));
 let h = await hp();
-await page.click('[data-cmd="fight"]'); assert.equal(await G(() => window.__dokdo.battle.quiz.phase), 'attack');
+await purifyAttack(); assert.equal(await G(() => window.__dokdo.battle.quiz.phase), 'attack');
 const right = await G(() => window.__dokdo.battle.quiz.q.answer);
 await page.click(`[data-battle-answer="${right}"]`); await page.click(`[data-battle-answer="${right}"]`, { force: true }).catch(() => { });
-let h2 = await hp(); assert.ok(h2.foe < h.foe, 'correct attack answer hurts the foe'); assert.equal(h2.me, h.me); assert.equal(h2.log, h.log + 1, 'answered once'); assert.deepEqual(h2.pp, h.pp, 'fighting uses no skill PP');
-await toMenu(); assert.equal(await G(() => window.__dokdo.battle.quiz.phase), 'defense', 'the foe asks next'); await answer(true); assert.equal((await hp()).me, h.me, 'correct defence avoids damage');
-await toMenu(); await page.click('[data-cmd="fight"]'); h = await hp(); await answer(false); h2 = await hp(); assert.ok(h2.me < h.me, 'wrong attack answer costs my HP'); assert.equal(h2.foe, h.foe);
-await toMenu(); h = await hp(); await answer(false); assert.ok((await hp()).me < h.me, 'wrong defence costs HP');
+let h2 = await hp(); assert.ok(h2.foe < h.foe, 'correct attack answer hurts the foe'); assert.equal(h2.me, h.me); assert.equal(h2.log, h.log + 1, 'answered once'); assert.equal(h2.pp[0], h.pp[0] - 1, 'the skill used one of its uses');
+await toMenu(); assert.equal(await G(() => window.__dokdo.battle.quiz.phase), 'defense', 'the foe asks next'); await answer(true); const softHit = h.me - (await hp()).me; assert.ok(softHit >= 1, 'a correct defence still takes a light hit');
+await toMenu(); await purifyAttack(); h = await hp(); await answer(false); h2 = await hp(); assert.equal(h2.me, h.me, 'a wrong attack answer just misses'); assert.equal(h2.foe, h.foe);
+await toMenu(); h = await hp(); await answer(false); assert.ok(h.me - (await hp()).me > softHit, 'a wrong defence hurts more than a correct one');
 // hint is logged as assisted
 await toMenu(); await G(() => { const b = window.__dokdo.battle; b.enemies[0].hp = b.enemies[0].maxHp; });
-await page.click('[data-cmd="fight"]'); await page.click('#battleHint'); assert.ok(await page.isVisible('.dq-hint')); await answer(true);
+await purifyAttack(); await page.click('#battleHint'); assert.ok(await page.isVisible('.dq-hint')); await answer(true);
 assert.equal(await G(() => window.__dokdo.state.answerLog.at(-1).assisted), true);
 await toMenu(); await answer(true);
-// a heal skill uses PP and asks no question; the item menu heals
-await toMenu(); h = await hp(); await page.click('[data-cmd="skill"]'); await page.click('#dqCommand .dq-option[data-index="2"]');
-assert.equal((await hp()).pp[2], h.pp[2] - 1); await toMenu(); await answer(true);
+// a guard skill uses PP and asks no question; the item menu heals
+await toMenu(); h = await hp(); await page.click('[data-cmd="purify"]'); await page.click('#dqCommand [data-cmd="skill-3"]');
+assert.equal((await hp()).pp[3], h.pp[3] - 1); await page.click('#dqMessage').catch(() => { }); assert.match(await page.textContent('.dq-text'), /절반/); await toMenu(); await answer(true);
 await toMenu(); await G(() => { window.__dokdo.state.party[0].hp = 5; }); await page.click('[data-cmd="item"]'); await page.click('[data-cmd="heal"]');
 await page.click('#dqMessage'); assert.ok((await hp()).me > 5); await toMenu(); await answer(true);
 // the orb befriends (first friends are guaranteed)
@@ -143,7 +153,7 @@ await toMenu(); await G(() => { Math.random = () => .1; }); await page.click('[d
 await until(() => !window.__dokdo.battle); await G(() => { Math.random = () => .5; window.__dokdo.state.active = 0; });
 // ── 5. Losing every friend: safe recovery at the shelter ──
 await G(() => { window.__dokdo.startBattle('wild', 39); const s = window.__dokdo.state; s.party.forEach(m => m.hp = 0); s.party[s.active].hp = 1; });
-await toMenu(); await page.click('[data-cmd="fight"]'); await answer(false);
+await toMenu(); await purifyAttack(); await answer(false); await toMenu(); await answer(false);
 for (let i = 0; i < 12 && await G(() => !!window.__dokdo.battle); i++) await page.click('#dqMessage');
 assert.equal(await G(() => window.__dokdo.battle), null); assert.equal(await G(() => window.__dokdo.talk?.name), '쉼터지기');
 await dismiss(); assert.ok(await G(() => window.__dokdo.state.party.every(m => m.hp === m.maxHp)));
@@ -154,11 +164,20 @@ for (let zone = 0; zone < 8; zone++) {
   if (zone > 0) { await npc('history'); }
   await npc('board'); await answerStudy(zone === 0); assert.equal(await G(() => window.__dokdo.state.progress[window.__dokdo.state.zone].studied), 2);
   await npc('shop'); await page.click('#healAll');
-  await npc('enemy'); totalTurns += await fight(); assert.equal(await G(() => window.__dokdo.state.progress[window.__dokdo.state.zone].enemy), true, `enemy ${zone}`);
-  if (zone === 7) { await skipCutscene(); await page.click('#legendOK'); assert.ok(await G(() => window.__dokdo.state.legend)); }
+  await npc('enemy');
+  if (zone === 7) { assert.equal(await G(() => window.__dokdo.cutscene()), 'boss-reveal', 'the truth about 백무 is revealed on 대한봉'); await skipCutscene(); }
+  await until(() => !!window.__dokdo.battle, 10000);
+  // the member's picture (부하 / 간부 / 대표) shows first, then fades out as the 독도몬 comes out
+  const role = zone === 7 ? 'boss' : [3, 4, 6].includes(zone) ? 'exec' : 'grunt';
+  assert.ok(await page.$('.dq-portrait.show'), '백무단 picture on the field'); assert.ok(await G(() => document.querySelector('.dq-enemy').classList.contains('waiting')), 'their 독도몬 waits');
+  assert.ok(await G(r => window.__dokdo.battle && document.querySelector('.dq-portrait canvas').getContext('2d').getImageData(0, 0, 384, 384).data.some((v, i) => i % 4 === 3 && v), role), 'the picture is drawn');
+  for (let i = 0; i < 20 && !(await page.$('.dq-portrait.leave')); i++) { await page.click('#dqMessage'); await page.waitForTimeout(120); } assert.ok(await page.$('.dq-portrait.leave'), 'the picture fades out'); await until(() => !document.querySelector('.dq-enemy').classList.contains('waiting'), 5000);
+  assert.match(await page.textContent('#dqFoe'), /광포화/); assert.match(await page.textContent('#dqFoe'), /암흑 에너지/);
+  totalTurns += await fight(); assert.equal(await G(() => window.__dokdo.state.progress[window.__dokdo.state.zone].enemy), true, `enemy ${zone}`);
+  if (zone === 7) { assert.equal(await G(() => window.__dokdo.cutscene()), 'boss-fall'); await skipCutscene(); await skipCutscene(); await page.click('#legendOK'); await dismiss(); assert.ok(await G(() => window.__dokdo.state.legend)); }
   await npc('shop'); await page.click('#healAll');
   await npc('boss'); await answerStudy(); totalTurns += await fight(); assert.ok(await G(() => window.__dokdo.state.badges.includes(window.__dokdo.state.zone)), `badge ${zone}`);
-  if (zone === 7) { await page.click('#endContinue'); break; }
+  if (zone === 7) { assert.equal(await G(() => window.__dokdo.cutscene()), 'epilogue'); await skipCutscene(); await page.click('#endContinue'); break; }
   await walkTo(`route${zone}`);
   if (zone === 0) {
     // every kind of route object
@@ -170,6 +189,13 @@ for (let zone = 0; zone < 8; zone++) {
     await npc('box'); assert.equal((await G(() => window.__dokdo.state.items.heal)), after.heal, 'a box opens once');
     await npc('stone'); await answerStudy(); assert.ok(await G(() => window.__dokdo.state.flags['route0:7']));
     await npc('trainer'); totalTurns += await fight(); assert.ok(await G(() => window.__dokdo.state.flags['route0:4']), 'trainer beaten once');
+  }
+  if (zone === 1) {
+    // the legendary 사철나무: calm it once and it joins; afterwards only the place remains
+    await npc('legend'); await until(() => !!window.__dokdo.battle, 10000); assert.equal(await G(() => window.__dokdo.battle.kind), 'legend');
+    totalTurns += await fight(); await until(() => !!document.querySelector('#legendTreeOK'), 10000); await page.click('#legendTreeOK');
+    assert.equal(await G(() => [...window.__dokdo.state.party, ...window.__dokdo.state.storage].filter(m => m.id === 18).length), 1, 'one 사철나무 joined');
+    await npc('legend'); assert.equal(await G(() => !!window.__dokdo.battle), false, 'the legend does not come back'); await dismiss();
   }
   await walkTo(`town${zone + 1}`); await skipCutscene();
   assert.ok(await G(() => window.__dokdo.state.visited.includes(window.__dokdo.state.zone)));
@@ -197,4 +223,4 @@ assert.deepEqual(st, { map: 'town3', visited: 8, onSpawn: true });
 
 assert.deepEqual(errors, [], 'no browser errors');
 await browser.close(); server.close();
-console.log(`PASS: opening read line by line with the mission choice, starter + guide, key walking, closed bridge, guide, DQ commands (fight, skill, item, orb, switch, run), quiz rules, hints, KO recovery, route objects, trainer, memory stone, 8 chapters walked through 7 routes, first-arrival scenes, fast travel, legend, ending, saves and a v0.21 save; ${totalTurns} battle turns.`);
+console.log(`PASS: 백무 reveal/fall/epilogue scenes, 광포화 duels with dark-energy gauges, 백무단 designs in battle, softened hits on correct defence, opening read line by line with the mission choice, starter + guide, key walking, closed bridge, guide, DQ commands (정화하기 with two starting skills, guard skill, item, orb, switch, run), my 독도몬 drawn from behind, 백무단 pictures fading out, legendary 사철나무 once, quiz rules (wrong attack = miss, correct defence = light hit), hints, KO recovery, route objects, trainer, memory stone, 8 chapters walked through 7 routes, first-arrival scenes, fast travel, legend, ending, saves and a v0.21 save; ${totalTurns} battle turns.`);

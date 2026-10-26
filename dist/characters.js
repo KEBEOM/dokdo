@@ -1,7 +1,10 @@
 import {assetImage} from './assets.js';
 import {strideFrame,MOVE_DURATION} from './movement.js';
 import {EXPLORER_ATLAS} from './explorer-atlas.js';
-import {NPC_ATLASES} from './npc-atlases.js';
+import {NPC_ATLASES as RESIDENT_ATLASES} from './npc-atlases.js';
+import {VILLAIN_ATLASES} from './villain-atlases.js';
+// Residents plus the 백무단 designs; every NPC sheet shares one format.
+export const NPC_ATLASES={...RESIDENT_ATLASES,...VILLAIN_ATLASES};
 export const EXPLORERS=[{id:'girl',label:'여학생',portrait:EXPLORER_ATLAS.key,sheet:EXPLORER_ATLAS.key},{id:'boy',label:'남학생',portrait:EXPLORER_ATLAS.key,sheet:EXPLORER_ATLAS.key}];
 export const RESIDENTS=[
  {id:'child-boy',label:'남자아이',sheet:'characters/child-boy-atlas-v18'},
@@ -9,7 +12,8 @@ export const RESIDENTS=[
  {id:'child-girl-ribbon',label:'여자아이 · 리본',sheet:'characters/child-girl-ribbon-atlas-v18'},
  {id:'man',label:'아저씨',sheet:'characters/man-atlas-v18'},
  {id:'woman',label:'아줌마',sheet:'characters/woman-atlas-v18'},
- {id:'professor',label:'김박사',sheet:'characters/professor-atlas-v19'}
+ {id:'professor',label:'김박사',sheet:'characters/professor-atlas-v19'},
+ ...Object.entries(VILLAIN_ATLASES).map(([id,a])=>({id,label:a.label,sheet:a.key,villain:true}))
 ];
 export const CHARACTER_SIZE=48;
 export function explorerInfo(id){return EXPLORERS.find(p=>p.id===id)||EXPLORERS[0];}

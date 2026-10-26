@@ -1,12 +1,12 @@
 // Cutscene scripts and Korean particles.
 import assert from 'node:assert/strict';
-import { OPENING, GUIDE, LEGEND, ARRIVALS, arrivalScene } from '../dist/story.js';
+import { OPENING, GUIDE, LEGEND, ARRIVALS, arrivalScene, BOSS_REVEAL, BOSS_FALL, EPILOGUE, VILLAIN_TALES } from '../dist/story.js';
 import { josa, fillJosa } from '../dist/text.js';
 import { MAPS } from '../dist/maps.js';
 import { ZONES } from '../dist/data.js';
 
-const BGS = new Set(['stage', 'sea', 'dock', 'field', 'crisis', 'title']);
-const CUES = /^(confetti|spot|jump|glint|rustle|pop|surprise|aura|device|kim-turn|night|rise|panel:(sea|rock|grass))$/;
+const BGS = new Set(['stage', 'sea', 'dock', 'field', 'crisis', 'title', 'summit']);
+const CUES = /^(confetti|spot|jump|glint|rustle|pop|surprise|aura|device|kim-turn|night|rise|machine|machine-off|blueprint|dark|records|panel:(sea|rock|grass))$/;
 function check(script) {
   assert.ok(script.id && script.scenes.length);
   for (const s of script.scenes) {
@@ -21,7 +21,13 @@ function check(script) {
     for (const l of s.lines) if (l.choice) { assert.ok(l.choice.length >= 2); l.choice.forEach(c => assert.ok(c.label && c.reply?.length)); }
   }
 }
-[OPENING, GUIDE, LEGEND].forEach(check);
+[OPENING, GUIDE, LEGEND, BOSS_REVEAL, BOSS_FALL, EPILOGUE].forEach(check);
+// The 백무단 story: clues in chapters 1–7, then the truth, the excuse and the answer on 대한봉.
+assert.equal(VILLAIN_TALES.length, 8); VILLAIN_TALES.slice(0, 7).forEach(v => assert.ok(v.before.length && v.after.length)); assert.equal(VILLAIN_TALES[7], null);
+const reveal = BOSS_REVEAL.scenes.flatMap(s => s.lines).map(l => l.text).join(' ');
+for (const key of ['독도몬을 만들어', '테마파크', '암흑 에너지', '독도를 위해', '천연기념물 제336호']) assert.ok(reveal.includes(key), `reveal mentions ${key}`);
+assert.ok(BOSS_REVEAL.scenes[0].lines.some(l => l.choice?.length === 2));
+assert.ok(OPENING.scenes.flatMap(s => s.lines).some(l => l.text.includes('아직 아무도 몰라요')), 'the cause of 광포화 is unknown at first');
 // The opening follows the specification: contest → ship → dock → 독도몬 → crisis → mission with a choice.
 assert.deepEqual(OPENING.scenes.map(s => s.bg), ['stage', 'sea', 'dock', 'field', 'crisis', 'dock']);
 assert.ok(OPENING.scenes.at(-1).lines.some(l => l.choice?.length === 2));

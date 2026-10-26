@@ -392,12 +392,12 @@ export const MONSTERS=[
     "evolveLevel": null,
     "zone": 3,
     "source": "https://contents.nahf.or.kr/item/level.do?levelId=eddok.d_0002_0020_0010",
-    "legendary": false,
+    "legendary": true,
     "area": "육지",
     "group": "식물",
     "recordStatus": "교육자료에 명시",
     "recordNote": "독도 식물 관련 교육자료에서 이름 확인",
-    "detail": "사철나무의 이름을 사용하는 창작 독도몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
+    "detail": "동도 천장굴 위쪽 비탈에서 100년 넘게 자란 독도의 사철나무(천연기념물 제538호)를 모티브로 한 전설의 독도몬이에요. 게임 전체에 한 마리만 있고, 천장굴 길에서 정화하면 동료가 돼요."
   },
   {
     "id": 19,
@@ -2219,8 +2219,9 @@ export const ZONES=[
 export const EXTRA_NPCS=[{name:'박어둔의 기억',zone:3,x:12,y:22,lines:['1693년 안용복과 함께 일본으로 연행된 어민 박어둔의 기억이오.','같은 사건에 여러 사람이 있었지. 누구의 기록인지 확인하고, 1696년의 일과 구별해 주시오.']},{name:'고종의 기억',zone:5,x:12,y:22,lines:['대한제국의 칙령 제41호는 1900년의 기록이네.','원문에서 어떤 구역을 관할하는지 읽고, 오늘날의 풀이와 함께 살펴보게. 이 대화는 게임용 재구성이네.']},{name:'이명래의 기억',zone:5,x:24,y:23,lines:['심흥택의 보고가 상부로 이어지는 과정을 살펴보게.','보고서를 처음 쓴 사람과 전달한 사람을 구별하면 기록의 흐름이 보인다네.']},{name:'최종덕의 기억',zone:6,x:12,y:22,lines:['나는 독도에서 살았던 최종덕의 기록을 바탕으로 한 기억이야.','1965년부터 거주한 것과 1981년 독도 주소로 주민등록한 것은 서로 다른 일이란다.','독도를 생각할 때 그곳에서 이어진 생활도 함께 살펴보렴.']}];
 
 // Distribute every ordinary species through the eight fictional exploration regions.
-for(let zone=0;zone<ZONES.length;zone++){const local=MONSTERS.filter(m=>!m.legendary&&m.zone===zone);ZONES[zone].wild=local.map(m=>m.id);const matching=MONSTERS.filter(m=>!m.legendary&&m.type===ZONES[zone].type&&m.zone<=zone);ZONES[zone].bossTeam=[...matching,...local].slice(-3).map(m=>m.id);}
-ZONES[0].wild=[66,67,1,...ZONES[0].wild.filter(id=>![66,67,1].includes(id))];
+// 전설(사철나무·강치)과 스타팅 독도몬(해국·괭이갈매기·독도새우)은 게임 전체에 한 마리씩만 있어서, 풀숲·관장·백무단 목록에 넣지 않습니다.
+export const isUnique=m=>m.legendary||STARTERS.includes(m.id);
+for(let zone=0;zone<ZONES.length;zone++){const local=MONSTERS.filter(m=>!isUnique(m)&&m.zone===zone);ZONES[zone].wild=local.map(m=>m.id);const matching=MONSTERS.filter(m=>!isUnique(m)&&m.type===ZONES[zone].type&&m.zone<=zone);ZONES[zone].bossTeam=[...matching,...local].slice(-3).map(m=>m.id);}
 // The final region revisits late-game species before the legendary encounter.
-ZONES[7].wild=MONSTERS.filter(m=>!m.legendary&&m.zone===6).map(m=>m.id);
-ZONES[7].bossTeam=[1,67,66];
+ZONES[7].wild=MONSTERS.filter(m=>!isUnique(m)&&m.zone===6).map(m=>m.id);
+ZONES[7].bossTeam=[71,52,50];

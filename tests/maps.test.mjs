@@ -42,13 +42,15 @@ for (const def of MAPS) {
     assert.ok(p.objects.some(o => o.type === 'sign'), `${def.id}: a place-name sign`);
   } else {
     const types = p.objects.map(o => o.type).sort();
-    for (const t of ['box', 'landmark', 'observe', 'person', 'sign', 'stone', 'trainer']) assert.ok(types.includes(t), `${def.id}: has a ${t}`);
+    for (const t of ['box', 'landmark', 'person', 'sign', 'stone', 'trainer']) assert.ok(types.includes(t), `${def.id}: has a ${t}`);
+    assert.ok(types.includes('observe') || types.includes('legend'), `${def.id}: has an observation point`);
     assert.ok(map.some(r => r.includes(3)), `${def.id}: tall grass for wild encounters`);
   }
   for (const o of p.objects) {
     assert.ok(o.name && Array.isArray(o.lines) && o.lines.length, `${def.id}:${o.key} has text`);
     assert.ok(!blocked(map, o.x, o.y, [], true) || o.type === 'landmark', `${def.id}:${o.key} stands on land`);
     if (o.type === 'observe') assert.ok(MONSTERS.some(m => m.id === o.species && !m.legendary));
+    if (o.type === 'legend') assert.ok(MONSTERS.some(m => m.id === o.species && m.legendary));
     if (o.type === 'trainer') { assert.ok(o.team.length >= 1); o.team.forEach(id => assert.ok(!getSpecies(id).legendary && getSpecies(id).id === id)); assert.ok(o.after?.length); }
     if (o.type === 'box' || (o.type === 'person' && o.give)) assert.ok(Object.values(o.give).every(n => Number.isInteger(n) && n > 0));
   }

@@ -176,8 +176,55 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
       }
       ctx.globalAlpha = 1;
       drawMonster(ctx, mon, 132, 70 + Math.sin(t / 120) * (s.cues.aura ? 2 : .8), 56, t / 1000);
+      // 백무단 members appear from the second panel on; the leader looms behind when the aura spreads.
+      if (s.cues.aura) { ctx.globalAlpha = .55 + .15 * Math.sin(t / 300); drawResident(ctx, 'villain-leader', 128, 2, 64, t, 'down', false, 0); ctx.globalAlpha = 1; }
+      if (panel !== 'sea') drawResident(ctx, 'villain-grunt-m', 58, 82, 58, t, 'right', false, 0);
+      if (panel === 'grass' || s.cues.aura) drawResident(ctx, 'villain-grunt-f', 206, 82, 58, t, 'left', false, 0);
       ctx.globalAlpha = .6 + .3 * Math.sin(t / 150); R(149, 92, 4, 3, '#ff5a5a'); R(167, 92, 4, 3, '#ff5a5a'); ctx.globalAlpha = 1;
       if (s.panelAt && t - s.panelAt < 160) { ctx.globalAlpha = 1 - (t - s.panelAt) / 160; R(0, 0, SW, SH, '#ffffff'); ctx.globalAlpha = 1; }
+    },
+    summit(t, s) {
+      // dusk sky over the summit of 대한봉
+      ['#f0b27a', '#d98f7e', '#a3779a', '#6c5a8a'].forEach((c, i) => R(0, i * 18, SW, 18, c));
+      R(40, 52, 22, 22, '#ffd59a'); R(36, 56, 30, 14, '#ffd59a');
+      R(0, 72, SW, 22, '#47507a'); for (let y = 74; y < 94; y += 5) for (let x = ((y * 9 + Math.floor(t / 120)) % 26) - 26; x < SW; x += 26) R(x, y, 9, 1, '#6c76a0');
+      tiles('grass', 0, 94, SW, SH); peaks(-40, 112, 120, [110, 185, 590, 575]); peaks(250, 106, 100, [110, 185, 590, 575]);
+      tiles('path', 40, 140, 320, SH);
+      const on = s.cues.machine && !s.cues['machine-off'], off = s.cues['machine-off'], pulse = .5 + .5 * Math.sin(t / 140);
+      // the blank machine (공백 장치)
+      const mx = 232, my = 50, shake = off && t - off < 900 ? Math.round(Math.sin(t / 25) * 1.5) : 0;
+      ctx.save(); ctx.translate(shake, 0);
+      R(mx + 4, my + 66, 58, 6, '#2b2f3a'); R(mx, my + 20, 66, 48, '#5a6070'); R(mx + 2, my + 22, 62, 4, '#7a8192'); R(mx, my + 60, 66, 8, '#444a58');
+      R(mx + 14, my, 38, 24, '#4a505e'); R(mx + 30, my - 18, 4, 18, '#7a8192'); R(mx + 26, my - 22, 12, 5, on ? '#c48cff' : '#555b68');
+      R(mx + 17, my + 3, 32, 18, '#1d1f28'); R(mx + 19, my + 5, 28, 14, on ? (pulse > .5 ? '#8b4fd1' : '#5e2fa0') : '#2a2d38');
+      if (on) { R(mx + 27, my + 8, 12, 8, '#d7b8ff'); R(mx + 31, my + 6, 4, 12, '#d7b8ff'); }
+      for (let i = 0; i < 4; i++) R(mx + 8 + i * 14, my + 34, 8, 8, on ? ['#e2b84f', '#7fe3ea', '#c75b4a', '#91b86b'][i] : '#3a3f4b');
+      R(mx - 20, my + 64, 22, 3, '#2b2f3a'); R(mx - 22, my + 58, 4, 9, '#2b2f3a');
+      ctx.restore();
+      if (on) for (let i = 0; i < 14; i++) { // purple smoke = dark energy leaking
+        const age = (t / 18 + i * 37) % 120, x = mx + 30 + Math.sin(i * 2.1 + t / 400) * (6 + age / 5), y = my - 18 - age * .6;
+        ctx.globalAlpha = Math.max(0, .5 - age / 260); R(x, y, 7 + age / 30, 6 + age / 30, i % 2 ? '#3b1d5c' : '#5a2f86');
+      }
+      ctx.globalAlpha = 1;
+      if (off && t - off < 1200) for (let i = 0; i < 10; i++) { const a = (t - off) / 1200, x = mx + 33 + Math.cos(i) * a * 40, y = my + 10 + Math.sin(i * 1.7) * a * 30; R(x, y, 2, 2, '#ffe9a6'); }
+      // the theme-park blueprint on an easel
+      const bx = 126, by = 62, glow = s.cues.blueprint ? .5 + .5 * Math.sin(t / 200) : 0;
+      R(bx + 8, by + 44, 3, 20, '#5a4030'); R(bx + 48, by + 44, 3, 20, '#5a4030'); R(bx + 28, by + 44, 3, 16, '#5a4030');
+      if (glow) { ctx.globalAlpha = .35 * glow; R(bx - 4, by - 4, 66, 54, '#fff1b4'); ctx.globalAlpha = 1; }
+      R(bx, by, 58, 46, '#2b3a6b'); R(bx + 1, by + 1, 56, 44, '#355094');
+      ctx.strokeStyle = '#d9e6ff'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(bx + 16, by + 26, 9, 0, Math.PI * 2); ctx.stroke(); for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.moveTo(bx + 16, by + 26); ctx.lineTo(bx + 16 + Math.cos(i) * 9, by + 26 + Math.sin(i) * 9); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(bx + 28, by + 38); ctx.bezierCurveTo(bx + 34, by + 14, bx + 42, by + 40, bx + 54, by + 18); ctx.stroke();
+      R(bx + 30, by + 38, 24, 1, '#d9e6ff');
+      ctx.fillStyle = '#ffe9a6'; ctx.font = 'bold 6px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('독도몬 테마파크', bx + 29, by + 8); ctx.textAlign = 'left';
+    },
+    summitFront(t, s) {
+      const dark = s.cues.dark && !s.cues['machine-off'];
+      if (dark) { // dark energy swirling around the 백무단 side
+        for (let i = 0; i < 22; i++) { const x = 200 + Math.sin(i * 1.3 + t / 500) * 60, y = 150 - ((t / 20 + i * 23) % 90); ctx.globalAlpha = .28; R(x, y, 6, 6, i % 2 ? '#3b1d5c' : '#120b1f'); }
+        ctx.globalAlpha = 1;
+      }
+      if (s.cues.records) { const age = t - s.cues.records; for (let i = 0; i < 16; i++) { const x = 230 + Math.sin(i * 2.3) * 70 - age / 30 * (i % 3), y = 130 - age / (6 + i % 4) - i * 3; if (y > -10) { R(x, y, 7, 9, '#fbf8ee'); R(x + 1, y + 2, 5, 1, '#9aa3a8'); R(x + 1, y + 5, 4, 1, '#9aa3a8'); } } }
     },
     title(t, s) {
       R(0, 0, SW, SH, '#123d52');
@@ -209,6 +256,7 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
     }
     if (s.def.bg === 'stage') PAINT.stageFront(t, s);
     if (s.def.bg === 'field') PAINT.fieldFront(t, s);
+    if (s.def.bg === 'summit') PAINT.summitFront(t, s);
     if (s.def.bg === 'sea' && s.cast.get('gangchi') && !s.cast.get('gangchi').hidden) { R(170, 128, 90, 6, '#2f7f95'); }
     const player = s.cast.get('player');
     if (player && !player.hidden) bubble(player.x, player.y - (player.size || 52), s.cues.surprise, t);

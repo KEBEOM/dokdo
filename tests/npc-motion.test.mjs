@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import {npcs,createMap,blocked,pathfind,PROP_KINDS} from '../dist/world.js';
 import {MAPS} from '../dist/maps.js';
 import {createNPCMotion,NPC_RADIUS,NPC_MOVE_MS} from '../dist/npc-motion.js';
-import {RESIDENTS,residentFrame,drawResident} from '../dist/characters.js';
-import {NPC_ATLASES} from '../dist/npc-atlases.js';
+import {RESIDENTS,residentFrame,drawResident,NPC_ATLASES} from '../dist/characters.js';
+import {VILLAIN_BY_ZONE} from '../dist/world.js';
 let seed=18;const random=()=>((seed=Math.imul(seed,1664525)+1013904223>>>0)/2**32);
 const allowed=new Set(RESIDENTS.map(n=>n.id));let moves=0;
 for(const def of MAPS){
@@ -50,4 +50,7 @@ for(const id of allowed){const atlas=NPC_ATLASES[id];assert.equal(atlas.frames.f
   calls.length=0;assert.ok(drawResident(ctx,id,0,0,48,0,dir,col>0,(col-1)*16));assert.equal(calls.filter(c=>c[0]==='drawImage').length,1);assert.equal(calls.some(c=>c[0]==='scale'&&c[1]===-1),dir==='left');
  }
 }
-console.log('PASS: all human roles mapped, 90 PNG poses, roaming on all 15 maps, one-tile radius, two-end collision reservations, route hold, pause/resume, facing, cleanup and reset.');
+// Every 백무단 member wears a 백무단 design.
+for(const def of MAPS){for(const n of npcs(def.id,{enemy:false}))if(n.id==='enemy'||n.kind==='trainer')assert.ok(n.actor.startsWith('villain-'),`${n.name} uses a 백무단 design`);}
+assert.equal(VILLAIN_BY_ZONE.length,8);assert.equal(VILLAIN_BY_ZONE[7],'villain-leader');
+console.log('PASS: all human roles mapped, 180 PNG poses incl. 6 백무단 sheets, 백무단 roles use 백무단 designs, roaming on all 15 maps, one-tile radius, two-end collision reservations, route hold, pause/resume, facing, cleanup and reset.');

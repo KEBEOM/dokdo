@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {MONSTERS,STARTERS,ZONES,getSpecies} from '../dist/data.js';
 import {CONCEPTS,QUESTIONS} from '../dist/learning.js';
-import {newState,createMonster,addMonster,healAll,gainXP,damage,captureChance,recordAnswer,validateSave,advantage} from '../dist/engine.js';
+import {newState,createMonster,addMonster,healAll,gainXP,damage,enemyHit,SOFTEN_RATE,captureChance,recordAnswer,validateSave,advantage,PP_MAX,skills,knownSkills,learnedBetween} from '../dist/engine.js';
 import {createMap,npcs,pathfind,blocked,cameraFor,TILE,W,H} from '../dist/world.js';
 import {MAPS} from '../dist/maps.js';
 import {selectBattleQuestion,shuffledChoices} from '../dist/battle-quiz.js';
@@ -37,10 +37,16 @@ test('every map: people on land, arrivals free, everyone and every exit reachabl
     assert.deepEqual(pathfind(map,s.x,s.y,0,0,people),[]);
   }
 });
+test('a correct answer to the opponent question still hurts, but much less',()=>{
+  const me=createMonster(1,8),foe=createMonster(34,9),rng=()=>.5;
+  const full=enemyHit(foe,me,{correct:false},rng),soft=enemyHit(foe,me,{correct:true},rng);
+  assert.equal(full,damage(foe,me,1,rng).amount);assert.ok(soft>=1&&soft<full,'correct answers soften the blow');assert.equal(soft,Math.max(1,Math.round(full*SOFTEN_RATE)));
+  assert.ok(enemyHit(foe,me,{correct:true,guard:true},rng)<=soft,'the guard skill softens it further');
+});
 test('damage, type advantage, capture and recovery remain finite',()=>{
   const s=newState();addMonster(s,createMonster(21,5));const foe=createMonster(47,5);assert.equal(advantage('wave','rock'),1.5);assert.equal(advantage('rock','wave'),.75);assert.ok(damage(s.party[0],foe,1,()=>.5).amount>0);
   const full=captureChance(foe);foe.hp=1;assert.ok(captureChance(foe)>full);assert.equal(captureChance(createMonster(100)),0);
-  s.party[0].hp=0;s.party[0].pp=[0,0,0,0];healAll(s);assert.equal(s.party[0].hp,s.party[0].maxHp);assert.deepEqual(s.party[0].pp,[20,12,8,6]);
+  s.party[0].hp=0;s.party[0].pp=[0,0,0,0];healAll(s);assert.equal(s.party[0].hp,s.party[0].maxHp);assert.deepEqual(s.party[0].pp,PP_MAX);
 });
 test('starter keeps its biological name as it levels and party overflows to storage',()=>{
   const m=createMonster(1,7);gainXP(m,91);assert.equal(m.level,8);assert.equal(m.id,1);while(m.level<16)gainXP(m,m.level*13);assert.equal(m.id,1);
@@ -84,8 +90,10 @@ test('combat question selection spaces repeats and revisits missed concepts',()=
 test('requested starters, exact spreadsheet names and NO.100',()=>{
  assert.deepEqual(STARTERS.map(id=>getSpecies(id).name),['해국','괭이갈매기','독도새우']);
  assert.equal(getSpecies(3).name,'섬기린초');assert.equal(getSpecies(100).name,'강치');
- assert.equal(MONSTERS.filter(m=>m.legendary).length,1);
- const reachable=new Set(ZONES.flatMap(z=>z.wild));assert.equal(reachable.size,99);assert.ok(!reachable.has(100));
+ assert.deepEqual(MONSTERS.filter(m=>m.legendary).map(m=>m.name),['사철나무','강치'],'two legendary 독도몬');
+ // legendary and starter 독도몬 exist once in the whole game: never in the grass, a 관장 team or a 백무단 team
+ const reachable=new Set(ZONES.flatMap(z=>[...z.wild,...z.bossTeam]));assert.equal(new Set(ZONES.flatMap(z=>z.wild)).size,95);
+ for(const id of [1,66,67,18,100])assert.ok(!reachable.has(id),`${id} is unique`);
 });
 test('v0.8 saves retain progress and migrate species once',()=>{
  const s=newState();delete s.rosterVersion;s.started=true;s.party=[createMonster(1,12),createMonster(69,16),createMonster(21,8)];s.storage=[createMonster(100,34)];s.seen=[1,2,3,67,69,100];s.caught=[1,3,69,100];s.badges=[0,1];s.progress[0].boss=true;
@@ -100,4 +108,20 @@ test('responsive cameras stay in bounds and preserve tile positions',()=>{
   const c=cameraFor(view,width,height);assert.ok(c.x>=0&&c.y>=0);assert.ok(c.x<=Math.max(0,W*TILE-width));assert.ok(c.y<=Math.max(0,H*TILE-height));assert.equal(c.x,Math.floor(c.x));assert.equal(c.y,Math.floor(c.y));
   const centerX=view.x*TILE+16-c.x,centerY=view.y*TILE+16-c.y;assert.equal(Math.floor((centerX+c.x)/TILE),view.x);assert.equal(Math.floor((centerY+c.y)/TILE),view.y);
  }
+});
+
+test('skills: two at first, more as the 독도몬 grows; 정화 skills only', () => {
+  const m = createMonster(1, 5);
+  assert.deepEqual(knownSkills(m).map(s => s.kind), ['attack', 'guard'], 'Lv5: an attack skill and a guard skill');
+  assert.equal(knownSkills(createMonster(1, 1)).length, 2, 'Lv1 starts with two');
+  assert.equal(knownSkills(createMonster(1, 8)).length, 3); assert.equal(knownSkills(createMonster(1, 12)).length, 4);
+  assert.deepEqual(learnedBetween(m, 7, 12).map(s => s.index).sort(), [1, 2]);
+  assert.equal(skills(m).length, 4); assert.deepEqual(m.pp, PP_MAX);
+  const grown = createMonster(1, 7); let before = grown.level; gainXP(grown, 7 * 13); assert.equal(grown.level, 8); assert.equal(learnedBetween(grown, before, grown.level).length, 1);
+});
+test('no wild 독도몬 stand on the grass; the legendary tree waits on 천장굴', () => {
+  const p = { met: true, studied: 2, enemy: false, boss: false };
+  for (const def of MAPS) for (const n of npcs(createMap(def.id), p, {})) assert.notEqual(n.kind, 'wild', `${def.id}: no monster standing on the grass`);
+  const legends = MAPS.flatMap(def => npcs(createMap(def.id), p, {}).filter(n => n.kind === 'legend').map(n => [def.id, n.species]));
+  assert.deepEqual(legends, [['route1', 18]]);
 });

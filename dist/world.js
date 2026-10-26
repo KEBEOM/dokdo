@@ -7,7 +7,7 @@ import { parseMap, getMapDef, MAP_W, MAP_H } from './maps.js';
 import { drawProp } from './props.js';
 
 export const TILE = 32, W = MAP_W, H = MAP_H;
-export const PROP_KINDS = ['sign', 'landmark', 'box', 'trash', 'observe', 'stone'];
+export const PROP_KINDS = ['sign', 'landmark', 'box', 'trash', 'observe', 'stone', 'legend'];
 
 // A tile grid (rows of tile codes) carrying the parsed map: buildings, decor, exits, spawns.
 export function createMap(ref = 0) {
@@ -35,9 +35,11 @@ export function villageResidents(zone) {
   ];
 }
 
+// 백무단: 수집원·조사원·기록 관리자는 대원, 먹선·쇄도·무음은 간부, 마지막은 대표 백무.
+export const VILLAIN_BY_ZONE = ['villain-grunt-m', 'villain-grunt-f', 'villain-grunt-m', 'villain-exec-ink', 'villain-exec-crimson', 'villain-grunt-f', 'villain-exec-indigo', 'villain-leader'];
 const ROLE_ACTOR = zone => ({
   history: zone === 0 ? 'professor' : zone === 4 || zone === 7 ? 'child-girl' : 'man',
-  guide: 'child-boy', enemy: zone === 7 ? 'man' : zone % 2 ? 'child-girl-ribbon' : 'child-boy',
+  guide: 'child-boy', enemy: VILLAIN_BY_ZONE[zone],
   boss: zone % 2 ? 'woman' : 'man', shop: 'woman', prof: 'woman', extra: 'man'
 });
 
@@ -58,7 +60,7 @@ export function npcs(ref = 0, progress = {}, flags = {}) {
     ];
     roles.forEach(([id, info], i) => { const p = at(id); if (p) list.push({ id, x: p.x, y: p.y, sprite: `npc/${String(zone + 1).padStart(2, '0')}/${String(i + 1).padStart(2, '0')}`, ...info }); });
     EXTRA_NPCS.filter(n => n.zone === zone).forEach((n, i) => { const p = at(`extra${i}`); if (p) list.push({ ...n, id: 'extra', kind: 'history', x: p.x, y: p.y }); });
-    ['wild0', 'wild1'].forEach((role, i) => { const p = at(role), species = z.wild[i]; if (p) list.push({ id: 'wild', kind: 'wild', x: p.x, y: p.y, species, name: getSpecies(species).name }); });
+    // 풀숲 위에 서 있는 야생 독도몬은 두지 않아요. 광포화된 독도몬은 풀숲을 걸을 때 갑자기 나타나요.
     for (const r of villageResidents(zone)) { const p = parsed.residents[r.key]; if (p) list.push({ ...r, id: 'resident', kind: 'resident', x: p.x, y: p.y }); }
   }
   for (const o of parsed.objects) {
@@ -147,6 +149,13 @@ export function drawNPCNameplate(ctx, name, cx, y, camX = 0, camY = 0) {
 // What the yellow quest marker points at in a town.
 export function wantedRole(p) { return !p.met ? 'history' : p.studied < 2 ? 'board' : !p.enemy ? 'enemy' : !p.boss ? 'boss' : null; }
 
+// 광포화: wild 독도몬 on the map are wrapped in drifting dark energy.
+function darkWisps(ctx, x, y, time) {
+  const cx = x * 32 + 16, cy = y * 32 + 18;
+  ctx.save(); ctx.globalAlpha = .28 + .1 * Math.sin(time / 300); ctx.fillStyle = '#3b1d5c'; ctx.beginPath(); ctx.ellipse(cx, cy + 6, 20, 9, 0, 0, Math.PI * 2); ctx.fill();
+  for (let i = 0; i < 6; i++) { const age = (time / 30 + i * 23) % 60; ctx.globalAlpha = Math.max(0, .55 - age / 110); ctx.fillStyle = i % 2 ? '#4a1f7a' : '#1a0f2e'; ctx.fillRect(Math.round(cx - 14 + i * 5 + Math.sin(time / 400 + i) * 3), Math.round(cy + 8 - age * .7), 3, 3); }
+  ctx.restore();
+}
 function marker(ctx, x, y, time, color = '#fbdf86') {
   const top = y * 32 + 28 - CHARACTER_SIZE - 22 + Math.sin(time / 250) * 2;
   rect(ctx, x * 32 + 8, top, 16, 18, color); rect(ctx, x * 32 + 14, top + 3, 3, 7, '#5f4a2e'); rect(ctx, x * 32 + 14, top + 12, 3, 2, '#5f4a2e');
@@ -161,7 +170,8 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
     if (n.scenery) { drawDecor(ctx, n, map, time); continue; }
     const fx = n.x * 32 + (32 - CHARACTER_SIZE) / 2, fy = n.y * 32 + 28 - CHARACTER_SIZE;
     if (n.kind === 'board') drawScenery(ctx, 'board', n.x * 32 - 8, n.y * 32 - 16, 48, 54);
-    else if (n.kind === 'wild') drawMonster(ctx, n.species, n.x * 32 - 6, n.y * 32 - 12, 44, time / 1000);
+    else if (n.kind === 'wild') { darkWisps(ctx, n.x, n.y, time); drawMonster(ctx, n.species, n.x * 32 - 6, n.y * 32 - 12, 44, time / 1000); }
+    else if (n.kind === 'legend') { drawProp(ctx, 'observe', n.x, n.y, { time }); if (!n.used) marker(ctx, n.x, n.y, time, '#ffe9a0'); }
     else if (PROP_KINDS.includes(n.kind)) drawProp(ctx, n.kind, n.x, n.y, { open: n.used, art: n.art, time, water: map[n.y]?.[n.x] === 0 });
     else if (n.player) { if (!drawExplorer(ctx, state.avatar, fx, fy, CHARACTER_SIZE, state.dir, motion.walking, motion.distance || 0)) drawHuman(ctx, fx, fy, '#418e91', state.dir, 0, 'normal', null, CHARACTER_SIZE); }
     else if (n.actor && drawResident(ctx, n.actor, fx, fy, CHARACTER_SIZE, time, n.dir || 'down', n.walking || false, n.walkDistance || 0)) { /* drawn */ }

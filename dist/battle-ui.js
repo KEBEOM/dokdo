@@ -2,26 +2,34 @@
 // The game logic (game.js) drives it with await ui.say(...), await ui.menu(...), await ui.quiz(...).
 import { createTypewriter } from './typewriter.js';
 import { portrait } from './sprites.js';
-import { assetImage } from './assets.js';
+import { assetImage, drawAsset } from './assets.js';
 import { TERRAIN_ATLAS } from './terrain-atlas.js';
 import { SCENERY_ATLAS } from './scenery-atlas.js';
 import { terrainSample } from './terrain.js';
+import { drawResident } from './characters.js';
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
   let writer = null, waiting = null, menuState = null, quizState = null, els = {};
 
-  function mount({ backdrop = 'field', sky = '#7fb7c4', aura = false, label = '' }) {
+  let trainer = null, portraitKey = null, portraitTimer = 0;
+  // foePortrait: the 백무단 member's large picture (assets key). It shows while they appear and fades out
+  // when their 독도몬 comes out. Without it, the small walking sprite stands at the side instead.
+  function mount({ backdrop = 'field', sky = '#7fb7c4', aura = false, label = '', foeTrainer = null, foePortrait = null }) {
+    trainer = foePortrait ? null : foeTrainer; portraitKey = foePortrait; clearTimeout(portraitTimer);
     root.classList.add('dq');
     root.innerHTML = `
       <div class="dq-top">
         <div class="dq-window dq-status" id="dqStatus"></div>
         <div class="dq-window dq-foe" id="dqFoe"></div>
       </div>
-      <div class="dq-stage">
+      <div class="dq-stage ${trainer ? 'has-trainer' : ''}">
         <canvas class="dq-backdrop" width="320" height="140" aria-hidden="true"></canvas>
-        <div class="dq-enemy ${aura ? 'aura' : ''}"><canvas id="enemySprite" class="battle-mon enemy" width="160" height="160" aria-label="상대 독도몬"></canvas><span class="dq-dmg" aria-hidden="true"></span></div>
+        ${trainer ? '<canvas class="dq-trainer" width="144" height="144" aria-hidden="true"></canvas>' : ''}
+        ${foePortrait ? '<div class="dq-portrait" aria-hidden="true"><canvas width="384" height="384"></canvas></div>' : ''}
+        <div class="dq-enemy ${aura ? 'aura' : ''}"><i class="dq-shadow" aria-hidden="true"></i><canvas id="enemySprite" class="battle-mon enemy" width="160" height="160" aria-label="상대 독도몬"></canvas><span class="dq-dmg" aria-hidden="true"></span></div>
+        <div class="dq-mine"><i class="dq-shadow" aria-hidden="true"></i><canvas id="allySprite" class="dq-ally-mon" width="160" height="160" aria-label="내 독도몬 (뒷모습)"></canvas></div>
         <span class="dq-label">${esc(label)}</span>
       </div>
       <div class="dq-bottom">
@@ -35,7 +43,8 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
       status: root.querySelector('#dqStatus'), foe: root.querySelector('#dqFoe'), command: root.querySelector('#dqCommand'),
       message: root.querySelector('#dqMessage'), text: root.querySelector('.dq-text'), extra: root.querySelector('.dq-extra'),
       next: root.querySelector('#dqNext'), enemy: root.querySelector('#enemySprite'), enemyWrap: root.querySelector('.dq-enemy'),
-      dmg: root.querySelector('.dq-dmg'), backdrop: root.querySelector('.dq-backdrop')
+      dmg: root.querySelector('.dq-dmg'), backdrop: root.querySelector('.dq-backdrop'),
+      ally: root.querySelector('#allySprite'), allyWrap: root.querySelector('.dq-mine'), portrait: root.querySelector('.dq-portrait')
     };
     writer = createTypewriter(els.text, { speed: 22, onChar: onBlip });
     els.message.addEventListener('click', e => { if (e.target.closest('a,button:not(#dqNext):not(.locked)')) return; confirm(); });
@@ -57,7 +66,6 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
       c.save(); c.translate(x + (f.flipX ? 16 : 0), y + (f.flipY ? 16 : 0)); c.scale(f.flipX ? -1 : 1, f.flipY ? -1 : 1); c.drawImage(sheet, ...f.rect, 0, 0, 16.5, 16.5); c.restore();
     }
     if (kind === 'field' && sheet) for (let x = 0, tx = 0; x < 320; x += 16, tx++) { const f = terrainSample('tall', tx, 0); c.drawImage(sheet, ...f.rect, x, 124, 16.5, 16.5); }
-    c.fillStyle = '#00000022'; c.beginPath(); c.ellipse(160, 120, 54, 9, 0, 0, Math.PI * 2); c.fill();
   }
   function shade(hex, amt) { const n = parseInt(hex.slice(1), 16); const f = v => Math.max(0, Math.min(255, v + amt)); return '#' + [f(n >> 16), f((n >> 8) & 255), f(n & 255)].map(v => v.toString(16).padStart(2, '0')).join(''); }
 
@@ -67,10 +75,44 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
       <div class="dq-hp">HP <b>${m.hp}</b> / ${m.maxHp}</div>${bar(m.hp, m.maxHp)}</div></div>
       <div class="dq-party" aria-label="동료 상태">${party.map(p => `<i class="${p.hp <= 0 ? 'down' : p.active ? 'on' : ''}" title="${esc(p.name)}"></i>`).join('')}</div>`;
     portrait(els.status.querySelector('.dq-ally'), m.id);
+    portrait(els.ally, m.id, 0, true); // my 독도몬 is seen from behind
+    els.allyWrap.classList.toggle('tired', m.hp <= 0);
   }
   function setFoe(e, info, extra = '') {
-    els.foe.innerHTML = `<strong>${esc(info.name)}</strong><span class="dq-lv">Lv ${e.level} · ${esc(info.type)}</span>${bar(e.hp, e.maxHp)}${extra ? `<small>${esc(extra)}</small>` : ''}`;
-    portrait(els.enemy, e.id);
+    // 광포화된 독도몬: a purple 암흑 에너지 gauge; 관장 duels: a plain 기운 gauge
+    const r = Math.max(0, e.hp / e.maxHp);
+    const gauge = info.dark ? `<div class="dq-gauge-label">${esc(info.gauge)} ${Math.ceil(r * 100)}%</div><div class="dq-bar dark"><i style="width:${r * 100}%"></i></div>` : `<div class="dq-gauge-label">${esc(info.gauge || '기운')}</div>${bar(e.hp, e.maxHp)}`;
+    els.foe.innerHTML = `<strong>${info.dark && e.hp > 0 ? '<span class="dq-berserk">광포화</span> ' : ''}${esc(info.name)}</strong><span class="dq-lv">Lv ${e.level} · ${esc(info.type)}</span>${gauge}${extra ? `<small>${esc(extra)}</small>` : ''}`;
+    portrait(els.enemy, e.id); paintTrainer(); paintPortrait();
+  }
+  function paintPortrait() {
+    const c = els.portrait?.querySelector('canvas'); if (!c || !portraitKey) return;
+    const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); g.imageSmoothingEnabled = false;
+    drawAsset(g, portraitKey, 0, 0, c.width, c.height);
+  }
+  // The 백무단 member steps in (their 독도몬 waits off stage) …
+  function portraitIn() {
+    const p = els.portrait; if (!p) return false;
+    clearTimeout(portraitTimer); paintPortrait();
+    els.enemyWrap.classList.add('waiting'); els.enemyWrap.classList.remove('enter');
+    p.classList.remove('leave'); void p.offsetWidth; p.classList.add('show'); root.classList.add('intro'); return true;
+  }
+  // … and fades away as the 독도몬 comes out.
+  function portraitOut() {
+    const p = els.portrait; if (!p) { enemyEnter(); return; }
+    clearTimeout(portraitTimer); p.classList.remove('show'); void p.offsetWidth; p.classList.add('leave'); root.classList.remove('intro');
+    portraitTimer = setTimeout(() => { if (els.enemyWrap) { els.enemyWrap.classList.remove('waiting'); enemyEnter(); } }, 380);
+  }
+  // Sending out the next 독도몬: the member shows up for a moment, then fades again.
+  function portraitFlash() {
+    if (!portraitIn()) { enemyEnter(); return; }
+    portraitTimer = setTimeout(portraitOut, 900);
+  }
+  // The 백무단 member who started the fight stands at the side of the field.
+  function paintTrainer() {
+    const c = root.querySelector('.dq-trainer'); if (!c || !trainer) return;
+    const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); g.imageSmoothingEnabled = false;
+    drawResident(g, trainer, 0, 0, c.width, 0, 'left', false, 0);
   }
   function hideCommand() { els.command.hidden = true; els.command.innerHTML = ''; menuState = null; root.classList.remove('menu-open'); }
 
@@ -158,11 +200,19 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
   function flashEnemy() { els.enemyWrap.classList.remove('hit'); void els.enemyWrap.offsetWidth; els.enemyWrap.classList.add('hit'); }
   function damage(n, target = 'enemy') {
     if (target === 'enemy') { els.dmg.textContent = n; els.dmg.classList.remove('show'); void els.dmg.offsetWidth; els.dmg.classList.add('show'); flashEnemy(); }
-    else { root.classList.remove('shake'); void root.offsetWidth; root.classList.add('shake'); }
+    else { root.classList.remove('shake'); void root.offsetWidth; root.classList.add('shake'); allyAct('hit'); }
+  }
+  // My 독도몬's small motions: 'lunge' (uses a skill), 'hit', 'enter' (sent out), 'tired'.
+  function allyAct(kind) {
+    const w = els.allyWrap; if (!w) return;
+    w.classList.remove('lunge', 'hit', 'enter'); if (kind !== 'tired') w.classList.remove('tired');
+    void w.offsetWidth; w.classList.add(kind);
   }
   function enemyDefeated() { els.enemyWrap.classList.add('gone'); }
-  function enemyEnter() { els.enemyWrap.classList.remove('gone', 'hit'); els.enemyWrap.classList.add('enter'); setTimeout(() => els.enemyWrap?.classList.remove('enter'), 600); }
-  function setAura(on) { els.enemyWrap.classList.toggle('aura', !!on); }
+  function enemyEnter() { els.enemyWrap.classList.remove('gone', 'hit', 'calm'); els.enemyWrap.classList.add('enter'); setTimeout(() => els.enemyWrap?.classList.remove('enter'), 600); }
+  // Aura strength follows the remaining dark energy (0 = calm).
+  function setAura(level) { const v = typeof level === 'number' ? level : level ? 1 : 0; els.enemyWrap.classList.toggle('aura', v > 0); els.enemyWrap.style.setProperty('--aura', String(v)); if (v > 0) els.enemyWrap.classList.remove('calm'); }
+  function enemyCalmed() { setAura(0); els.enemyWrap.classList.remove('hit'); void els.enemyWrap.offsetWidth; els.enemyWrap.classList.add('calm'); }
 
   function handleKey(e) {
     const up = ['ArrowUp', 'w', 'W'].includes(e.key), down = ['ArrowDown', 's', 'S'].includes(e.key), ok = ['Enter', ' ', 'e', 'E'].includes(e.key);
@@ -182,6 +232,6 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
     if (ok && (waiting || writer?.typing)) { if (document.activeElement?.tagName === 'A') return false; confirm(); e.preventDefault(); return true; }
     return false;
   }
-  function destroy() { writer?.clear(); waiting = null; menuState = null; quizState = null; root.innerHTML = ''; root.classList.remove('dq', 'menu-open', 'quiz-open', 'shake'); }
-  return { mount, setStatus, setFoe, say, menu, quiz, reveal, explain, confirm, damage, enemyDefeated, enemyEnter, setAura, handleKey, destroy, get waiting() { return !!waiting; } };
+  function destroy() { clearTimeout(portraitTimer); writer?.clear(); waiting = null; menuState = null; quizState = null; root.innerHTML = ''; root.classList.remove('dq', 'menu-open', 'quiz-open', 'shake', 'intro'); }
+  return { mount, setStatus, setFoe, say, menu, quiz, reveal, explain, confirm, damage, enemyDefeated, enemyCalmed, enemyEnter, setAura, allyAct, portraitIn, portraitOut, portraitFlash, handleKey, destroy, get waiting() { return !!waiting; } };
 }

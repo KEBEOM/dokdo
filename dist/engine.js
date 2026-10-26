@@ -2,12 +2,24 @@ import {getSpecies,TYPES,ROSTER_VERSION,LEGACY_SPECIES_MAP} from './data.js';
 import {MAP_BY_ID,parseMap,MAP_W,MAP_H} from './maps.js';
 const START=parseMap('town0').spawns.a;
 export function stats(id,level){const s=getSpecies(id);const st=s.stage;return {maxHp:24+level*5+st*5,attack:8+level*2+st*3,defense:5+level+st*3,speed:8+level+(s.type==='wind'?6:0)};}
-export function createMonster(id,level=4){const s=stats(id,level);return {uid:`m${Date.now().toString(36)}${Math.random().toString(36).slice(2,7)}`,id,level,xp:0,hp:s.maxHp,...s,pp:[20,12,8,6]};}
+export function createMonster(id,level=4){const s=stats(id,level);return {uid:`m${Date.now().toString(36)}${Math.random().toString(36).slice(2,7)}`,id,level,xp:0,hp:s.maxHp,...s,pp:PP_MAX.slice()};}
 export function advantage(a,b){const ring={wave:'rock',rock:'wind',wind:'wave',leaf:'light',light:'echo',echo:'leaf'};return ring[a]===b?1.5:ring[b]===a?.75:1;}
 export function damage(attacker,defender,power=1,rng=Math.random){const mult=advantage(getSpecies(attacker.id).type,getSpecies(defender.id).type);return {amount:Math.max(3,Math.round((attacker.attack*power-defender.defense*.45)*mult*(.9+rng()*.2))),mult};}
-export function skills(m){const t=getSpecies(m.id).type;const names={wave:['물결 치기','너울 강타','숨 고르기','파도 보호'],wind:['바람 치기','돌풍 날개','숨 고르기','순풍 보호'],rock:['돌진','단단한 일격','숨 고르기','바위 보호'],leaf:['잎새 치기','꽃잎 바람','잎새 회복','초록 보호'],light:['빛줄기','반짝 강타','숨 고르기','별빛 보호'],echo:['울림 치기','메아리 파동','숨 고르기','기억 보호']}[t];return names.map((name,i)=>({name,kind:i<2?'attack':i===2?'heal':'guard',power:i===1?1.45:1,max:[20,12,8,6][i]}));}
-export function healAll(state){for(const m of state.party){const st=stats(m.id,m.level);Object.assign(m,st);m.hp=m.maxHp;m.pp=[20,12,8,6];}return state;}
-export function gainXP(m,amount){m.xp+=amount;const changes=[];while(m.xp>=m.level*13){m.xp-=m.level*13;m.level++;changes.push(`${getSpecies(m.id).name} Lv.${m.level}`);const sp=getSpecies(m.id);if(sp.evolvesTo&&m.level>=sp.evolveLevel){m.id=sp.evolvesTo;changes.push(`${sp.name} → ${getSpecies(m.id).name}`);}Object.assign(m,stats(m.id,m.level));m.hp=m.maxHp;m.pp=[20,12,8,6];}return changes;}
+// v0.23: the opponent's question attack always lands, but a correct answer softens the blow.
+export const SOFTEN_RATE=.25;
+export function enemyHit(attacker,defender,{correct=false,guard=false}={},rng=Math.random){let d=damage(attacker,defender,1,rng).amount;if(correct)d=Math.max(1,Math.round(d*SOFTEN_RATE));if(guard)d=Math.max(1,Math.ceil(d/2));return d;}
+// 기술: 처음(Lv1)에는 손길(정화)과 보호 두 가지, Lv8에 숨 고르기(회복), Lv12에 파동(강한 정화)을 배웁니다.
+// 배열 순서(0 손길, 1 파동, 2 숨 고르기, 3 보호)는 저장 파일의 기술 횟수(pp) 순서와 같습니다.
+export const PP_MAX=[25,8,8,10];
+export const LEARN_LEVEL=[1,12,8,1];
+const SKILL_NAMES={wave:['물결 손길','너울 파동','숨 고르기','파도 보호'],wind:['바람 손길','돌풍 파동','숨 고르기','순풍 보호'],rock:['바위 손길','묵직한 파동','숨 고르기','바위 보호'],leaf:['잎새 손길','꽃잎 파동','잎새 회복','초록 보호'],light:['빛줄기','반짝 파동','숨 고르기','별빛 보호'],echo:['울림 손길','메아리 파동','숨 고르기','기억 보호']};
+export function skills(m){const t=getSpecies(m.id).type;return SKILL_NAMES[t].map((name,i)=>({index:i,name,kind:i<2?'attack':i===2?'heal':'guard',power:i===1?1.74:1.2,max:PP_MAX[i],learn:LEARN_LEVEL[i]}));}
+// The skills this 독도몬 can use now, in the order they were learned.
+export function knownSkills(m){return skills(m).filter(s=>m.level>=s.learn).sort((a,b)=>a.learn-b.learn||a.index-b.index);}
+// Skills learned when the level rises from `from` to `to`.
+export function learnedBetween(m,from,to){return skills(m).filter(s=>s.learn>from&&s.learn<=to);}
+export function healAll(state){for(const m of state.party){const st=stats(m.id,m.level);Object.assign(m,st);m.hp=m.maxHp;m.pp=PP_MAX.slice();}return state;}
+export function gainXP(m,amount){m.xp+=amount;const changes=[];while(m.xp>=m.level*13){m.xp-=m.level*13;m.level++;changes.push(`${getSpecies(m.id).name} Lv.${m.level}`);const sp=getSpecies(m.id);if(sp.evolvesTo&&m.level>=sp.evolveLevel){m.id=sp.evolvesTo;changes.push(`${sp.name} → ${getSpecies(m.id).name}`);}Object.assign(m,stats(m.id,m.level));m.hp=m.maxHp;m.pp=PP_MAX.slice();}return changes;}
 export function captureChance(enemy){if(getSpecies(enemy.id).legendary)return 0;return Math.min(.93,.45+(1-enemy.hp/enemy.maxHp)*.43);}
 export function addMonster(state,mon){if(state.party.length<6)state.party.push(mon);else state.storage.push(mon);if(!state.caught.includes(mon.id))state.caught.push(mon.id);if(!state.seen.includes(mon.id))state.seen.push(mon.id);}
 export function recordAnswer(state,q,correct,assisted=false,context={}){const r=state.learning[q.concept]||{attempts:0,correct:0,independent:0,seen:[],sessions:[],last:0};r.attempts++;if(correct){r.correct++;if(!assisted)r.independent++;}if(!r.seen.includes(q.id))r.seen.push(q.id);if(!r.sessions.includes(state.sessionId))r.sessions.push(state.sessionId);r.last=Date.now();state.learning[q.concept]=r;state.answerLog.push({q:q.id,concept:q.concept,correct,assisted,time:Date.now(),session:state.sessionId,mode:context.mode||'study',phase:context.phase||'',opponent:context.opponent||null,zone:state.zone});if(state.answerLog.length>2000)state.answerLog.shift();return r;}
@@ -26,7 +38,7 @@ export function validateSave(value){
   for(const m of [...v.party,...v.storage]){
     if(!Number.isInteger(m.id)||m.id<1||m.id>100||!Number.isInteger(m.level)||m.level<1||m.level>100||!Number.isFinite(m.hp)||!Number.isFinite(m.xp)||m.xp<0||!Array.isArray(m.pp)||m.pp.length!==4||m.pp.some(p=>!Number.isInteger(p)||p<0))fail();
     if(legacy)m.id=LEGACY_SPECIES_MAP[m.id];
-    Object.assign(m,stats(m.id,m.level));m.hp=Math.max(0,Math.min(m.hp,m.maxHp));m.pp=m.pp.map((p,i)=>Math.min(p,[20,12,8,6][i]));
+    Object.assign(m,stats(m.id,m.level));m.hp=Math.max(0,Math.min(m.hp,m.maxHp));m.pp=m.pp.map((p,i)=>Math.min(p,PP_MAX[i]));
   }
   for(const p of v.progress)if(!p||typeof p!=='object'||!Number.isFinite(p.studied)||['met','enemy','boss'].some(k=>typeof p[k]!=='boolean'))fail();
   if(!v.items||!Number.isFinite(v.items.heal)||v.items.heal<0||!Number.isFinite(v.items.orb)||v.items.orb<0||!v.learning||typeof v.learning!=='object'||Array.isArray(v.learning))fail();
