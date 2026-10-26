@@ -176,7 +176,7 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
       }
       ctx.globalAlpha = 1;
       drawMonster(ctx, mon, 132, 70 + Math.sin(t / 120) * (s.cues.aura ? 2 : .8), 56, t / 1000);
-      // 백무단 members appear from the second panel on; the leader looms behind when the aura spreads.
+      // 몽땅랜드 members appear from the second panel on; the leader looms behind when the aura spreads.
       if (s.cues.aura) { ctx.globalAlpha = .55 + .15 * Math.sin(t / 300); drawResident(ctx, 'villain-leader', 128, 2, 64, t, 'down', false, 0); ctx.globalAlpha = 1; }
       if (panel !== 'sea') drawResident(ctx, 'villain-grunt-m', 58, 82, 58, t, 'right', false, 0);
       if (panel === 'grass' || s.cues.aura) drawResident(ctx, 'villain-grunt-f', 206, 82, 58, t, 'left', false, 0);
@@ -191,7 +191,7 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
       tiles('grass', 0, 94, SW, SH); peaks(-40, 112, 120, [110, 185, 590, 575]); peaks(250, 106, 100, [110, 185, 590, 575]);
       tiles('path', 40, 140, 320, SH);
       const on = s.cues.machine && !s.cues['machine-off'], off = s.cues['machine-off'], pulse = .5 + .5 * Math.sin(t / 140);
-      // the blank machine (공백 장치)
+      // the blank machine (지우개 기계)
       const mx = 232, my = 50, shake = off && t - off < 900 ? Math.round(Math.sin(t / 25) * 1.5) : 0;
       ctx.save(); ctx.translate(shake, 0);
       R(mx + 4, my + 66, 58, 6, '#2b2f3a'); R(mx, my + 20, 66, 48, '#5a6070'); R(mx + 2, my + 22, 62, 4, '#7a8192'); R(mx, my + 60, 66, 8, '#444a58');
@@ -220,7 +220,7 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
     },
     summitFront(t, s) {
       const dark = s.cues.dark && !s.cues['machine-off'];
-      if (dark) { // dark energy swirling around the 백무단 side
+      if (dark) { // dark energy swirling around the 몽땅랜드 side
         for (let i = 0; i < 22; i++) { const x = 200 + Math.sin(i * 1.3 + t / 500) * 60, y = 150 - ((t / 20 + i * 23) % 90); ctx.globalAlpha = .28; R(x, y, 6, 6, i % 2 ? '#3b1d5c' : '#120b1f'); }
         ctx.globalAlpha = 1;
       }

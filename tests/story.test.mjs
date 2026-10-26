@@ -25,7 +25,7 @@ function check(script) {
 // The 백무단 story: clues in chapters 1–7, then the truth, the excuse and the answer on 대한봉.
 assert.equal(VILLAIN_TALES.length, 8); VILLAIN_TALES.slice(0, 7).forEach(v => assert.ok(v.before.length && v.after.length)); assert.equal(VILLAIN_TALES[7], null);
 const reveal = BOSS_REVEAL.scenes.flatMap(s => s.lines).map(l => l.text).join(' ');
-for (const key of ['독도몬을 만들어', '테마파크', '암흑 에너지', '독도를 위해', '천연기념물 제336호']) assert.ok(reveal.includes(key), `reveal mentions ${key}`);
+for (const key of ['독도몬을 만들어', '테마파크', '검은 기운', '독도를 위해', '천연기념물 제336호']) assert.ok(reveal.includes(key), `reveal mentions ${key}`);
 assert.ok(BOSS_REVEAL.scenes[0].lines.some(l => l.choice?.length === 2));
 assert.ok(OPENING.scenes.flatMap(s => s.lines).some(l => l.text.includes('아직 아무도 몰라요')), 'the cause of 광포화 is unknown at first');
 // The opening follows the specification: contest → ship → dock → 독도몬 → crisis → mission with a choice.
@@ -42,3 +42,8 @@ assert.equal(josa('물골', '으로/로'), '물골로'); assert.equal(josa('우�
 assert.equal(fillJosa('{s}와(과) 함께, {s}을(를) 골랐다', { s: '해국' }), '해국과 함께, 해국을 골랐다');
 assert.equal(fillJosa('{s}와(과) 함께', { s: '독도새우' }), '독도새우와 함께');
 console.log('PASS: opening/guide/legend/arrival scripts are well-formed and follow the spec; Korean particles follow the last syllable.');
+
+// Easy words for grades 5–6: no 광포화 / 암흑 에너지 / 백무단 left in what players read.
+for (const script of [OPENING, GUIDE, LEGEND, BOSS_REVEAL, BOSS_FALL, EPILOGUE]) for (const l of script.scenes.flatMap(s => s.lines.flatMap(l => [l, ...(l.choice || []).flatMap(c => c.reply || [])]))) assert.ok(!/광포화|암흑 에너지|백무단|공백 장치/.test(l.text + (l.who || '')), `easy words: ${l.text}`);
+for (const v of VILLAIN_TALES.filter(Boolean)) for (const t of [...v.before, ...v.after]) assert.ok(!/광포화|암흑 에너지|백무단/.test(t), t);
+assert.ok(OPENING.scenes.flatMap(s => s.lines).some(l => l.text.includes('몽땅랜드 컴퍼니')), 'the company is named in the opening');

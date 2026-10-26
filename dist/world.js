@@ -35,7 +35,7 @@ export function villageResidents(zone) {
   ];
 }
 
-// 백무단: 수집원·조사원·기록 관리자는 대원, 먹선·쇄도·무음은 간부, 마지막은 대표 백무.
+// 몽땅랜드: 수집원·조사원·기록 관리자는 대원, 먹선·쇄도·무음은 팀장, 마지막은 백무 사장.
 export const VILLAIN_BY_ZONE = ['villain-grunt-m', 'villain-grunt-f', 'villain-grunt-m', 'villain-exec-ink', 'villain-exec-crimson', 'villain-grunt-f', 'villain-exec-indigo', 'villain-leader'];
 const ROLE_ACTOR = zone => ({
   history: zone === 0 ? 'professor' : zone === 4 || zone === 7 ? 'child-girl' : 'man',
@@ -60,7 +60,7 @@ export function npcs(ref = 0, progress = {}, flags = {}) {
     ];
     roles.forEach(([id, info], i) => { const p = at(id); if (p) list.push({ id, x: p.x, y: p.y, sprite: `npc/${String(zone + 1).padStart(2, '0')}/${String(i + 1).padStart(2, '0')}`, ...info }); });
     EXTRA_NPCS.filter(n => n.zone === zone).forEach((n, i) => { const p = at(`extra${i}`); if (p) list.push({ ...n, id: 'extra', kind: 'history', x: p.x, y: p.y }); });
-    // 풀숲 위에 서 있는 야생 독도몬은 두지 않아요. 광포화된 독도몬은 풀숲을 걸을 때 갑자기 나타나요.
+    // 풀숲 위에 서 있는 야생 독도몬은 두지 않아요. 사나워진 독도몬은 풀숲을 걸을 때 갑자기 나타나요.
     for (const r of villageResidents(zone)) { const p = parsed.residents[r.key]; if (p) list.push({ ...r, id: 'resident', kind: 'resident', x: p.x, y: p.y }); }
   }
   for (const o of parsed.objects) {
@@ -149,7 +149,7 @@ export function drawNPCNameplate(ctx, name, cx, y, camX = 0, camY = 0) {
 // What the yellow quest marker points at in a town.
 export function wantedRole(p) { return !p.met ? 'history' : p.studied < 2 ? 'board' : !p.enemy ? 'enemy' : !p.boss ? 'boss' : null; }
 
-// 광포화: wild 독도몬 on the map are wrapped in drifting dark energy.
+// 사나워짐: wild 독도몬 on the map are wrapped in drifting dark energy.
 function darkWisps(ctx, x, y, time) {
   const cx = x * 32 + 16, cy = y * 32 + 18;
   ctx.save(); ctx.globalAlpha = .28 + .1 * Math.sin(time / 300); ctx.fillStyle = '#3b1d5c'; ctx.beginPath(); ctx.ellipse(cx, cy + 6, 20, 9, 0, 0, Math.PI * 2); ctx.fill();

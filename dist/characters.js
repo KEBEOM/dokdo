@@ -3,7 +3,7 @@ import {strideFrame,MOVE_DURATION} from './movement.js';
 import {EXPLORER_ATLAS} from './explorer-atlas.js';
 import {NPC_ATLASES as RESIDENT_ATLASES} from './npc-atlases.js';
 import {VILLAIN_ATLASES} from './villain-atlases.js';
-// Residents plus the 백무단 designs; every NPC sheet shares one format.
+// Residents plus the 몽땅랜드 designs; every NPC sheet shares one format.
 export const NPC_ATLASES={...RESIDENT_ATLASES,...VILLAIN_ATLASES};
 export const EXPLORERS=[{id:'girl',label:'여학생',portrait:EXPLORER_ATLAS.key,sheet:EXPLORER_ATLAS.key},{id:'boy',label:'남학생',portrait:EXPLORER_ATLAS.key,sheet:EXPLORER_ATLAS.key}];
 export const RESIDENTS=[

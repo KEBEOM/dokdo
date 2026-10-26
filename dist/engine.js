@@ -23,7 +23,7 @@ export function gainXP(m,amount){m.xp+=amount;const changes=[];while(m.xp>=m.lev
 export function captureChance(enemy){if(getSpecies(enemy.id).legendary)return 0;return Math.min(.93,.45+(1-enemy.hp/enemy.maxHp)*.43);}
 export function addMonster(state,mon){if(state.party.length<6)state.party.push(mon);else state.storage.push(mon);if(!state.caught.includes(mon.id))state.caught.push(mon.id);if(!state.seen.includes(mon.id))state.seen.push(mon.id);}
 export function recordAnswer(state,q,correct,assisted=false,context={}){const r=state.learning[q.concept]||{attempts:0,correct:0,independent:0,seen:[],sessions:[],last:0};r.attempts++;if(correct){r.correct++;if(!assisted)r.independent++;}if(!r.seen.includes(q.id))r.seen.push(q.id);if(!r.sessions.includes(state.sessionId))r.sessions.push(state.sessionId);r.last=Date.now();state.learning[q.concept]=r;state.answerLog.push({q:q.id,concept:q.concept,correct,assisted,time:Date.now(),session:state.sessionId,mode:context.mode||'study',phase:context.phase||'',opponent:context.opponent||null,zone:state.zone});if(state.answerLog.length>2000)state.answerLog.shift();return r;}
-export function newState(){return {schema:1,rosterVersion:ROSTER_VERSION,started:false,zone:0,map:'town0',visited:[0],flags:{},x:START.x,y:START.y,dir:'up',avatar:null,party:[],storage:[],active:0,caught:[],seen:[],badges:[],progress:Array.from({length:8},()=>({met:false,studied:0,enemy:false,boss:false})),learning:{},answerLog:[],items:{heal:8,orb:15},coins:120,playMs:0,ended:false,legend:false,sound:false,sessionId:Date.now().toString(36),savedAt:0};}
+export function newState(){return {schema:1,rosterVersion:ROSTER_VERSION,started:false,zone:0,map:'town0',visited:[0],flags:{},x:START.x,y:START.y,dir:'up',avatar:null,party:[],storage:[],active:0,caught:[],seen:[],badges:[],progress:Array.from({length:8},()=>({met:false,studied:0,enemy:false,boss:false})),learning:{},answerLog:[],items:{heal:8,orb:15},coins:120,playMs:0,ended:false,legend:false,sound:false,tutorial:{battle:true,walk:4},sessionId:Date.now().toString(36),savedAt:0};}
 export function validateSave(value){
   const fail=()=>{throw new Error('저장 파일의 정보가 올바르지 않아요.');};
   if(!value||value.schema!==1||!Array.isArray(value.party)||value.party.length>6||!Array.isArray(value.progress)||value.progress.length!==8||!Number.isInteger(value.zone)||value.zone<0||value.zone>7)fail();
@@ -42,6 +42,8 @@ export function validateSave(value){
   }
   for(const p of v.progress)if(!p||typeof p!=='object'||!Number.isFinite(p.studied)||['met','enemy','boss'].some(k=>typeof p[k]!=='boolean'))fail();
   if(!v.items||!Number.isFinite(v.items.heal)||v.items.heal<0||!Number.isFinite(v.items.orb)||v.items.orb<0||!v.learning||typeof v.learning!=='object'||Array.isArray(v.learning))fail();
+  // 튜토리얼 진행(연습 대결, 걷기 안내 0~4단계). 예전 저장 파일은 이미 끝낸 것으로 봐요.
+  const t=v.tutorial&&typeof v.tutorial==='object'?v.tutorial:{battle:true,walk:4};v.tutorial={battle:!!t.battle,walk:Math.max(0,Math.min(4,Number.isInteger(t.walk)?t.walk:4))};
   for(const k of ['coins','playMs','savedAt'])if(!Number.isFinite(v[k])||v[k]<0)fail();
   for(const r of Object.values(v.learning))if(!r||['attempts','correct','independent','last'].some(k=>!Number.isFinite(r[k])||r[k]<0)||!Array.isArray(r.seen)||!Array.isArray(r.sessions))fail();
   for(const a of v.answerLog)if(!a||typeof a.q!=='string'||typeof a.concept!=='string'||typeof a.session!=='string'||!Number.isFinite(a.time)||a.time<0||a.time>8640000000000000||typeof a.correct!=='boolean'||typeof a.assisted!=='boolean')fail();

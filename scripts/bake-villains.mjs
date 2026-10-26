@@ -1,11 +1,11 @@
-// 백무단 NPC 걷기 시트 생성기 (v0.25 · 사용자 참고 도트 반영)
+// 몽땅랜드 NPC 걷기 시트 생성기 (v0.25 · 사용자 참고 도트 반영)
 // node scripts/bake-villains.mjs  →  dist/assets/characters/villain-*-v25.png + dist/villain-atlases.js
 //
 // 도트 원본은 scripts/villain-dots.json 에 글자 그림으로 들어 있습니다(한 칸 32×32 도트, 글자 하나 = 도트 하나).
-//   grunt: 부하(참고 이미지 2)  boss: 대표 백무(참고 이미지 1)
+//   grunt: 직원(참고 이미지 2)  boss: 백무 사장(참고 이미지 1)
 //   sheets.down / right / up 마다 [정지, 걷기1, 걷기2, 걷기3, 걷기4]. 왼쪽은 오른쪽을 반전합니다.
 // 주인공·김박사와 같은 크기: 32도트 = 지도 한 칸(unit), 몸 높이 약 26도트, 검은 1도트 외곽선.
-// 아래 DESIGNS에서 색 바꾸기(recolor), 머리카락 감추기(hood), 간부 코트(coat)를 고칠 수 있습니다.
+// 아래 DESIGNS에서 색 바꾸기(recolor), 머리카락 감추기(hood), 팀장 코트(coat)를 고칠 수 있습니다.
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -20,12 +20,12 @@ const OUTLINE = '#080709', HEAD_MAX = 18, BELT = 23, COAT_END = 27; // rows on t
 const GREYS = 'cdeghjk';
 const ramp = (dark, light) => Object.fromEntries([...GREYS].map((ch, i) => [ch, mix(dark, light, i / (GREYS.length - 1))]));
 export const DESIGNS = {
-  'grunt-m': { label: '백무단 부하', base: 'grunt', hood: true },
-  'grunt-f': { label: '백무단 부하', base: 'grunt', hair: { b: '#2a1d16', f: '#4a3628', i: '#6a5040' } },
-  'exec-ink': { label: '간부 먹선', base: 'grunt', hood: true, coat: { body: '#1b1c21', shade: '#121317', trim: '#7a2333', opening: '#2b2c33' }, belt: '#7a2333' },
-  'exec-crimson': { label: '간부 쇄도', base: 'grunt', hair: { b: '#2a1d16', f: '#4a3628', i: '#6a5040' }, head: ramp('#3a1118', '#8a2c3a'), coat: { body: '#1d1a1d', shade: '#131114', trim: '#8f2b3b', opening: '#341a20' }, belt: '#5c4733' },
-  'exec-indigo': { label: '간부 무음', base: 'grunt', hood: true, head: ramp('#252b3a', '#5f6a82'), coat: { body: '#222634', shade: '#171a24', trim: '#8d96a8', opening: '#323849' }, belt: '#4b4f5c' },
-  leader: { label: '대표 백무', base: 'boss' }
+  'grunt-m': { label: '몽땅랜드 직원', base: 'grunt', hood: true },
+  'grunt-f': { label: '몽땅랜드 직원', base: 'grunt', hair: { b: '#2a1d16', f: '#4a3628', i: '#6a5040' } },
+  'exec-ink': { label: '먹선 팀장', base: 'grunt', hood: true, coat: { body: '#1b1c21', shade: '#121317', trim: '#7a2333', opening: '#2b2c33' }, belt: '#7a2333' },
+  'exec-crimson': { label: '쇄도 팀장', base: 'grunt', hair: { b: '#2a1d16', f: '#4a3628', i: '#6a5040' }, head: ramp('#3a1118', '#8a2c3a'), coat: { body: '#1d1a1d', shade: '#131114', trim: '#8f2b3b', opening: '#341a20' }, belt: '#5c4733' },
+  'exec-indigo': { label: '무음 팀장', base: 'grunt', hood: true, head: ramp('#252b3a', '#5f6a82'), coat: { body: '#222634', shade: '#171a24', trim: '#8d96a8', opening: '#323849' }, belt: '#4b4f5c' },
+  leader: { label: '백무 사장', base: 'boss' }
 };
 
 function mix(a, b, t) { const A = hex(a), B = hex(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join(''); }
@@ -46,7 +46,7 @@ function paint(d, rows, dir) {
   if (d.coat) coat(g, rows, d.coat, dir);
   return g;
 }
-// 간부: the jacket continues as a long coat over the legs (boots still show), trimmed in the design colour.
+// 팀장: the jacket continues as a long coat over the legs (boots still show), trimmed in the design colour.
 function coat(g, rows, c, dir) {
   const skin = (x, y) => 'now'.includes(rows[y][x]);
   const xs = g[BELT].map((v, x) => (v ? x : -1)).filter(x => x >= 0); if (!xs.length) return;
@@ -103,7 +103,7 @@ export function bake(write = true) {
     if (write) fs.writeFileSync(path.join(root, 'dist/assets', key + '.png'), png(W, H, rgba));
     atlases[`villain-${id}`] = { key, label: d.label, width: W, height: H, unit: N * SCALE, rows: { down: 0, right: 1, up: 2 }, frames };
   }
-  if (write) fs.writeFileSync(path.join(root, 'dist/villain-atlases.js'), `// 백무단 걷기 시트 (scripts/bake-villains.mjs가 scripts/villain-dots.json으로 만든 파일). 정지 1 + 걷기 4, 왼쪽은 오른쪽 반전.\nexport const VILLAIN_ATLASES=${JSON.stringify(atlases)};\n`);
+  if (write) fs.writeFileSync(path.join(root, 'dist/villain-atlases.js'), `// 몽땅랜드 걷기 시트 (scripts/bake-villains.mjs가 scripts/villain-dots.json으로 만든 파일). 정지 1 + 걷기 4, 왼쪽은 오른쪽 반전.\nexport const VILLAIN_ATLASES=${JSON.stringify(atlases)};\n`);
   return atlases;
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) { const a = bake(); console.log('baked', Object.keys(a).join(', ')); }

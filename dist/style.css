@@ -276,3 +276,40 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
 .battle-screen.dq.quiz-open .dq-portrait{height:100%}
 .battle-screen.dq.intro .dq-foe{visibility:hidden}
 .dq-portrait{height:min(100%,58vw);bottom:0}
+
+/* v0.29 — tutorial: 김박사's tips in the practice duel and on the map */
+.dq-coach{position:absolute;left:50%;top:8px;transform:translateX(-50%);z-index:6;display:flex;align-items:center;gap:10px;max-width:min(92%,640px);padding:8px 14px 8px 8px;background:#fff9e6;color:#2d4a44;border:3px solid #f0c45a;border-radius:12px;box-shadow:0 4px 0 #0005}
+.dq-coach canvas{width:48px;height:48px;flex:0 0 48px;image-rendering:pixelated;background:#e9f1e2;border-radius:8px}
+.dq-coach p{margin:0;font-size:16px;line-height:1.5;font-weight:700}
+.dq-coach-skip{flex:0 0 auto;font-size:12px;padding:6px 9px;border-radius:6px;background:#e5ebdc;color:#3b5a50}
+.dq-coach.pop{animation:coach-pop .35s ease-out}
+@keyframes coach-pop{from{transform:translate(-50%,-6px);opacity:0}to{transform:translateX(-50%);opacity:1}}
+.dq-option.coach-pick{outline:3px solid #f0c45a;outline-offset:2px;animation:coach-glow 1.1s ease-in-out infinite}
+@keyframes coach-glow{50%{outline-color:#fff3c0;box-shadow:0 0 14px #f0c45a}}
+.battle-screen.dq.quiz-open .dq-coach{top:4px;padding:5px 10px 5px 5px}.battle-screen.dq.quiz-open .dq-coach canvas{width:36px;height:36px;flex-basis:36px}.battle-screen.dq.quiz-open .dq-coach p{font-size:14px}
+.coach-panel{position:absolute;z-index:6;top:96px;left:50%;transform:translateX(-50%);width:min(560px,calc(100% - 24px));display:flex;gap:12px;align-items:center;padding:10px 14px 10px 10px;background:#fff9e6;border:3px solid #f0c45a;border-radius:12px;box-shadow:0 4px 0 #19393f44;color:#2d4a44}
+.coach-panel canvas{width:52px;height:52px;flex:0 0 52px;image-rendering:pixelated;background:#e9f1e2;border-radius:8px}
+.coach-panel small{display:block;font-size:11px;color:#8a9a7a;font-weight:700;letter-spacing:1px}
+.coach-panel p{margin:2px 0 0;font-size:15px;line-height:1.5;font-weight:700}
+.coach-panel button{margin-left:auto;flex:0 0 auto;font-size:12px;padding:7px 10px;border-radius:6px;background:#e5ebdc}
+.screen-frame.battling .coach-panel,.screen-frame.story .coach-panel{display:none}
+.coach-glow{outline:3px solid #f0c45a!important;outline-offset:2px;animation:coach-glow 1.1s ease-in-out infinite}
+@media(max-width:600px){.coach-panel{top:78px}.coach-panel p{font-size:14px}.dq-coach p{font-size:14px}}
+
+/* v0.30 — world map: a picture of the two islands with clickable towns */
+.world-map{position:relative;width:100%;aspect-ratio:16/10;margin:12px 0 8px;border:4px solid #2c5560;border-radius:12px;overflow:hidden;background:#2e84a0;box-shadow:0 4px 0 #18393f33}
+.world-map canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
+.wm-town{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;padding:0;background:none;border:0;cursor:pointer;z-index:2}
+.wm-town i{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;font-style:normal;font-weight:900;font-size:16px;background:#f7f1d8;color:#2d5a4e;border:3px solid #2d5a4e;box-shadow:0 3px 0 #0005}
+.wm-town span{font-size:12px;font-weight:800;color:#fff;background:#173c43d9;padding:2px 7px;border-radius:10px;white-space:nowrap}
+.wm-town.visited:not(:disabled):hover i,.wm-town.visited:not(:disabled):focus-visible i{background:#ffe28a;transform:scale(1.12)}
+.wm-town.here i{background:#ffe28a;color:#7a4a10;border-color:#7a4a10;animation:wm-pulse 1.2s ease-in-out infinite}
+.wm-town.locked i{background:#c9d2cc;color:#6a7a74;border-color:#6a7a74}.wm-town.locked span{opacity:.8}
+.wm-town:disabled{opacity:1;cursor:default}
+@keyframes wm-pulse{50%{box-shadow:0 0 0 6px #ffe28a66,0 3px 0 #0005}}
+.wm-route{position:absolute;transform:translate(-50%,-50%);font-size:10px;color:#fffbe8;background:#2c556099;padding:1px 6px;border-radius:8px;white-space:nowrap;pointer-events:none;z-index:1}
+.wm-route.here{background:#7a4a10;color:#ffe9b0;font-weight:800}
+.wm-island{position:absolute;transform:translate(-50%,-50%);font-size:13px;font-weight:900;color:#fff;letter-spacing:3px;text-shadow:0 2px 0 #0006}
+.wm-compass{position:absolute;right:10px;top:8px;color:#fff;font-weight:900;font-size:11px;text-align:center;line-height:1;text-shadow:0 2px 0 #0006}
+.wm-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:#5a7a6a}.wm-legend i{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;font-style:normal;font-size:10px;font-weight:900;border:2px solid #2d5a4e;background:#f7f1d8;margin-right:3px}.wm-legend i.here{background:#ffe28a}.wm-legend i.locked{background:#c9d2cc}
+@media(max-width:600px){.wm-town i{width:26px;height:26px;font-size:12px;border-width:2px}.wm-town span{font-size:10px;padding:1px 5px}.wm-route{display:none}.wm-island{font-size:11px}}

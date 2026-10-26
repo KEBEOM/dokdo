@@ -14,7 +14,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
   let writer = null, waiting = null, menuState = null, quizState = null, els = {};
 
   let trainer = null, portraitKey = null, portraitTimer = 0;
-  // foePortrait: the 백무단 member's large picture (assets key). It shows while they appear and fades out
+  // foePortrait: the 몽땅랜드 member's large picture (assets key). It shows while they appear and fades out
   // when their 독도몬 comes out. Without it, the small walking sprite stands at the side instead.
   function mount({ backdrop = 'field', sky = '#7fb7c4', aura = false, label = '', foeTrainer = null, foePortrait = null }) {
     trainer = foePortrait ? null : foeTrainer; portraitKey = foePortrait; clearTimeout(portraitTimer);
@@ -31,6 +31,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
         <div class="dq-enemy ${aura ? 'aura' : ''}"><i class="dq-shadow" aria-hidden="true"></i><canvas id="enemySprite" class="battle-mon enemy" width="160" height="160" aria-label="상대 독도몬"></canvas><span class="dq-dmg" aria-hidden="true"></span></div>
         <div class="dq-mine"><i class="dq-shadow" aria-hidden="true"></i><canvas id="allySprite" class="dq-ally-mon" width="160" height="160" aria-label="내 독도몬 (뒷모습)"></canvas></div>
         <span class="dq-label">${esc(label)}</span>
+        <div class="dq-coach" hidden><canvas width="64" height="64" aria-hidden="true"></canvas><p></p><button type="button" class="dq-coach-skip" hidden>연습 건너뛰기</button></div>
       </div>
       <div class="dq-bottom">
         <div class="dq-window dq-command" id="dqCommand" hidden></div>
@@ -44,7 +45,8 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
       message: root.querySelector('#dqMessage'), text: root.querySelector('.dq-text'), extra: root.querySelector('.dq-extra'),
       next: root.querySelector('#dqNext'), enemy: root.querySelector('#enemySprite'), enemyWrap: root.querySelector('.dq-enemy'),
       dmg: root.querySelector('.dq-dmg'), backdrop: root.querySelector('.dq-backdrop'),
-      ally: root.querySelector('#allySprite'), allyWrap: root.querySelector('.dq-mine'), portrait: root.querySelector('.dq-portrait')
+      ally: root.querySelector('#allySprite'), allyWrap: root.querySelector('.dq-mine'), portrait: root.querySelector('.dq-portrait'),
+      coach: root.querySelector('.dq-coach')
     };
     writer = createTypewriter(els.text, { speed: 22, onChar: onBlip });
     els.message.addEventListener('click', e => { if (e.target.closest('a,button:not(#dqNext):not(.locked)')) return; confirm(); });
@@ -79,10 +81,10 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
     els.allyWrap.classList.toggle('tired', m.hp <= 0);
   }
   function setFoe(e, info, extra = '') {
-    // 광포화된 독도몬: a purple 암흑 에너지 gauge; 관장 duels: a plain 기운 gauge
+    // 사나워진 독도몬: a purple 검은 기운 gauge; 관장 duels: a plain 기운 gauge
     const r = Math.max(0, e.hp / e.maxHp);
     const gauge = info.dark ? `<div class="dq-gauge-label">${esc(info.gauge)} ${Math.ceil(r * 100)}%</div><div class="dq-bar dark"><i style="width:${r * 100}%"></i></div>` : `<div class="dq-gauge-label">${esc(info.gauge || '기운')}</div>${bar(e.hp, e.maxHp)}`;
-    els.foe.innerHTML = `<strong>${info.dark && e.hp > 0 ? '<span class="dq-berserk">광포화</span> ' : ''}${esc(info.name)}</strong><span class="dq-lv">Lv ${e.level} · ${esc(info.type)}</span>${gauge}${extra ? `<small>${esc(extra)}</small>` : ''}`;
+    els.foe.innerHTML = `<strong>${info.dark && e.hp > 0 ? '<span class="dq-berserk">사나워짐</span> ' : ''}${esc(info.name)}</strong><span class="dq-lv">Lv ${e.level} · ${esc(info.type)}</span>${gauge}${extra ? `<small>${esc(extra)}</small>` : ''}`;
     portrait(els.enemy, e.id); paintTrainer(); paintPortrait();
   }
   function paintPortrait() {
@@ -90,7 +92,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
     const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); g.imageSmoothingEnabled = false;
     drawAsset(g, portraitKey, 0, 0, c.width, c.height);
   }
-  // The 백무단 member steps in (their 독도몬 waits off stage) …
+  // The 몽땅랜드 member steps in (their 독도몬 waits off stage) …
   function portraitIn() {
     const p = els.portrait; if (!p) return false;
     clearTimeout(portraitTimer); paintPortrait();
@@ -108,7 +110,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
     if (!portraitIn()) { enemyEnter(); return; }
     portraitTimer = setTimeout(portraitOut, 900);
   }
-  // The 백무단 member who started the fight stands at the side of the field.
+  // The 몽땅랜드 member who started the fight stands at the side of the field.
   function paintTrainer() {
     const c = root.querySelector('.dq-trainer'); if (!c || !trainer) return;
     const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); g.imageSmoothingEnabled = false;
@@ -141,6 +143,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
     const all = cancel ? [...items, { label: '돌아가기', value: null, back: true }] : items;
     els.command.hidden = false;
     els.command.innerHTML = `${title ? `<div class="dq-command-title">${esc(title)}</div>` : ''}<div class="dq-options">${all.map((it, i) => `<button type="button" class="dq-option ${it.back ? 'back' : ''}" data-index="${i}" ${it.value ? `data-cmd="${esc(it.value)}"` : ''} ${it.disabled ? 'disabled' : ''}><span class="dq-cursor">▶</span><span>${esc(it.label)}</span>${it.sub ? `<small>${esc(it.sub)}</small>` : ''}</button>`).join('')}</div>`;
+    all.forEach((it, i) => { if (it.hint) els.command.querySelectorAll('.dq-option')[i].classList.add('coach-pick'); });
     return new Promise(resolve => {
       const buttons = [...els.command.querySelectorAll('.dq-option')];
       const choose = i => { if (all[i].disabled) return; const v = all[i].value; hideCommand(); onSelect?.(); resolve(v); };
@@ -208,6 +211,15 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
     w.classList.remove('lunge', 'hit', 'enter'); if (kind !== 'tired') w.classList.remove('tired');
     void w.offsetWidth; w.classList.add(kind);
   }
+  // 연습 대결: 김박사's tip above the field. text null hides it; onSkip shows the skip button.
+  function coach(text, { onSkip = null } = {}) {
+    const c = els.coach; if (!c) return;
+    if (!text) { c.hidden = true; return; }
+    c.hidden = false; c.querySelector('p').textContent = text;
+    const g = c.querySelector('canvas').getContext('2d'); g.clearRect(0, 0, 64, 64); g.imageSmoothingEnabled = false; drawResident(g, 'professor', 0, 0, 64);
+    const skip = c.querySelector('.dq-coach-skip'); skip.hidden = !onSkip; skip.onclick = onSkip ? e => { e.stopPropagation(); onSkip(); } : null;
+    c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop');
+  }
   function enemyDefeated() { els.enemyWrap.classList.add('gone'); }
   function enemyEnter() { els.enemyWrap.classList.remove('gone', 'hit', 'calm'); els.enemyWrap.classList.add('enter'); setTimeout(() => els.enemyWrap?.classList.remove('enter'), 600); }
   // Aura strength follows the remaining dark energy (0 = calm).
@@ -233,5 +245,5 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
     return false;
   }
   function destroy() { clearTimeout(portraitTimer); writer?.clear(); waiting = null; menuState = null; quizState = null; root.innerHTML = ''; root.classList.remove('dq', 'menu-open', 'quiz-open', 'shake', 'intro'); }
-  return { mount, setStatus, setFoe, say, menu, quiz, reveal, explain, confirm, damage, enemyDefeated, enemyCalmed, enemyEnter, setAura, allyAct, portraitIn, portraitOut, portraitFlash, handleKey, destroy, get waiting() { return !!waiting; } };
+  return { mount, setStatus, setFoe, say, menu, quiz, reveal, explain, confirm, damage, enemyDefeated, enemyCalmed, enemyEnter, setAura, allyAct, portraitIn, portraitOut, portraitFlash, coach, handleKey, destroy, get waiting() { return !!waiting; } };
 }
