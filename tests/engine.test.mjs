@@ -90,8 +90,8 @@ test('combat question selection spaces repeats and revisits missed concepts',()=
 test('requested starters, exact spreadsheet names and NO.100',()=>{
  assert.deepEqual(STARTERS.map(id=>getSpecies(id).name),['해국','괭이갈매기','독도새우']);
  assert.equal(getSpecies(3).name,'섬기린초');assert.equal(getSpecies(100).name,'강치');
- assert.deepEqual(MONSTERS.filter(m=>m.legendary).map(m=>m.name),['사철나무','강치'],'two legendary 독도몬');
- // legendary and starter 독도몬 exist once in the whole game: never in the grass, a 관장 team or a 백무단 team
+ assert.deepEqual(MONSTERS.filter(m=>m.legendary).map(m=>m.name),['사철나무','강치'],'two legendary 우산몬');
+ // legendary and starter 우산몬 exist once in the whole game: never in the grass, a 관장 team or a 백무단 team
  const reachable=new Set(ZONES.flatMap(z=>[...z.wild,...z.bossTeam]));assert.equal(new Set(ZONES.flatMap(z=>z.wild)).size,95);
  for(const id of [1,66,67,18,100])assert.ok(!reachable.has(id),`${id} is unique`);
 });
@@ -110,7 +110,7 @@ test('responsive cameras stay in bounds and preserve tile positions',()=>{
  }
 });
 
-test('skills: two at first, more as the 독도몬 grows; 정화 skills only', () => {
+test('skills: two at first, more as the 우산몬 grows; 정화 skills only', () => {
   const m = createMonster(1, 5);
   assert.deepEqual(knownSkills(m).map(s => s.kind), ['attack', 'guard'], 'Lv5: an attack skill and a guard skill');
   assert.equal(knownSkills(createMonster(1, 1)).length, 2, 'Lv1 starts with two');
@@ -119,7 +119,7 @@ test('skills: two at first, more as the 독도몬 grows; 정화 skills only', ()
   assert.equal(skills(m).length, 4); assert.deepEqual(m.pp, PP_MAX);
   const grown = createMonster(1, 7); let before = grown.level; gainXP(grown, 7 * 13); assert.equal(grown.level, 8); assert.equal(learnedBetween(grown, before, grown.level).length, 1);
 });
-test('no wild 독도몬 stand on the grass; the legendary tree is only seen on 천장굴 and joins from 백무 사장', () => {
+test('no wild 우산몬 stand on the grass; the legendary tree is only seen on 천장굴 and joins from 백무 사장', () => {
   const p = { met: true, studied: 2, enemy: false, boss: false };
   for (const def of MAPS) for (const n of npcs(createMap(def.id), p, {})) assert.notEqual(n.kind, 'wild', `${def.id}: no monster standing on the grass`);
   const legends = MAPS.flatMap(def => npcs(createMap(def.id), p, {}).filter(n => n.kind === 'legend').map(n => [def.id, n.species]));

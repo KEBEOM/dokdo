@@ -15,7 +15,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
 
   let trainer = null, portraitKey = null, portraitTimer = 0;
   // foePortrait: the 몽땅랜드 member's large picture (assets key). It shows while they appear and fades out
-  // when their 독도몬 comes out. Without it, the small walking sprite stands at the side instead.
+  // when their 우산몬 comes out. Without it, the small walking sprite stands at the side instead.
   function mount({ backdrop = 'field', sky = '#7fb7c4', aura = false, label = '', foeTrainer = null, foePortrait = null }) {
     trainer = foePortrait ? null : foeTrainer; portraitKey = foePortrait; clearTimeout(portraitTimer);
     root.classList.add('dq');
@@ -28,8 +28,8 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
         <canvas class="dq-backdrop" width="320" height="140" aria-hidden="true"></canvas>
         ${trainer ? '<canvas class="dq-trainer" width="144" height="144" aria-hidden="true"></canvas>' : ''}
         ${foePortrait ? '<div class="dq-portrait" aria-hidden="true"><canvas width="384" height="384"></canvas></div>' : ''}
-        <div class="dq-enemy ${aura ? 'aura' : ''}"><i class="dq-shadow" aria-hidden="true"></i><canvas id="enemySprite" class="battle-mon enemy" width="160" height="160" aria-label="상대 독도몬"></canvas><span class="dq-dmg" aria-hidden="true"></span></div>
-        <div class="dq-mine"><i class="dq-shadow" aria-hidden="true"></i><canvas id="allySprite" class="dq-ally-mon" width="160" height="160" aria-label="내 독도몬 (뒷모습)"></canvas></div>
+        <div class="dq-enemy ${aura ? 'aura' : ''}"><i class="dq-shadow" aria-hidden="true"></i><canvas id="enemySprite" class="battle-mon enemy" width="160" height="160" aria-label="상대 우산몬"></canvas><span class="dq-dmg" aria-hidden="true"></span></div>
+        <div class="dq-mine"><i class="dq-shadow" aria-hidden="true"></i><canvas id="allySprite" class="dq-ally-mon" width="160" height="160" aria-label="내 우산몬 (뒷모습)"></canvas></div>
         <span class="dq-label">${esc(label)}</span>
       </div>
       <div class="dq-coach" hidden><canvas width="64" height="64" aria-hidden="true"></canvas><p></p><button type="button" class="dq-coach-skip" hidden>연습 건너뛰기</button></div>
@@ -77,11 +77,11 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
       <div class="dq-hp">HP <b>${m.hp}</b> / ${m.maxHp}</div>${bar(m.hp, m.maxHp)}</div></div>
       <div class="dq-party" aria-label="동료 상태">${party.map(p => `<i class="${p.hp <= 0 ? 'down' : p.active ? 'on' : ''}" title="${esc(p.name)}"></i>`).join('')}</div>`;
     portrait(els.status.querySelector('.dq-ally'), m.id);
-    battlePortrait(els.ally, m.id, true); // my 독도몬 is seen from behind, looking right
+    battlePortrait(els.ally, m.id, true); // my 우산몬 is seen from behind, looking right
     els.allyWrap.classList.toggle('tired', m.hp <= 0);
   }
   function setFoe(e, info, extra = '') {
-    // 사나워진 독도몬: a purple 검은 기운 gauge; 관장 duels: a plain 기운 gauge
+    // 사나워진 우산몬: a purple 검은 기운 gauge; 관장 duels: a plain 기운 gauge
     const r = Math.max(0, e.hp / e.maxHp);
     const gauge = info.dark ? `<div class="dq-gauge-label">${esc(info.gauge)} ${Math.ceil(r * 100)}%</div><div class="dq-bar dark"><i style="width:${r * 100}%"></i></div>` : `<div class="dq-gauge-label">${esc(info.gauge || '기운')}</div>${bar(e.hp, e.maxHp)}`;
     els.foe.innerHTML = `<strong>${info.dark && e.hp > 0 ? '<span class="dq-berserk">사나워짐</span> ' : ''}${esc(info.name)}</strong><span class="dq-lv">Lv ${e.level} · ${esc(info.type)}</span>${gauge}${extra ? `<small>${esc(extra)}</small>` : ''}`;
@@ -92,20 +92,20 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
     const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); g.imageSmoothingEnabled = false;
     drawAsset(g, portraitKey, 0, 0, c.width, c.height);
   }
-  // The 몽땅랜드 member steps in (their 독도몬 waits off stage) …
+  // The 몽땅랜드 member steps in (their 우산몬 waits off stage) …
   function portraitIn() {
     const p = els.portrait; if (!p) return false;
     clearTimeout(portraitTimer); paintPortrait();
     els.enemyWrap.classList.add('waiting'); els.enemyWrap.classList.remove('enter');
     p.classList.remove('leave'); void p.offsetWidth; p.classList.add('show'); root.classList.add('intro'); return true;
   }
-  // … and fades away as the 독도몬 comes out.
+  // … and fades away as the 우산몬 comes out.
   function portraitOut() {
     const p = els.portrait; if (!p) { enemyEnter(); return; }
     clearTimeout(portraitTimer); p.classList.remove('show'); void p.offsetWidth; p.classList.add('leave'); root.classList.remove('intro');
     portraitTimer = setTimeout(() => { if (els.enemyWrap) { els.enemyWrap.classList.remove('waiting'); enemyEnter(); } }, 380);
   }
-  // Sending out the next 독도몬: the member shows up for a moment, then fades again.
+  // Sending out the next 우산몬: the member shows up for a moment, then fades again.
   function portraitFlash() {
     if (!portraitIn()) { enemyEnter(); return; }
     portraitTimer = setTimeout(portraitOut, 900);
@@ -205,7 +205,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
     if (target === 'enemy') { els.dmg.textContent = n; els.dmg.classList.remove('show'); void els.dmg.offsetWidth; els.dmg.classList.add('show'); flashEnemy(); }
     else { root.classList.remove('shake'); void root.offsetWidth; root.classList.add('shake'); allyAct('hit'); }
   }
-  // My 독도몬's small motions: 'lunge' (uses a skill), 'hit', 'enter' (sent out), 'tired'.
+  // My 우산몬's small motions: 'lunge' (uses a skill), 'hit', 'enter' (sent out), 'tired'.
   function allyAct(kind) {
     const w = els.allyWrap; if (!w) return;
     w.classList.remove('lunge', 'hit', 'enter'); if (kind !== 'tired') w.classList.remove('tired');

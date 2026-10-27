@@ -203,7 +203,7 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
       R(51, 52, 2, 16, '#6b7280'); R(53, 52, 12, 7, '#e07a3a');
       // sign board
       R(90, 92, 2, 24, '#5a4030'); R(130, 92, 2, 24, '#5a4030'); R(82, 84, 58, 14, '#5a4030'); R(83, 85, 56, 12, '#f1e4c2');
-      ctx.fillStyle = '#5a4030'; ctx.font = 'bold 6px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('독도몬 연구 기지', 111, 91); ctx.textAlign = 'left';
+      ctx.fillStyle = '#5a4030'; ctx.font = 'bold 6px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('우산몬 연구 기지', 111, 91); ctx.textAlign = 'left';
       // table with a monitor and jars
       R(138, 104, 34, 4, '#8a5a34'); R(140, 108, 2, 10, '#6a4126'); R(168, 108, 2, 10, '#6a4126');
       R(142, 92, 14, 11, '#232634'); R(143, 93, 12, 8, s.cues.device ? (Math.sin(t / 160) > 0 ? '#7fe3ea' : '#3f8189') : '#3f8189'); R(148, 103, 2, 2, '#232634');
@@ -233,7 +233,17 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
       if (panel === 'sea') { R(0, 0, SW, 60, '#6c8ea0'); R(0, 60, SW, 120, '#24566a'); for (let y = 64; y < SH; y += 7) for (let x = ((y * 11 + Math.floor(t / 80)) % 26) - 26; x < SW; x += 26) R(x, y, 9, 1, '#5e93a3'); peaks(110, 72, 110); }
       if (panel === 'rock') { R(0, 0, SW, SH, '#7b8f99'); peaks(-20, 182, 360); }
       if (panel === 'grass') { R(0, 0, SW, 50, '#7f9fb0'); tiles('grass', 0, 50, SW, SH); tiles('tall', 40, 90, 280, 150); }
-      const mon = { sea: 34, rock: 55, grass: 9 }[panel];
+      if (panel === 'dig') { // 울릉도 공사 현장: 파헤친 초록 산, 가림막, 안내판
+        R(0, 0, SW, SH, '#8fb6c4'); hills(-24, 150, 220); hills(150, 150, 196);
+        ctx.fillStyle = '#9a7048'; ctx.beginPath(); ctx.moveTo(34, 150); ctx.lineTo(62, 108); ctx.lineTo(112, 100); ctx.lineTo(138, 150); ctx.fill();
+        for (let i = 0; i < 6; i++) R(52 + i * 13, 118 + (i % 2) * 9, 7, 2, '#7a5536');
+        R(0, 150, SW, 30, '#b9a27a');
+        for (let x = 4; x < SW; x += 22) R(x, 132, 2, 22, '#55585c');
+        R(0, 136, SW, 10, '#e8c64a'); for (let x = 0; x < SW; x += 16) R(x, 136, 8, 10, '#33343a');
+        R(236, 108, 64, 22, '#f4efe2'); R(236, 108, 64, 3, '#c8463c'); R(266, 130, 3, 8, '#55585c');
+        ctx.fillStyle = '#3a2f2a'; ctx.font = 'bold 7px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('몽땅랜드 공사 중', 268, 121); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      }
+      const mon = { sea: 34, rock: 55, grass: 9, dig: 3 }[panel];
       const aura = s.cues.aura ? 1 : .55;
       // dark aura blobs
       ctx.globalAlpha = .45 * aura; R(0, 0, SW, SH, '#1a1030'); ctx.globalAlpha = 1;
@@ -283,7 +293,7 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
       ctx.beginPath(); ctx.arc(bx + 16, by + 26, 9, 0, Math.PI * 2); ctx.stroke(); for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.moveTo(bx + 16, by + 26); ctx.lineTo(bx + 16 + Math.cos(i) * 9, by + 26 + Math.sin(i) * 9); ctx.stroke(); }
       ctx.beginPath(); ctx.moveTo(bx + 28, by + 38); ctx.bezierCurveTo(bx + 34, by + 14, bx + 42, by + 40, bx + 54, by + 18); ctx.stroke();
       R(bx + 30, by + 38, 24, 1, '#d9e6ff');
-      ctx.fillStyle = '#ffe9a6'; ctx.font = 'bold 6px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('독도몬 테마파크', bx + 29, by + 8); ctx.textAlign = 'left';
+      ctx.fillStyle = '#ffe9a6'; ctx.font = 'bold 6px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('우산몬 테마파크', bx + 29, by + 8); ctx.textAlign = 'left';
     },
     summitFront(t, s) {
       const dark = s.cues.dark && !s.cues['machine-off'];

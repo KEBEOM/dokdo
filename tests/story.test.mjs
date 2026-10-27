@@ -6,7 +6,7 @@ import { MAPS } from '../dist/maps.js';
 import { ZONES, STARTERS } from '../dist/data.js';
 
 const BGS = new Set(['stage', 'sea', 'dock', 'field', 'crisis', 'title', 'summit', 'camp']);
-const CUES = /^(confetti|spot|jump|glint|rustle|pop|surprise|aura|device|kim-turn|night|rise|machine|machine-off|machine-quiet|blueprint|dark|records|glow|picture:professor|picture-off|(show|hop|come|calm):[a-z0-9]+|panel:(sea|rock|grass))$/;
+const CUES = /^(confetti|spot|jump|glint|rustle|pop|surprise|aura|device|kim-turn|night|rise|machine|machine-off|machine-quiet|blueprint|dark|records|glow|picture:professor|picture-off|(show|hop|come|calm):[a-z0-9]+|panel:(sea|rock|grass|dig))$/;
 function check(script) {
   assert.ok(script.id && script.scenes.length);
   for (const s of script.scenes) {
@@ -37,10 +37,10 @@ assert.ok(TREE_JOINS.scenes[0].lines.some(l => l.cue === 'calm:tree'));
 // The 백무단 story: clues in chapters 1–7, then the truth, the excuse and the answer on 대한봉.
 assert.equal(VILLAIN_TALES.length, 8); VILLAIN_TALES.slice(0, 7).forEach(v => assert.ok(v.before.length && v.after.length)); assert.equal(VILLAIN_TALES[7], null);
 const reveal = BOSS_REVEAL.scenes.flatMap(s => s.lines).map(l => l.text).join(' ');
-for (const key of ['독도몬을 만들어', '테마파크', '검은 기운', '독도를 위해', '천연기념물 제336호']) assert.ok(reveal.includes(key), `reveal mentions ${key}`);
+for (const key of ['우산몬을 만들어', '테마파크', '검은 기운', '두 섬을 위해', '울릉도에서 시험', '천연기념물 제336호']) assert.ok(reveal.includes(key), `reveal mentions ${key}`);
 assert.ok(BOSS_REVEAL.scenes[0].lines.some(l => l.choice?.length === 2));
 assert.ok(OPENING.scenes.flatMap(s => s.lines).some(l => l.text.includes('아직 아무도 몰라요')), 'the cause of 광포화 is unknown at first');
-// The opening follows the specification: contest → ship → dock → 독도몬 → crisis → mission with a choice.
+// The opening follows the specification: contest → ship → dock → 우산몬 → crisis → mission with a choice.
 assert.deepEqual(OPENING.scenes.map(s => s.bg), ['stage', 'sea', 'dock', 'field', 'crisis', 'dock']);
 assert.ok(OPENING.scenes.at(-1).lines.some(l => l.choice?.length === 2));
 assert.ok(OPENING.scenes.flatMap(s => s.lines).some(l => l.who === '김박사'));

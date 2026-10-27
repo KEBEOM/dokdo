@@ -4,7 +4,7 @@
 
 흰 배경을 지우고 JPG 얼룩을 정리해 같은 키(512 칸, 발끝 기준)로 맞춘 뒤
 dist/assets/characters/baekmudan-{grunt,exec,boss}-portrait.png 로 저장합니다.
-전투에서 백무단이 나타날 때 잠깐 보였다가, 독도몬을 내보내면 사라집니다.
+전투에서 백무단이 나타날 때 잠깐 보였다가, 우산몬을 내보내면 사라집니다.
 """
 import os, sys, importlib.util
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

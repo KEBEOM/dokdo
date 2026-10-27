@@ -14,7 +14,7 @@ export const PP_MAX=[25,8,8,10];
 export const LEARN_LEVEL=[1,12,8,1];
 const SKILL_NAMES={wave:['물결 손길','너울 파동','숨 고르기','파도 보호'],wind:['바람 손길','돌풍 파동','숨 고르기','순풍 보호'],rock:['바위 손길','묵직한 파동','숨 고르기','바위 보호'],leaf:['잎새 손길','꽃잎 파동','잎새 회복','초록 보호'],light:['빛줄기','반짝 파동','숨 고르기','별빛 보호'],echo:['울림 손길','메아리 파동','숨 고르기','기억 보호']};
 export function skills(m){const t=getSpecies(m.id).type;return SKILL_NAMES[t].map((name,i)=>({index:i,name,kind:i<2?'attack':i===2?'heal':'guard',power:i===1?1.74:1.2,max:PP_MAX[i],learn:LEARN_LEVEL[i]}));}
-// The skills this 독도몬 can use now, in the order they were learned.
+// The skills this 우산몬 can use now, in the order they were learned.
 export function knownSkills(m){return skills(m).filter(s=>m.level>=s.learn).sort((a,b)=>a.learn-b.learn||a.index-b.index);}
 // Skills learned when the level rises from `from` to `to`.
 export function learnedBetween(m,from,to){return skills(m).filter(s=>s.learn>from&&s.learn<=to);}

@@ -1,15 +1,15 @@
-"""독도몬 그림 가져오기 (v0.26)
+"""우산몬 그림 가져오기 (v0.26)
 
     python scripts/import-monsters.py <그림 폴더>          # Pillow, numpy 필요 (pip install pillow numpy)
 
 <그림 폴더> 안의 '번호 이름.jpg' 또는 '번호 이름.png' (예: '01 해국.jpg', '100 강치.png')를 읽어
-  dist/assets/monsters/NNN.png       정면 (상대 독도몬, 도감)
-  dist/assets/monsters/back/NNN.png  뒷모습 (전투에서 내 독도몬)
+  dist/assets/monsters/NNN.png       정면 (상대 우산몬, 도감)
+  dist/assets/monsters/back/NNN.png  뒷모습 (전투에서 내 우산몬)
 을 만듭니다. 흰 배경은 투명하게 지우고, JPG 얼룩을 줄인 뒤 512×512 칸의 같은 자리(발끝 기준)에 놓습니다.
 
 뒷모습은 scripts/monster-backs.json 설정을 따릅니다.
   "face": [x0, y0, x1, y1]   얼굴 영역(512 칸 좌표). 눈·입·볼을 몸 색으로 덮고 좌우를 뒤집습니다.
-  "side": true               옆을 보는 독도몬(새·새우 등). 좌우만 뒤집어 상대를 바라보게 합니다.
+  "side": true               옆을 보는 우산몬(새·새우 등). 좌우만 뒤집어 상대를 바라보게 합니다.
   "fill": "#rrggbb"          얼굴을 덮을 색을 직접 정할 때(예: 사람 모습이면 머리카락 색).
 설정이 없으면 눈을 자동으로 찾아 덮어 봅니다. 결과가 어색하면 face 영역을 적어 다시 실행하세요.
 """

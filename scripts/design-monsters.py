@@ -1,9 +1,9 @@
-"""독도몬 도트 디자인 생성기 (v0.28)
+"""우산몬 도트 디자인 생성기 (v0.28)
 
-    python scripts/design-monsters.py              # 디자인이 있는 독도몬을 모두 다시 그림
+    python scripts/design-monsters.py              # 디자인이 있는 우산몬을 모두 다시 그림
     python scripts/design-monsters.py 27 50 88     # 몇 마리만
 
-사용자가 그린 그림이 없는 독도몬(20~65, 68~99번)을 64×64 도트로 그려
+사용자가 그린 그림이 없는 우산몬(20~65, 68~99번)을 64×64 도트로 그려
 dist/assets/monsters/NNN.png(정면)와 back/NNN.png(뒷모습)로 저장합니다. Pillow, numpy가 필요합니다.
 그림체는 사용자 그림에 맞췄습니다: 진한 외곽선, 위왼쪽에서 오는 빛, 큰 눈과 반짝임, 볼 터치.
 새·물고기는 옆모습(왼쪽을 봄)이라 뒷모습은 좌우만 뒤집고, 나머지는 얼굴 없이 그린 뒤 뒤집습니다.

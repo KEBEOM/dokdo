@@ -54,7 +54,7 @@ export const ROOM_TEMPLATES = {
       'wwwwwwwwwwwwww'],
       objects: z => ({
         0: { type: 'storage', name: '동료 보관함', furniture: 'pc' },
-        1: { type: 'person', actor: 'child-girl', name: '쉬러 온 아이 다솜', lines: ['보관함에서 동료를 바꿔 데려갈 수 있어.', `여기 ${ZONES[z].name}에서는 ${TYPES[ZONES[z].type].name} 속성 독도몬이 힘을 내.`] },
+        1: { type: 'person', actor: 'child-girl', name: '쉬러 온 아이 다솜', lines: ['보관함에서 동료를 바꿔 데려갈 수 있어.', `여기 ${ZONES[z].name}에서는 ${TYPES[ZONES[z].type].name} 속성 우산몬이 힘을 내.`] },
         2: { type: 'sign', name: '여행 사진첩', furniture: 'shelf', lines: book(z, 3) }
       }) }
   ],
@@ -141,7 +141,7 @@ export const ROOM_TEMPLATES = {
       'wq__mmmmmm__qw',
       'wwwwwwwwwwwwww'],
       objects: z => ({
-        0: { type: 'landmark', name: '전망 창', furniture: 'window', lines: [`${ZONES[z].name} 마을이 한눈에 내려다보여요.`, ZONES[z].subtitle + '.', '지명은 실제 독도의 이름이지만, 마을과 건물은 게임 속 창작이에요.'] },
+        0: { type: 'landmark', name: '전망 창', furniture: 'window', lines: [`${ZONES[z].name} 마을이 한눈에 내려다보여요.`, ZONES[z].subtitle + '.', `지명은 실제 ${z === 0 ? '울릉도' : '독도'}의 이름이지만, 마을과 건물은 게임 속 창작이에요.`] },
         1: { type: 'person', actor: 'man', name: '수호관 지기', lines: ['높은 곳에서 보면 길이 어떻게 이어지는지 잘 보여.', ZONES[z].fact] }
       }) }
   ],

@@ -111,7 +111,7 @@ await until(() => (document.querySelector('.cs-text')?.textContent || '').length
 await page.click('.cs-skip'); await until(() => !window.__dokdo.cutscene());
 let st = await G(() => ({ started: window.__dokdo.state.started, party: window.__dokdo.state.party.map(m => m.id), map: window.__dokdo.map.id, avatar: window.__dokdo.state.avatar }));
 assert.deepEqual(st, { started: true, party: [1], map: 'town0', avatar: 'girl' });
-assert.equal(await page.textContent('#questTitle'), '독도몬의 비밀을 찾아서');
+assert.equal(await page.textContent('#questTitle'), '우산몬의 비밀을 찾아서');
 assert.equal(await page.textContent('#locationName'), '도동항', 'chapter 1 is 울릉도 도동항');
 
 // ── 1b. Tutorial: a practice duel with 김박사's tips, then the walking guide ──
@@ -146,7 +146,7 @@ await G(() => { Math.random = () => .5; window.__dokdo.startBattle('wild', 21); 
 assert.equal(await page.$('.dq-trainer'), null, 'wild battles show no 백무단 member');
 await page.click('#dqMessage'); assert.match(await page.textContent('.dq-text'), /나타났다/);
 assert.equal(await toMenu(), 'cmd'); assert.deepEqual(await page.$$eval('#dqCommand .dq-option', b => b.map(x => x.dataset.cmd)), ['purify', 'item', 'party', 'run'], '정화하기 replaces the plain attack');
-assert.ok(await G(() => { const c = document.querySelector('#allySprite'); return !!c && c.getContext('2d').getImageData(0, 0, c.width, c.height).data.some((v, i) => i % 4 === 3 && v > 0); }), 'my 독도몬 is drawn (from behind)');
+assert.ok(await G(() => { const c = document.querySelector('#allySprite'); return !!c && c.getContext('2d').getImageData(0, 0, c.width, c.height).data.some((v, i) => i % 4 === 3 && v > 0); }), 'my 우산몬 is drawn (from behind)');
 await page.click('[data-cmd="purify"]'); assert.deepEqual(await page.$$eval('#dqCommand .dq-option[data-cmd]', b => b.map(x => x.dataset.cmd)), ['skill-0', 'skill-3'], 'two skills at first');
 await page.click('#dqCommand .dq-option.back');
 const hp = () => G(() => ({ me: window.__dokdo.state.party[window.__dokdo.state.active].hp, foe: window.__dokdo.battle?.enemies[window.__dokdo.battle.index].hp, log: window.__dokdo.state.answerLog.length, pp: window.__dokdo.state.party[0].pp.slice() }));
@@ -193,9 +193,9 @@ for (let zone = 0; zone < 8; zone++) {
   await npc('enemy');
   if (zone === 7) { assert.equal(await G(() => window.__dokdo.cutscene()), 'boss-reveal', 'the truth about 백무 is revealed on 대한봉'); await skipCutscene(); }
   await until(() => !!window.__dokdo.battle, 10000);
-  // the member's picture (부하 / 간부 / 대표) shows first, then fades out as the 독도몬 comes out
+  // the member's picture (부하 / 간부 / 대표) shows first, then fades out as the 우산몬 comes out
   const role = zone === 7 ? 'boss' : [3, 4, 6].includes(zone) ? 'exec' : 'grunt';
-  assert.ok(await page.$('.dq-portrait.show'), '백무단 picture on the field'); assert.ok(await G(() => document.querySelector('.dq-enemy').classList.contains('waiting')), 'their 독도몬 waits');
+  assert.ok(await page.$('.dq-portrait.show'), '백무단 picture on the field'); assert.ok(await G(() => document.querySelector('.dq-enemy').classList.contains('waiting')), 'their 우산몬 waits');
   assert.ok(await G(r => window.__dokdo.battle && document.querySelector('.dq-portrait canvas').getContext('2d').getImageData(0, 0, 384, 384).data.some((v, i) => i % 4 === 3 && v), role), 'the picture is drawn');
   for (let i = 0; i < 20 && !(await page.$('.dq-portrait.leave')); i++) { await page.click('#dqMessage'); await page.waitForTimeout(120); } assert.ok(await page.$('.dq-portrait.leave'), 'the picture fades out'); await until(() => !document.querySelector('.dq-enemy').classList.contains('waiting'), 5000);
   assert.match(await page.textContent('#dqFoe'), /사나워짐/); assert.match(await page.textContent('#dqFoe'), /검은 기운/);
@@ -273,4 +273,4 @@ assert.deepEqual(st, { map: 'town3', visited: 8, onSpawn: true });
 
 assert.deepEqual(errors, [], 'no browser errors');
 await browser.close(); server.close();
-console.log(`PASS: 백무 사장 reveal/fall/epilogue scenes, 사나워진 독도몬 duels with 검은 기운 gauges, 몽땅랜드 designs in battle, softened hits on correct defence, opening read line by line with the mission choice, starter + guide, key walking, closed bridge, guide, DQ commands (정화하기 with two starting skills, guard skill, item, orb, switch, run), my 독도몬 drawn from behind, 백무단 pictures fading out, explorer drawings in the character choice, 울릉도 도동항 and the ferry to 독도, buildings with floors (door, stairs, dex, books, review desk, rest), 김박사 picture and starter cutscene, 사철나무 purified from 백무 사장 and joining once, practice duel and walking tutorial, clickable picture map, easy words (사나워진 독도몬 · 검은 기운 · 몽땅랜드 컴퍼니), quiz rules (wrong attack = miss, correct defence = light hit), hints, KO recovery, route objects, trainer, memory stone, 8 chapters walked through 7 routes, first-arrival scenes, fast travel, legend, ending, saves and a v0.21 save; ${totalTurns} battle turns.`);
+console.log(`PASS: 백무 사장 reveal/fall/epilogue scenes, 사나워진 우산몬 duels with 검은 기운 gauges, 몽땅랜드 designs in battle, softened hits on correct defence, opening read line by line with the mission choice, starter + guide, key walking, closed bridge, guide, DQ commands (정화하기 with two starting skills, guard skill, item, orb, switch, run), my 우산몬 drawn from behind, 백무단 pictures fading out, explorer drawings in the character choice, 울릉도 도동항 and the ferry to 독도, buildings with floors (door, stairs, dex, books, review desk, rest), 김박사 picture and starter cutscene, 사철나무 purified from 백무 사장 and joining once, practice duel and walking tutorial, clickable picture map, easy words (사나워진 우산몬 · 검은 기운 · 몽땅랜드 컴퍼니), quiz rules (wrong attack = miss, correct defence = light hit), hints, KO recovery, route objects, trainer, memory stone, 8 chapters walked through 7 routes, first-arrival scenes, fast travel, legend, ending, saves and a v0.21 save; ${totalTurns} battle turns.`);

@@ -197,6 +197,24 @@ export function drawProp(ctx, kind, tx, ty, opts = {}) {
       if (opts.water) { ctx.fillStyle = '#d5e0bb'; ctx.fillRect(cx - 15, bottom - 4, 30, 2); ctx.fillRect(cx - 12, bottom - 1, 24, 2); }
       blit(ctx, 'rock', cx + ((tx * 7 + ty * 3) % 5) - 2, bottom - 2); break;
     }
+    case 'barrier': { // 몽땅랜드 공사 가림막: 노랑·검정 줄무늬 판과 기둥
+      const x0 = tx * 32, top = bottom - 30;
+      ctx.fillStyle = '#1d3a3a33'; ctx.fillRect(x0, bottom - 2, 32, 4);
+      ctx.fillStyle = '#e8c64a'; ctx.fillRect(x0, top + 4, 32, 20);
+      ctx.fillStyle = '#2f3036'; for (let i = -20; i < 32; i += 10) for (let r = 0; r < 20; r++) { const sx = i + r; if (sx >= 0 && sx < 32) ctx.fillRect(x0 + sx, top + 4 + r, Math.min(4, 32 - sx), 1); }
+      ctx.fillStyle = '#b8932f'; ctx.fillRect(x0, top + 22, 32, 2); ctx.fillStyle = '#c8463c'; ctx.fillRect(x0, top + 2, 32, 3);
+      ctx.fillStyle = '#6a6c70'; ctx.fillRect(x0 + 2, top, 3, 30); ctx.fillRect(x0 + 27, top, 3, 30);
+      break;
+    }
+    case 'beacon': { // 방파제 끝의 빨간 등대
+      const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
+      shadow(ctx, cx, bottom, 20);
+      R(cx - 9, bottom - 6, 18, 6, '#8f8a80'); R(cx - 6, bottom - 40, 12, 34, '#c8463c'); R(cx + 3, bottom - 40, 3, 34, '#9a3029');
+      R(cx - 6, bottom - 30, 12, 4, '#f3efe6'); R(cx - 6, bottom - 18, 12, 4, '#f3efe6');
+      R(cx - 8, bottom - 44, 16, 4, '#3d3f44'); R(cx - 4, bottom - 50, 8, 6, '#f7e08a'); R(cx - 5, bottom - 53, 10, 3, '#3d3f44');
+      ctx.globalAlpha = .25 + .25 * Math.sin(t / 300); R(cx - 12, bottom - 52, 24, 10, '#ffeaa0'); ctx.globalAlpha = 1;
+      break;
+    }
     case 'crag': {
       // A peak rising from a large rock outcrop (x,y = bottom-left tile of the cluster).
       const w = Math.min(opts.w, 7) * 32, left = tx * 32 + (opts.w * 32 - w) / 2, base = (ty - Math.floor(opts.h / 2) + 1) * 32 + 8;
@@ -209,9 +227,39 @@ export function drawProp(ctx, kind, tx, ty, opts = {}) {
       else if (art === 'peak') drawPeaks(ctx, 'peak', cx, bottom + 2, 58);
       else if (art === 'pillar') { shadow(ctx, cx, bottom, 22); blit(ctx, 'pillar', cx, bottom, 3); }
       else if (art === 'arch') { shadow(ctx, cx, bottom, 60); blit(ctx, 'arch', cx, bottom, 3); }
+      else if (art === 'spring') { // 물골 샘: 콘크리트로 둘러싼 작은 샘
+        const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
+        shadow(ctx, cx, bottom + 1, 44);
+        R(cx - 20, bottom - 26, 40, 24, '#9c988e'); R(cx - 20, bottom - 26, 40, 4, '#d9d5ca'); R(cx + 16, bottom - 26, 4, 24, '#7d796f');
+        R(cx - 16, bottom - 20, 32, 12, '#4f8fa8'); R(cx - 16, bottom - 20, 32, 2, '#2f6175');
+        ctx.globalAlpha = .55 + .3 * Math.sin(t / 260); R(cx - 10 + (Math.floor(t / 400) % 3) * 6, bottom - 15, 6, 2, '#bfe9f4'); ctx.globalAlpha = 1;
+        R(cx - 22, bottom - 6, 44, 6, '#857f74'); R(cx - 4, bottom - 34, 8, 8, '#6f6a61'); R(cx - 1, bottom - 26, 2, 6, '#79c3d8');
+      }
       else { shadow(ctx, cx, bottom, 34); blit(ctx, 'rock', cx, bottom, 3); }
       break;
     }
   }
   ctx.restore();
+}
+
+// 밟고 지나가는 바닥 그림(v0.37): 돌계단, 헬기장(3×3칸), 몽돌 해안. 지형 바로 위, 사람보다 먼저 그려요.
+export function drawGround(ctx, g, time = 0) {
+  const x = g.x * 32, y = g.y * 32, R = (a, b, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(a, b, w, h); };
+  if (g.kind === 'steps') {
+    R(x, y, 32, 32, '#a49e92');
+    for (let i = 0; i < 4; i++) { R(x + 1, y + i * 8, 30, 3, '#d3cdbf'); R(x + 1, y + i * 8 + 3, 30, 3, '#b6b0a3'); R(x + 1, y + i * 8 + 6, 30, 2, '#7f796e'); }
+    R(x, y, 1, 32, '#6f695f'); R(x + 31, y, 1, 32, '#6f695f');
+  } else if (g.kind === 'helipad') {
+    R(x, y, 96, 96, '#9ea39f'); R(x + 2, y + 2, 92, 92, '#b3b8b3');
+    for (let yy = 0; yy < 96; yy += 2) for (let xx = 0; xx < 96; xx += 2) { const d = Math.hypot(xx - 47, yy - 47); if (d > 36 && d < 41) R(x + xx, y + yy, 2, 2, '#e8c64a'); }
+    R(x + 34, y + 30, 6, 36, '#f6f4ee'); R(x + 56, y + 30, 6, 36, '#f6f4ee'); R(x + 40, y + 45, 16, 6, '#f6f4ee');
+    for (let i = 0; i < 96; i += 8) { R(x + i, y, 4, 2, '#f6f4ee'); R(x + i, y + 94, 4, 2, '#f6f4ee'); }
+  } else if (g.kind === 'pebbles') {
+    R(x, y, 32, 32, '#b9b3a6');
+    const tones = ['#8d877c', '#a7a196', '#d3cec3', '#76736c', '#c4bfb3'];
+    for (let i = 0; i < 9; i++) {
+      const h = (g.x * 73 + g.y * 151 + i * 97) % 997, px = x + 2 + (h % 26), py = y + 2 + ((h >> 3) % 26), w = 4 + (h % 4), hh = 3 + ((h >> 2) % 3);
+      R(px, py + hh, w, 1, '#6d685f'); R(px, py, w, hh, tones[h % tones.length]); R(px + 1, py, w - 2, 1, '#e4e0d6');
+    }
+  }
 }

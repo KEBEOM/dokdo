@@ -4,7 +4,7 @@ import { drawScenery, drawIslandArt } from './scenery.js';
 import { drawTerrain } from './terrain.js';
 import { drawExplorer, drawResident, CHARACTER_SIZE } from './characters.js';
 import { parseMap, getMapDef, MAP_W, MAP_H } from './maps.js';
-import { drawProp } from './props.js';
+import { drawProp, drawGround } from './props.js';
 import { drawInterior, drawFurniture, FURNITURE_DEPTH } from './interior-art.js';
 
 export const TILE = 32, W = MAP_W, H = MAP_H;
@@ -19,7 +19,7 @@ export function createMap(ref = 0) {
   return Object.assign(grid, {
     id: def.id, def, zone: def.zone, kind: def.kind, name: def.name,
     solid: parsed.solid, exits: parsed.exits, spawns: parsed.spawns,
-    buildings: parsed.buildings, decor: parsed.decor, rockTiles: parsed.rockTiles, keepClear, parsed,
+    buildings: parsed.buildings, decor: parsed.decor, ground: parsed.ground || [], rockTiles: parsed.rockTiles, keepClear, parsed,
     doors: parsed.doors || [], stairs: parsed.stairs || [], focus: parsed.focus || null
   });
 }
@@ -27,13 +27,13 @@ export function createMap(ref = 0) {
 export const BUILDINGS = parseMap('town0').buildings;
 
 export function villageResidents(zone) {
-  const z = ZONES[zone];
+  const z = ZONES[zone], ul = zone === 0; // 1장 도동항(울릉도) 주민은 몽땅랜드 공사 이야기를 해요
   return [
     { key: '1', actor: 'child-boy', name: '남자아이 준', lines: ['나는 준! 방금 배운 내용을 보지 않고 말해 보는 연습을 해.', '문제를 틀렸다면 해설을 읽고, 다음 만남에서 다시 떠올려 봐!'] },
     { key: '2', actor: 'child-girl', name: '여자아이 솔', lines: ['나는 솔이야. 이번 지역에서 기억할 내용을 함께 읽어 볼까?', z.fact, '수첩을 잠깐 닫고 네 말로 설명해 봐!'] },
     { key: '3', actor: 'child-girl-ribbon', name: '여자아이 봄', lines: ['나는 봄! 탐험 수첩에 지금까지 배운 내용을 모아 두었어.', '각 지역의 기록판을 다시 만나면 지난 개념도 함께 복습할 수 있어.'] },
-    { key: '4', actor: 'man', name: '도윤 아저씨', lines: [`이번 조사 주제는 ‘${z.histTitle}’란다.`, '자료를 읽을 때 누가, 언제 만들었는지 살펴보렴. 출처도 직접 확인하면 좋겠지?', z.hint] },
-    { key: '5', actor: 'woman', name: '미소 아줌마', lines: ['반가워! 탐험하다 지치면 쉼터지기에게 가 보렴.', '동료 체력을 회복하고, 수첩에서 헷갈린 개념을 천천히 다시 읽어 봐.'] }
+    { key: '4', actor: 'man', name: '도윤 아저씨', lines: [...(ul ? ['요즘 뒷산에 몽땅랜드 공사 가림막이 생겼어. 후박나무 숲을 밀고 리조트를 짓는다나.', '울릉도만이 아니래. 독도까지 개발한다는 소문이 돌더구나.'] : []), `이번 조사 주제는 ‘${z.histTitle}’란다.`, '자료를 읽을 때 누가, 언제 만들었는지 살펴보렴. 출처도 직접 확인하면 좋겠지?', z.hint] },
+    { key: '5', actor: 'woman', name: '미소 아줌마', lines: [...(ul ? ['울릉도에 온 걸 환영해! 요즘 공사 소리 때문에 우산몬들이 잠을 못 잔대.'] : []), '반가워! 탐험하다 지치면 쉼터지기에게 가 보렴.', '동료 체력을 회복하고, 수첩에서 헷갈린 개념을 천천히 다시 읽어 봐.'] }
   ];
 }
 
@@ -62,7 +62,7 @@ export function npcs(ref = 0, progress = {}, flags = {}) {
     ];
     roles.forEach(([id, info], i) => { const p = at(id); if (p) list.push({ id, x: p.x, y: p.y, sprite: `npc/${String(zone + 1).padStart(2, '0')}/${String(i + 1).padStart(2, '0')}`, ...info }); });
     EXTRA_NPCS.filter(n => n.zone === zone).forEach((n, i) => { const p = at(`extra${i}`); if (p) list.push({ ...n, id: 'extra', kind: 'history', x: p.x, y: p.y }); });
-    // 풀숲 위에 서 있는 야생 독도몬은 두지 않아요. 사나워진 독도몬은 풀숲을 걸을 때 갑자기 나타나요.
+    // 풀숲 위에 서 있는 야생 우산몬은 두지 않아요. 사나워진 우산몬은 풀숲을 걸을 때 갑자기 나타나요.
     for (const r of villageResidents(zone)) { const p = parsed.residents[r.key]; if (p) list.push({ ...r, id: 'resident', kind: 'resident', x: p.x, y: p.y }); }
   }
   for (const o of parsed.objects) {
@@ -149,7 +149,7 @@ export function drawWorld(ctx, map, state, view, time, target = null, motion = {
   ctx.clearRect(0, 0, width, height); ctx.fillStyle = room ? '#0e1418' : z.color; ctx.fillRect(0, 0, width, height);
   ctx.save(); ctx.translate(-camX, -camY);
   if (room) drawInterior(ctx, map, time, { x: camX, y: camY, width, height });
-  else drawTerrain(ctx, map, time, { x: camX, y: camY, width, height });
+  else { drawTerrain(ctx, map, time, { x: camX, y: camY, width, height }); for (const g of map.ground || []) drawGround(ctx, g, time); }
   if (target) { ctx.fillStyle = '#fff1b440'; ctx.fillRect(target.x * 32, target.y * 32, 32, 32); ctx.strokeStyle = '#f6d37d'; ctx.lineWidth = 2; ctx.strokeRect(target.x * 32 + 3, target.y * 32 + 3, 26, 26); }
   if (viewport.actors !== false) drawActors(ctx, state, view, time, motion, people, map);
   if (viewport.labels) for (const n of people) if (n.actor) drawNPCNameplate(ctx, n.name, (n.drawX ?? n.x) * 32 + 16, (n.drawY ?? n.y) * 32 + 35, camX, camY);
@@ -169,7 +169,7 @@ export function drawNPCNameplate(ctx, name, cx, y, camX = 0, camY = 0) {
 // What the yellow quest marker points at in a town.
 export function wantedRole(p) { return !p.met ? 'history' : p.studied < 2 ? 'board' : !p.enemy ? 'enemy' : !p.boss ? 'boss' : null; }
 
-// 사나워짐: wild 독도몬 on the map are wrapped in drifting dark energy.
+// 사나워짐: wild 우산몬 on the map are wrapped in drifting dark energy.
 function darkWisps(ctx, x, y, time) {
   const cx = x * 32 + 16, cy = y * 32 + 18;
   ctx.save(); ctx.globalAlpha = .28 + .1 * Math.sin(time / 300); ctx.fillStyle = '#3b1d5c'; ctx.beginPath(); ctx.ellipse(cx, cy + 6, 20, 9, 0, 0, Math.PI * 2); ctx.fill();
@@ -213,6 +213,8 @@ function drawDecor(ctx, n, map, time) {
     case 'boat': return drawScenery(ctx, 'boat', n.x * 32 - 16, n.y * 32 - 30, 64, 100);
     case 'rock': return drawProp(ctx, 'rock', n.x, n.y, { water: map[n.y]?.[n.x] === 0, time });
     case 'crag': return drawProp(ctx, 'crag', n.x, n.y, { w: n.w, h: n.h });
+    case 'beacon': return drawProp(ctx, 'beacon', n.x, n.y, { time });
+    case 'barrier': return drawProp(ctx, 'barrier', n.x, n.y);
   }
 }
 
@@ -223,7 +225,7 @@ export function sceneDrawOrder(people, view, map = createMap(0)) {
   for (const b of map.buildings) items.push({ scenery: b.kind, building: b, depth: (b.y + b.h) * TILE });
   for (const d of map.decor) {
     if (d.kind === 'fence') { for (let i = 0; i < d.len; i += 2) items.push({ scenery: 'fence', x: d.x + i, y: d.y, w: Math.min(2, d.len - i), depth: d.y * TILE + 27 }); continue; }
-    const depth = { tree: 24, planter: 29, monument: 32, boat: 70, rock: 26, crag: 30, ...FURNITURE_DEPTH }[d.kind] ?? 24;
+    const depth = { tree: 24, beacon: 28, barrier: 27, planter: 29, monument: 32, boat: 70, rock: 26, crag: 30, ...FURNITURE_DEPTH }[d.kind] ?? 24;
     items.push({ scenery: d.kind, x: d.x, y: d.y, w: d.w, h: d.h, depth: d.y * TILE + depth });
   }
   return items.sort((a, b) => a.depth - b.depth);

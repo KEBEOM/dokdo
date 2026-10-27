@@ -5,7 +5,7 @@
 흰 배경을 지우고 그림 색을 정리한 뒤 512 칸(발끝 기준)에 맞춰
   dist/assets/characters/explorer-girl-portrait-v33.png   캐릭터 선택 창
   dist/assets/characters/explorer-boy-portrait-v33.png    캐릭터 선택 창
-  dist/assets/characters/professor-portrait-v33.png       김박사를 처음 만날 때, 스타팅 독도몬 소개
+  dist/assets/characters/professor-portrait-v33.png       김박사를 처음 만날 때, 스타팅 우산몬 소개
 로 저장합니다.
 """
 import os, sys, importlib.util
