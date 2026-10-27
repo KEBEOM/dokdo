@@ -1,6 +1,6 @@
 // Cutscene scripts and Korean particles.
 import assert from 'node:assert/strict';
-import { OPENING, STARTER_MEET, GUIDE, LEGEND, ARRIVALS, arrivalScene, BOSS_REVEAL, BOSS_FALL, TREE_JOINS, EPILOGUE, VILLAIN_TALES } from '../dist/story.js';
+import { OPENING, STARTER_MEET, GUIDE, LEGEND, ARRIVALS, arrivalScene, BOSS_REVEAL, BOSS_FALL, TREE_JOINS, EPILOGUE, VILLAIN_TALES, FERRY, FERRY_AGAIN } from '../dist/story.js';
 import { josa, fillJosa } from '../dist/text.js';
 import { MAPS } from '../dist/maps.js';
 import { ZONES, STARTERS } from '../dist/data.js';
@@ -23,7 +23,10 @@ function check(script) {
     for (const l of s.lines) if (l.choice) { assert.ok(l.choice.length >= 2); l.choice.forEach(c => assert.ok(c.label && c.reply?.length)); }
   }
 }
-[OPENING, STARTER_MEET, GUIDE, LEGEND, BOSS_REVEAL, BOSS_FALL, TREE_JOINS, EPILOGUE].forEach(check);
+[OPENING, STARTER_MEET, GUIDE, LEGEND, BOSS_REVEAL, BOSS_FALL, TREE_JOINS, EPILOGUE, FERRY, FERRY_AGAIN('dokdo'), FERRY_AGAIN('ulleung')].forEach(check);
+// v0.36: the journey starts on 울릉도 (도동항) and the ferry crosses about 87km to 독도
+assert.ok(OPENING.scenes.some(s => s.island === 'ulleung' && /도동항/.test(s.caption)), 'Kim meets you at 울릉도 도동항');
+assert.ok(FERRY.scenes[0].lines.some(l => /87/.test(l.text)) && FERRY.scenes[0].lines.some(l => /동도 선착장/.test(l.text)));
 // v0.33: 김박사's picture at the first meeting, the three starters in their own scene, 사철나무 with 백무 사장
 assert.ok(OPENING.scenes.some(s => s.lines.some(l => l.cue === 'picture:professor') && s.lines.some(l => l.cue === 'picture-off')), 'the 김박사 picture comes and goes');
 assert.deepEqual(STARTER_MEET.scenes[0].cast.filter(c => c.who.startsWith('monster:')).map(c => Number(c.who.slice(8))), STARTERS, 'all three starters are introduced');

@@ -367,3 +367,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
 .joystick.active{border-color:#ffe28a}.joystick.active .joy-knob{box-shadow:0 2px 0 #8a6a2a88,0 0 12px #ffe28a99}
 @media (min-width:700px) and (min-height:700px){.joystick{width:140px;height:140px}.joy-knob{width:60px;height:60px;margin:-30px 0 0 -30px}.joy-arrow{font-size:14px}}
 @media (max-height:460px){.joystick{width:100px;height:100px}.joy-knob{width:44px;height:44px;margin:-22px 0 0 -22px}}
+
+/* v0.36 — world map: 울릉도 inset and the ferry */
+.wm-island.small{font-size:11px;letter-spacing:1px}
+.wm-ferry{position:absolute;transform:translate(-50%,-50%);font-size:10px;font-weight:800;color:#fffbe8;background:#173c43c0;padding:1px 6px;border-radius:8px;white-space:nowrap;pointer-events:none;z-index:1}

@@ -16,7 +16,7 @@ import { QUESTIONS, CONCEPTS, SOURCES } from './learning.js';
 export const ROOM_W = 42, ROOM_H = 30; // rooms sit in the middle of a normal-size map
 export const BUILDING_ROOMS = { lab: '연구소', gym: '수호관', shop: '쉼터', home: '집' };
 
-const TOWN_ISLAND = ['동도', '동도', '동도', '서도', '서도', '서도', '서도', '서도'];
+const TOWN_ISLAND = ['울릉도', '동도', '동도', '서도', '서도', '서도', '서도', '서도']; // 1장(도동항)은 울릉도
 const sourceTitle = url => SOURCES.find(s => s.url === url)?.title || '학습 자료';
 const books = zone => QUESTIONS.filter(q => q.zone === zone);
 function book(zone, i) {
@@ -99,9 +99,9 @@ export const ROOM_TEMPLATES = {
       'wwwwwwwwwwwwww'],
       objects: z => ({
         0: { type: 'landmark', name: '망원경', furniture: 'telescope', lines: [`망원경으로 ${ZONES[z].name} 둘레를 바라봐요.`, ZONES[z].fact] },
-        1: { type: 'landmark', name: '큰 창', furniture: 'window', lines: [`창밖으로 ${TOWN_ISLAND[z]}의 바다가 펼쳐져요. 오늘 날씨는 ${ZONES[z].sky}.`, '독도 주변은 따뜻한 바닷물과 차가운 바닷물이 만나는 곳이라 생물이 많아요.'] },
+        1: { type: 'landmark', name: '큰 창', furniture: 'window', lines: [`창밖으로 ${TOWN_ISLAND[z]}의 바다가 펼쳐져요. 오늘 날씨는 ${ZONES[z].sky}.`, z === 0 ? '울릉도와 독도 주변은 따뜻한 바닷물과 차가운 바닷물이 만나는 곳이라 생물이 많아요.' : '독도 주변은 따뜻한 바닷물과 차가운 바닷물이 만나는 곳이라 생물이 많아요.'] },
         2: { type: 'box', name: '관측 장비 상자', furniture: 'chest', give: { orb: 3 }, lines: ['친구 구슬 3개가 들어 있어요!'] },
-        3: { type: 'person', actor: 'child-boy', name: '관측 동아리 이준', lines: ['맑은 날에는 울릉도에서도 독도가 보인대!', '본 것을 적을 때는 날짜와 날씨도 함께 적어야 해.'] }
+        3: { type: 'person', actor: 'child-boy', name: '관측 동아리 이준', lines: [z === 0 ? '맑은 날에는 여기 울릉도에서도 독도가 보여! 동남쪽 수평선을 잘 봐.' : '맑은 날에는 울릉도에서도 독도가 보인대!', '본 것을 적을 때는 날짜와 날씨도 함께 적어야 해.'] }
       }) }
   ],
   gym: [

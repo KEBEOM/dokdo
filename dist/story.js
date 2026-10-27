@@ -3,6 +3,7 @@
 //
 // 장면(scene)
 //   bg       배경 이름: stage(시상식) sea(배 위) dock(선착장) field(풀밭) crisis(위기) title(지역 소개) summit(대한봉 정상) camp(김박사 연구 기지)
+//   island   'ulleung'이면 뒤쪽 풍경이 독도 바위 대신 울릉도의 초록 산이에요(1장은 울릉도 도동항).
 //   caption  화면 왼쪽 위에 잠깐 보이는 장면 제목
 //   cast     등장인물. who: 'player'(주인공) | 'actor:professor' 같은 인물 그림 | 'monster:67' 같은 독도몬
 //            x, y는 320×180 장면 안의 발 위치, dir은 down·left·right·up, size는 키(기본 52)
@@ -40,34 +41,34 @@ export const OPENING = {
       ]
     },
     {
-      bg: 'sea', caption: '독도로 향하는 배',
+      bg: 'sea', caption: '울릉도로 향하는 배', island: 'ulleung',
       cast: [{ id: 'player', who: 'player', x: 196, y: 117, dir: 'right', size: 40 }],
       lines: [
-        { who: '안내 방송', text: '잠시 후 독도에 도착합니다.' },
-        { who: '안내 방송', text: '독도는 동도와 서도, 그리고 주변의 여러 바위섬으로 이루어진 아름다운 섬입니다.' },
-        { who: '@player', text: '드디어 독도다! 사진으로만 봤는데 정말 멋지다!' },
+        { who: '안내 방송', text: '잠시 후 울릉도 도동항에 도착합니다.' },
+        { who: '안내 방송', text: '독도로 가시는 분은 도동항에서 독도행 여객선으로 갈아타시기 바랍니다.' },
+        { who: '@player', text: '저기가 울릉도구나! 산이 정말 높고 푸르다!' },
         { who: null, text: '그때, 바다 위에서 신비한 푸른빛이 잠깐 나타났다가 사라졌다.', cue: 'glint' },
         { who: '@player', text: '어? 방금 저 빛은 뭐였지?', cue: 'surprise' }
       ]
     },
     {
-      bg: 'dock', caption: '독도 · 동도 선착장',
+      bg: 'dock', caption: '울릉도 · 도동항', island: 'ulleung',
       cast: [
         { id: 'player', who: 'player', x: 112, y: 140, dir: 'right' },
         { id: 'kim', who: 'actor:professor', x: 340, y: 140, dir: 'left', walkTo: [206, 140], walkMs: 1700 }
       ],
       lines: [
-        { who: '김박사', text: '독도에 오신 것을 환영합니다!' },
+        { who: '김박사', text: '울릉도 도동항에 오신 것을 환영합니다!' },
         { who: '김박사', text: '저는 독도의 자연과 생물을 연구하고 있는 김박사라고 합니다.', cue: 'picture:professor' },
         { who: '김박사', text: '혹시 이번 독도 사랑 대회에서 우승한 학생인가요?' },
         { who: '@player', text: '네! 그런데 제가 누군지 어떻게 아세요?', cue: 'picture-off' },
         { who: '김박사', text: '하하! 이야기를 많이 들었거든요.' },
         { who: '김박사', text: '독도를 무척 사랑하고, 독도에 관해서도 아주 많이 알고 있는 학생이라고요.' },
-        { who: '김박사', text: '사실 오늘 여러분을 기다리고 있었습니다.' }
+        { who: '김박사', text: '사실 오늘 여러분을 기다리고 있었습니다. 독도에 가기 전에 꼭 보여 줄 것이 있거든요.' }
       ]
     },
     {
-      bg: 'field', caption: '선착장 옆 풀밭',
+      bg: 'field', caption: '도동항 옆 풀밭', island: 'ulleung',
       start: ['rustle'],
       cast: [
         { id: 'player', who: 'player', x: 104, y: 140, dir: 'right' },
@@ -99,13 +100,14 @@ export const OPENING = {
       ]
     },
     {
-      bg: 'dock', caption: '모험의 시작',
+      bg: 'dock', caption: '모험의 시작', island: 'ulleung',
       cast: [
         { id: 'player', who: 'player', x: 128, y: 140, dir: 'right' },
         { id: 'kim', who: 'actor:professor', x: 196, y: 140, dir: 'left' }
       ],
       lines: [
         { who: '김박사', text: '독도의 자연과 역사를 조사하고, 독도몬이 사나워진 까닭을 밝혀 주세요.' },
+        { who: '김박사', text: '먼저 여기 울릉도에서 준비를 마치고, 독도행 배를 타고 건너가요.' },
         { who: '김박사', text: '모험을 하다 보면 독도를 지켜 온 사람들의 이야기와 신비로운 비밀을 발견하게 될 거예요.' },
         { who: '김박사', text: '위험한 조사에는 제가 개발한 특별한 탐사 장치도 사용할 수 있습니다.', cue: 'device' },
         {
@@ -128,7 +130,7 @@ export const STARTER_MEET = {
   id: 'starters',
   scenes: [
     {
-      bg: 'camp', caption: '김박사의 독도몬 연구 기지',
+      bg: 'camp', caption: '김박사의 독도몬 연구 기지 · 울릉도', island: 'ulleung',
       cast: [
         { id: 'player', who: 'player', x: 52, y: 152, dir: 'right' },
         { id: 'kim', who: 'actor:professor', x: 108, y: 152, dir: 'right' },
@@ -158,7 +160,7 @@ export const GUIDE = {
   id: 'guide',
   scenes: [
     {
-      bg: 'camp', caption: '첫 번째 동료',
+      bg: 'camp', caption: '첫 번째 동료', island: 'ulleung',
       start: ['glow'],
       cast: [
         { id: 'player', who: 'player', x: 52, y: 152, dir: 'right' },
@@ -172,7 +174,7 @@ export const GUIDE = {
       ]
     },
     {
-      bg: 'dock', caption: '모험 준비',
+      bg: 'dock', caption: '모험 준비', island: 'ulleung',
       cast: [
         { id: 'player', who: 'player', x: 120, y: 140, dir: 'right' },
         { id: 'buddy', who: 'monster:{starterId}', x: 82, y: 142, size: 40 },
@@ -189,6 +191,33 @@ export const GUIDE = {
     }
   ]
 };
+
+// 울릉도 도동항 ↔ 독도 동도 선착장 여객선. 처음 건널 때는 FERRY, 그다음부터는 짧은 장면이에요.
+export const FERRY = {
+  id: 'ferry',
+  scenes: [{
+    bg: 'sea', caption: '독도행 여객선',
+    cast: [
+      { id: 'player', who: 'player', x: 182, y: 117, dir: 'right', size: 40 },
+      { id: 'kim', who: 'actor:professor', x: 152, y: 117, dir: 'right', size: 40 }
+    ],
+    lines: [
+      { who: '안내 방송', text: '독도행 여객선이 도동항을 출발합니다. 독도는 울릉도에서 동남쪽으로 약 87km 떨어져 있습니다.' },
+      { who: '김박사', text: '맑은 날에는 울릉도에서도 독도가 보여요. 오늘은 바다가 잔잔해서 다행이에요.' },
+      { who: null, text: '한참을 달리자, 수평선 위로 바위섬 두 개가 솟아올랐다.', cue: 'glint' },
+      { who: '@player', text: '보여요! 저기 동도와 서도!', cue: 'jump' },
+      { who: '안내 방송', text: '잠시 후 독도 동도 선착장에 도착합니다. 독도는 섬 전체가 천연보호구역이니 자연을 아껴 주세요.' }
+    ]
+  }]
+};
+export const FERRY_AGAIN = to => ({
+  id: 'ferry',
+  scenes: [{
+    bg: 'sea', caption: to === 'dokdo' ? '독도행 여객선' : '울릉도행 여객선', island: to === 'dokdo' ? undefined : 'ulleung',
+    cast: [{ id: 'player', who: 'player', x: 182, y: 117, dir: 'right', size: 40 }],
+    lines: [{ who: '안내 방송', text: to === 'dokdo' ? '잠시 후 독도 동도 선착장에 도착합니다.' : '잠시 후 울릉도 도동항에 도착합니다.' }]
+  }]
+});
 
 // 처음 도착한 마을에서 보여 주는 짧은 지역 소개(0번 마을은 오프닝이 대신합니다).
 export const ARRIVALS = [

@@ -59,13 +59,15 @@ async function fight() {
   throw new Error('battle did not finish');
 }
 async function skipCutscene() { await until(() => !!window.__dokdo.cutscene(), 15000); const id = await G(() => window.__dokdo.cutscene()); for (let i = 0; i < 60 && await G(() => !!window.__dokdo.cutscene()) && await page.evaluate(id => window.__dokdo.cutscene() === id, id); i++) { await page.click('.cs-skip').catch(() => { }); await page.waitForTimeout(250); } }
+let ferries = 0; // 울릉도 도동항 → 독도: the ferry scene plays at the pier
 async function walkTo(target) {
   // guide() walks to the next exit (or quest person); keep going until the map changes.
   const from = await G(() => window.__dokdo.map.id);
   for (let tries = 0; tries < 6; tries++) {
     await G(() => window.__dokdo.guide());
-    await until(id => window.__dokdo.map.id !== id || !!window.__dokdo.battle, 60000, from).catch(() => { });
+    await until(id => window.__dokdo.map.id !== id || !!window.__dokdo.battle || window.__dokdo.cutscene() === 'ferry', 60000, from).catch(() => { });
     if (await G(() => !!window.__dokdo.battle)) { await fight(); continue; }
+    if (await G(() => window.__dokdo.cutscene() === 'ferry')) { ferries++; await skipCutscene(); await until(id => window.__dokdo.map.id !== id, 15000, from); }
     const now = await G(() => window.__dokdo.map.id);
     if (now !== from) break;
   }
@@ -110,7 +112,7 @@ await page.click('.cs-skip'); await until(() => !window.__dokdo.cutscene());
 let st = await G(() => ({ started: window.__dokdo.state.started, party: window.__dokdo.state.party.map(m => m.id), map: window.__dokdo.map.id, avatar: window.__dokdo.state.avatar }));
 assert.deepEqual(st, { started: true, party: [1], map: 'town0', avatar: 'girl' });
 assert.equal(await page.textContent('#questTitle'), '독도몬의 비밀을 찾아서');
-assert.equal(await page.textContent('#locationName'), '동도 선착장');
+assert.equal(await page.textContent('#locationName'), '도동항', 'chapter 1 is 울릉도 도동항');
 
 // ── 1b. Tutorial: a practice duel with 김박사's tips, then the walking guide ──
 await until(() => window.__dokdo.battle?.kind === 'tutorial', 10000);
@@ -229,6 +231,7 @@ for (let zone = 0; zone < 8; zone++) {
     await leave(); assert.equal(await G(() => window.__dokdo.map.id), 'town0');
   }
   await walkTo(`route${zone}`);
+  if (zone === 0) assert.equal(ferries, 1, 'the ferry takes you from 울릉도 to 독도');
   if (zone === 0) {
     // every kind of route object
     const before = await G(() => ({ ...window.__dokdo.state.items, coins: window.__dokdo.state.coins }));
@@ -270,4 +273,4 @@ assert.deepEqual(st, { map: 'town3', visited: 8, onSpawn: true });
 
 assert.deepEqual(errors, [], 'no browser errors');
 await browser.close(); server.close();
-console.log(`PASS: 백무 사장 reveal/fall/epilogue scenes, 사나워진 독도몬 duels with 검은 기운 gauges, 몽땅랜드 designs in battle, softened hits on correct defence, opening read line by line with the mission choice, starter + guide, key walking, closed bridge, guide, DQ commands (정화하기 with two starting skills, guard skill, item, orb, switch, run), my 독도몬 drawn from behind, 백무단 pictures fading out, explorer drawings in the character choice, buildings with floors (door, stairs, dex, books, review desk, rest), 김박사 picture and starter cutscene, 사철나무 purified from 백무 사장 and joining once, practice duel and walking tutorial, clickable picture map, easy words (사나워진 독도몬 · 검은 기운 · 몽땅랜드 컴퍼니), quiz rules (wrong attack = miss, correct defence = light hit), hints, KO recovery, route objects, trainer, memory stone, 8 chapters walked through 7 routes, first-arrival scenes, fast travel, legend, ending, saves and a v0.21 save; ${totalTurns} battle turns.`);
+console.log(`PASS: 백무 사장 reveal/fall/epilogue scenes, 사나워진 독도몬 duels with 검은 기운 gauges, 몽땅랜드 designs in battle, softened hits on correct defence, opening read line by line with the mission choice, starter + guide, key walking, closed bridge, guide, DQ commands (정화하기 with two starting skills, guard skill, item, orb, switch, run), my 독도몬 drawn from behind, 백무단 pictures fading out, explorer drawings in the character choice, 울릉도 도동항 and the ferry to 독도, buildings with floors (door, stairs, dex, books, review desk, rest), 김박사 picture and starter cutscene, 사철나무 purified from 백무 사장 and joining once, practice duel and walking tutorial, clickable picture map, easy words (사나워진 독도몬 · 검은 기운 · 몽땅랜드 컴퍼니), quiz rules (wrong attack = miss, correct defence = light hit), hints, KO recovery, route objects, trainer, memory stone, 8 chapters walked through 7 routes, first-arrival scenes, fast travel, legend, ending, saves and a v0.21 save; ${totalTurns} battle turns.`);

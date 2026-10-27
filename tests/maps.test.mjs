@@ -8,8 +8,8 @@ const towns = MAPS.filter(m => m.kind === 'town'), routes = MAPS.filter(m => m.k
 assert.equal(towns.length, 8); assert.equal(routes.length, 7);
 assert.deepEqual(MAPS.map(m => m.id), ['town0', 'route0', 'town1', 'route1', 'town2', 'route2', 'town3', 'route3', 'town4', 'route4', 'town5', 'route5', 'town6', 'route6', 'town7']);
 
-// Real Dokdo place names, one per map, all different.
-const REAL = ['동도 선착장', '숫돌바위 길', '우산봉', '천장굴 길', '한반도바위', '독립문바위 바닷길', '탕건봉', '촛대바위 해안', '가제바위', '보찰바위 갯바위', '코끼리바위', '삼형제굴바위 해안', '물골', '상장군바위 오르막', '대한봉'];
+// Real place names (도동항 on 울릉도, the rest on 독도), one per map, all different.
+const REAL = ['도동항', '숫돌바위 길', '우산봉', '천장굴 길', '한반도바위', '독립문바위 바닷길', '탕건봉', '촛대바위 해안', '가제바위', '보찰바위 갯바위', '코끼리바위', '삼형제굴바위 해안', '물골', '상장군바위 오르막', '대한봉'];
 assert.deepEqual(MAPS.map(m => m.name), REAL);
 towns.forEach(t => assert.equal(ZONES[t.zone].name, t.name, 'chapter title uses the town name'));
 

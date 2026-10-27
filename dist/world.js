@@ -1,6 +1,6 @@
 import { ZONES, EXTRA_NPCS, getSpecies } from './data.js';
 import { drawHuman, drawMonster } from './sprites.js';
-import { drawScenery } from './scenery.js';
+import { drawScenery, drawIslandArt } from './scenery.js';
 import { drawTerrain } from './terrain.js';
 import { drawExplorer, drawResident, CHARACTER_SIZE } from './characters.js';
 import { parseMap, getMapDef, MAP_W, MAP_H } from './maps.js';
@@ -104,16 +104,21 @@ export function pathfind(map, sx, sy, tx, ty, people = []) {
 }
 
 function rect(ctx, x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.floor(x), Math.floor(y), w, h); }
-function tree(ctx, x, y) { if (!drawScenery(ctx, 'tree', x - 32, y - 58, 80, 88)) drawTreeDefault(ctx, x, y); }
+// 울릉도: 후박나무·동백나무 / 독도: 키 큰 나무 없이 사철나무 덤불과 해국 (소나무는 쓰지 않아요)
+const ulleung = map => map?.def?.island === '울릉도';
+function tree(ctx, x, y, map) {
+  const k = ((x / 32) * 7 + (y / 32) * 13) % 3, key = ulleung(map) ? (k === 0 ? 'tree-dongbaek' : 'tree-hubak') : (k === 0 ? 'shrub-haeguk' : 'shrub-saecheol');
+  if (!drawIslandArt(ctx, key, x - 24, y - 56, 80, 88)) drawTreeDefault(ctx, x, y);
+}
 export function drawTreeDefault(ctx, x, y) {
   const r = (a, b, w, h, c) => rect(ctx, x + a, y + b, w, h, c);
   r(-9, 15, 29, 8, '#375e4a22'); r(4, 0, 7, 24, '#816f50'); r(-8, -22, 30, 27, '#427e65'); r(-13, -14, 40, 20, '#427e65'); r(-3, -29, 20, 10, '#73a97a');
 }
-// The door in each building picture sits right above the middle tile (buildings are an odd number of tiles wide);
-// these few pixels line the painted door up exactly with the tile you stand on to go in.
-const DOOR_NUDGE = { lab: -4, shop: -3, gym: 1, home: 0 };
-function house(ctx, b, labels = true) {
-  if (!drawScenery(ctx, b.kind, b.x * TILE - 8 + (DOOR_NUDGE[b.kind] || 0), b.y * TILE - 40, b.w * TILE + 16, b.h * TILE + 40)) { drawHouseDefault(ctx, b, labels); return; }
+// Buildings look like the island they stand on (울릉도: 투막집·너와집·터미널 / 독도: 등대·경비대 숙소·주민숙소).
+// Each picture is exactly as wide as its plot plus 8px eaves on both sides, with the door above the middle tile.
+function house(ctx, b, labels = true, map = null) {
+  const key = `${ulleung(map) ? 'ulleung' : 'dokdo'}-${b.kind}`;
+  if (!drawIslandArt(ctx, key, b.x * TILE - 8, b.y * TILE - 40, b.w * TILE + 16, b.h * TILE + 40) && !drawScenery(ctx, b.kind, b.x * TILE - 8, b.y * TILE - 40, b.w * TILE + 16, b.h * TILE + 40)) { drawHouseDefault(ctx, b, labels); return; }
   if (!labels) return;
   ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#345c52'; ctx.fillText(b.name, (b.x + b.w / 2) * TILE, (b.y + b.h) * TILE + 14);
 }
@@ -185,7 +190,7 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
     if (n.scenery) { drawDecor(ctx, n, map, time); continue; }
     const fx = n.x * 32 + (32 - CHARACTER_SIZE) / 2, fy = n.y * 32 + 28 - CHARACTER_SIZE;
     if (n.furniture) drawFurniture(ctx, n.furniture, n.x, n.y, time, { open: n.used, glow: n.kind === 'rest' });
-    else if (n.kind === 'board') drawScenery(ctx, 'board', n.x * 32 - 8, n.y * 32 - 16, 48, 54);
+    else if (n.kind === 'board') drawIslandArt(ctx, 'record-board', n.x * 32 - 8, n.y * 32 - 16, 48, 54);
     else if (n.kind === 'wild') { darkWisps(ctx, n.x, n.y, time); drawMonster(ctx, n.species, n.x * 32 - 6, n.y * 32 - 12, 44, time / 1000); }
     else if (n.kind === 'legend') { drawProp(ctx, 'observe', n.x, n.y, { time }); if (!n.used) marker(ctx, n.x, n.y, time, '#ffe9a0'); }
     else if (PROP_KINDS.includes(n.kind)) drawProp(ctx, n.kind, n.x, n.y, { open: n.used, art: n.art, time, water: map[n.y]?.[n.x] === 0 });
@@ -198,11 +203,11 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
 }
 
 function drawDecor(ctx, n, map, time) {
-  if (n.building) return house(ctx, n.building, false);
+  if (n.building) return house(ctx, n.building, false, map);
   if (n.scenery in FURNITURE_DEPTH) return drawFurniture(ctx, n.scenery, n.x, n.y, time);
   switch (n.scenery) {
-    case 'tree': return tree(ctx, n.x * 32, n.y * 32);
-    case 'fence': return drawScenery(ctx, 'fence', n.x * 32, n.y * 32 - 6, n.w * 32, 36);
+    case 'tree': return tree(ctx, n.x * 32, n.y * 32, map);
+    case 'fence': return drawIslandArt(ctx, ulleung(map) ? 'wall-stone' : 'rail-wood', n.x * 32, n.y * 32 - 6, 64, 36, n.w * 32);
     case 'planter': return drawScenery(ctx, 'planter', n.x * 32 - 4, n.y * 32 + 3, 40, 28);
     case 'monument': return drawScenery(ctx, 'monument', n.x * 32, (n.y + 1) * 32 - 80, 96, 80);
     case 'boat': return drawScenery(ctx, 'boat', n.x * 32 - 16, n.y * 32 - 30, 64, 100);

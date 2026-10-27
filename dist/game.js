@@ -1,4 +1,4 @@
-// 독도 탐험대 v0.35 — screens, movement between maps, story cutscenes and Dragon Quest–style quiz battles.
+// 독도 탐험대 v0.36 — screens, movement between maps, story cutscenes and Dragon Quest–style quiz battles.
 import { worldScale } from './layout.js';
 import { createJoystick } from './joystick.js';
 import { roomId, parseRoomId } from './interiors.js';
@@ -15,11 +15,11 @@ import { selectBattleQuestion, shuffledChoices } from './battle-quiz.js';
 import { createMap, npcs, blocked, pathfind, drawWorld, drawActors, TILE, W, H, wantedRole, VILLAIN_BY_ZONE } from './world.js';
 import { MAPS, getMapDef, townId, nextMapId, prevMapId } from './maps.js';
 import { createCutscenePlayer } from './cutscene.js';
-import { OPENING, STARTER_MEET, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_FALL, TREE_JOINS, EPILOGUE } from './story.js';
+import { OPENING, STARTER_MEET, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_FALL, TREE_JOINS, EPILOGUE, FERRY, FERRY_AGAIN } from './story.js';
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.35';
+const VERSION = '0.36';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -72,7 +72,8 @@ function exitLabels() {
     const tiles = [...map.exits].filter(([, d]) => d === dir).map(([k]) => k.split(',').map(Number)); if (!tiles.length) continue;
     const target = getMapDef(dir === 'next' ? nextMapId(map.id) : prevMapId(map.id)), locked = dir === 'next' && map.kind === 'town' && !state.badges.includes(state.zone);
     const x = tiles[0][0] + (dir === 'next' ? -1.2 : 1.6), y = Math.min(...tiles.map(t => t[1]));
-    out.push({ name: dir === 'next' ? `${target.name} →${locked ? ' (인증 후)' : ''}` : `← ${target.name}`, x: x * TILE + 16, y: y * TILE - 10, exit: true, locked });
+    const boat = crossesSea(map.id, target.id), label = boat ? (target.island === '울릉도' ? '울릉도행 배' : '독도행 배') : target.name;
+    out.push({ name: dir === 'next' ? `${label} →${locked ? ' (인증 후)' : ''}` : `← ${label}`, x: x * TILE + 16, y: y * TILE - 10, exit: true, locked });
   }
   return out;
 }
@@ -268,7 +269,16 @@ function showPlaceBanner(def) {
 }
 
 // ── who to go to next ──────────────────────────────────────────────────────────
-function exitTile(dir = 'next') { const k = [...map.exits].find(([, d]) => d === dir)?.[0]; if (!k) return null; const [x, y] = k.split(',').map(Number); return { exit: dir, x, y, name: getMapDef(dir === 'next' ? nextMapId(map.id) : prevMapId(map.id)).name }; }
+function exitTile(dir = 'next') { const k = [...map.exits].find(([, d]) => d === dir)?.[0]; if (!k) return null; const [x, y] = k.split(',').map(Number); const to = getMapDef(dir === 'next' ? nextMapId(map.id) : prevMapId(map.id)); return { exit: dir, x, y, name: crossesSea(map.id, to.id) ? (to.island === '울릉도' ? '울릉도행 배' : '독도행 배') : to.name }; }
+// 울릉도(1장 도동항)와 독도 사이는 걸어갈 수 없어요: 부두 끝에서 여객선을 타요.
+function crossesSea(from, to) { return !!to && (getMapDef(from).island === '울릉도') !== (getMapDef(to).island === '울릉도'); }
+async function takeFerry(to, spawnKey) {
+  const toDokdo = getMapDef(to).island !== '울릉도';
+  settleMovement(); path = []; pathAction = null; keys.clear();
+  if (toDokdo && !state.flags.ferry) { state.flags.ferry = true; await playStory(FERRY); }
+  else await playStory(FERRY_AGAIN(toDokdo ? 'dokdo' : 'ulleung'));
+  await changeMap(to, spawnKey);
+}
 function targetNPC() {
   if (map.kind === 'route') return exitTile('next');
   if (map.kind === 'room') { // inside: down the stairs, then out of the door
@@ -396,10 +406,11 @@ function useStairs(s) {
 
 // ── walking, exits and encounters ──────────────────────────────────────────────
 function exitLocked(x, y) { return map.exits.get(`${x},${y}`) === 'next' && map.kind === 'town' && !state.badges.includes(state.zone); }
+const lockedMessage = () => map.def.island === '울릉도' ? `관장 ${z().boss}의 인증을 받으면 독도행 배를 탈 수 있어요.` : `관장 ${z().boss}의 인증을 받으면 다리 건너 길이 열려요.`;
 function move(dx, dy, now) {
   if (moving || busy() || Math.abs(dx) + Math.abs(dy) !== 1) return false;
   const nx = state.x + dx, ny = state.y + dy; state.dir = dx < 0 ? 'left' : dx > 0 ? 'right' : dy < 0 ? 'up' : 'down';
-  if (exitLocked(nx, ny)) { if (!move.warned || now - move.warned > 1500) { toast(`관장 ${z().boss}의 인증을 받으면 다리 건너 길이 열려요.`); move.warned = now; } return false; }
+  if (exitLocked(nx, ny)) { if (!move.warned || now - move.warned > 1500) { toast(lockedMessage()); move.warned = now; } return false; }
   if (dy === -1) { const b = buildingDoorAt(nx, ny); if (b) { enterBuilding(b); return true; } } // walking up into a door
   if (blocked(map, nx, ny, liveNPCs())) return false;
   moving = { fromX: state.x, fromY: state.y, toX: nx, toY: ny, start: now }; return true;
@@ -409,7 +420,7 @@ function arrive() {
   state.x = moving.toX; state.y = moving.toY; view = { x: state.x, y: state.y }; moving = null; walks++; tutorialEvent('walk');
   if (walks % 10 === 0) save();
   const exit = map.exits.get(`${state.x},${state.y}`);
-  if (exit) { changeMap(exit === 'next' ? nextMapId(map.id) : prevMapId(map.id), exit === 'next' ? 'a' : 'z'); return; }
+  if (exit) { const to = exit === 'next' ? nextMapId(map.id) : prevMapId(map.id), key = exit === 'next' ? 'a' : 'z'; if (crossesSea(map.id, to)) takeFerry(to, key); else changeMap(to, key); return; }
   if (map.kind === 'room') {
     if (map.doors.some(d => d.x === state.x && d.y === state.y)) { leaveBuilding(); return; }
     const s = map.stairs.find(s => s.x === state.x && s.y === state.y); if (s) { useStairs(s); return; }
@@ -906,9 +917,10 @@ function dexDetail(id, filter) {
 // ── 세계 지도: 두 섬을 그린 그림 지도. 가 본 마을을 누르면 바로 이동해요. ──
 // 자리(320×200 지도 칸)는 실제 지명의 대략적인 방향을 따랐어요. 섬 모양은 게임용 그림이에요.
 const WORLD_SPOTS = {
-  town0: [196, 136], town1: [222, 98], town2: [252, 116], town3: [148, 70], town4: [118, 16], town5: [52, 102], town6: [76, 64], town7: [110, 96]
+  town0: [26, 24], town1: [222, 98], town2: [252, 116], town3: [148, 70], town4: [118, 16], town5: [52, 102], town6: [76, 64], town7: [110, 96]
 };
-const ROUTE_BENDS = { route1: [[246, 80]], route2: [[170, 152], [150, 112]], route3: [[136, 40]], route4: [[62, 36]], route6: [[90, 82]] };
+const ROUTE_LABEL = { route0: [206, 150] };
+const ROUTE_BENDS = { route0: [[30, 60], [18, 186], [170, 190], [204, 146]], route1: [[246, 80]], route2: [[170, 152], [150, 112]], route3: [[136, 40]], route4: [[62, 36]], route6: [[90, 82]] };
 function drawWorldMap(c) {
   const g = c.getContext('2d'), W = c.width, H = c.height; g.imageSmoothingEnabled = false;
   const img = g.createImageData(W, H), px = img.data;
@@ -938,7 +950,12 @@ function drawWorldMap(c) {
   for (const [x, y, r] of [[20, 150, 3], [28, 158, 2], [180, 30, 3], [290, 160, 3], [300, 150, 2], [170, 180, 2], [140, 172, 3], [280, 60, 2], [44, 20, 2]])
     for (let yy = -r; yy <= r; yy++) for (let xx = -r; xx <= r; xx++) if (xx * xx + yy * yy <= r * r) set(((y + yy) * W + x + xx) * 4, xx + yy < 0 ? [150, 132, 112] : [112, 96, 82]);
   g.putImageData(img, 0, 0);
-  // the walking routes between towns
+  // 울릉도 (작게 줄인 그림): 왼쪽 위 네모 안. 실제로는 독도에서 서북쪽으로 약 87.4km 떨어져 있어요.
+  g.fillStyle = '#2a7896'; g.fillRect(0, 0, 64, 46); g.strokeStyle = '#f7f1d8'; g.lineWidth = 2; g.strokeRect(1, 1, 62, 44);
+  g.fillStyle = '#3f7a4a'; g.beginPath(); g.ellipse(28, 24, 20, 15, -.3, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#2f5a3c'; g.beginPath(); g.ellipse(26, 20, 9, 7, -.3, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#e4f2ee'; g.fillRect(36, 34, 4, 2);
+  // the walking routes between towns (and the ferry)
   const towns = MAPS.filter(m => m.kind === 'town');
   g.lineWidth = 2; g.setLineDash([3, 3]);
   towns.slice(0, -1).forEach((t, i) => {
@@ -952,25 +969,26 @@ function drawWorldMap(c) {
 function showMap() {
   const towns = MAPS.filter(m => m.kind === 'town'), routes = MAPS.filter(m => m.kind === 'route');
   const pct = ([x, y]) => `left:${Math.min(92, Math.max(8, x / 320 * 100)).toFixed(2)}%;top:${Math.min(87, Math.max(13, y / 200 * 100)).toFixed(2)}%`; // markers stay inside the picture
-  const routeSpot = r => { const a = WORLD_SPOTS[`town${r.zone}`], b = WORLD_SPOTS[`town${r.zone + 1}`], bend = ROUTE_BENDS[r.id]?.[0]; return bend || [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; };
+  const routeSpot = r => { const a = WORLD_SPOTS[`town${r.zone}`], b = WORLD_SPOTS[`town${r.zone + 1}`], bend = ROUTE_LABEL[r.id] || ROUTE_BENDS[r.id]?.[0]; return bend || [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; };
   const townMarks = towns.map((t, i) => {
     const visited = state.visited.includes(t.zone), here = (map.def.town || map.id) === t.id, badge = state.badges.includes(t.zone);
     const status = here ? '지금 여기' : visited ? '눌러서 바로 이동' : '아직 가 보지 않은 곳';
     return `<button class="wm-town ${here ? 'here' : ''} ${visited ? 'visited' : 'locked'}" style="${pct(WORLD_SPOTS[t.id])}" data-zone="${t.zone}" ${!visited || here ? 'disabled' : ''} aria-label="${esc(t.name)} · ${status}"><i>${here ? '★' : visited ? (badge ? '✓' : ZONES[t.zone].icon) : '?'}</i><span>${String(i + 1).padStart(2, '0')} ${esc(visited ? t.name : '???')}</span></button>`;
   }).join('');
   const routeMarks = routes.map(r => `<span class="wm-route ${map.id === r.id ? 'here' : ''}" style="${pct(routeSpot(r))}">${map.id === r.id ? '★ ' : ''}${esc(state.visited.includes(r.zone + 1) || map.id === r.id ? r.name : '…')}</span>`).join('');
-  openModal(head('독도 탐험 지도', '실제 독도 지명 · 마을과 길은 게임 속 창작') + `<p>가 본 마을을 누르면 바로 이동해요(동료도 회복). 처음 가는 곳은 점선 길을 따라 걸어가요.</p>
-    <div class="world-map"><canvas id="worldMapArt" width="320" height="200" aria-hidden="true"></canvas><span class="wm-island" style="left:28%;top:94%">서도</span><span class="wm-island" style="left:70%;top:94%">동도</span><span class="wm-compass" aria-hidden="true">N<br>▲</span>${routeMarks}${townMarks}</div>
+  openModal(head('울릉도·독도 탐험 지도', '실제 지명 · 마을과 길은 게임 속 창작') + `<p>가 본 마을을 누르면 바로 이동해요(동료도 회복). 처음 가는 곳은 점선 길을 따라 걸어가요.</p>
+    <div class="world-map"><canvas id="worldMapArt" width="320" height="200" aria-hidden="true"></canvas><span class="wm-island small" style="left:10%;top:27%">울릉도</span><span class="wm-ferry" style="left:6%;top:64%">⛴ 약 87.4km</span><span class="wm-island" style="left:28%;top:94%">서도</span><span class="wm-island" style="left:70%;top:94%">동도</span><span class="wm-compass" aria-hidden="true">N<br>▲</span>${routeMarks}${townMarks}</div>
     <div class="wm-legend"><span><i class="here">★</i> 지금 여기</span><span><i class="visited">✓</i> 인증 받은 마을</span><span><i class="visited">≈</i> 가 본 마을</span><span><i class="locked">?</i> 아직 못 가 본 곳</span></div>
-    <p class="footer-note">지명은 실제 독도의 이름이고 대략적인 방향을 따랐지만, 섬 모양·마을·건물은 게임용 그림이에요. 실제 지형은 공식 지도와 사진으로 확인해요.</p>`, () => {
+    <p class="footer-note">지명은 실제 울릉도·독도의 이름이고 대략적인 방향을 따랐지만, 섬 모양·마을·건물은 게임용 그림이에요. 울릉도는 실제로 훨씬 크고 멀리(약 87.4km) 있어서 왼쪽 위에 작게 줄여 그렸어요.</p>`, () => {
     drawWorldMap($('#worldMapArt'));
     $$('[data-zone]').forEach(b => b.onclick = () => travel(Number(b.dataset.zone)));
   });
 }
 async function travel(zone) {
   if (battle || !state.started || !state.visited.includes(zone)) return;
+  const boat = crossesSea(map.def.town || map.id, townId(zone));
   closeModal(); await changeMap(townId(zone), 'a', { heal: true });
-  toast(`${map.name}에 도착했어요. 동료들도 기운을 되찾았어요.`);
+  toast(`${boat ? '배를 타고 ' : ''}${map.name}에 도착했어요. 동료들도 기운을 되찾았어요.`);
 }
 function showNotebook() {
   openModal(head('배움의 기록', `발견한 개념 ${Object.keys(state.learning).length}/12`) + `<p>게임 레벨과 배움의 기록은 달라요. 힌트 없이 해결한 경험과 여러 번의 학습을 함께 살펴봐요.</p>${CONCEPTS.map(c => { const r = state.learning[c.id]; const status = !r ? '아직 발견 전' : r.independent >= 3 && r.sessions.length >= 2 ? '반복 확인 중' : r.independent ? '혼자 해결한 경험' : '도움받아 배우는 중'; return `<div class="knowledge-row"><div><strong>${c.title}</strong><small>${c.standard} · ${status}</small><small>독립 정답 ${r?.independent || 0} · 학습 세션 ${r?.sessions.length || 0}</small></div><button data-review="${c.id}" ${!state.started ? 'disabled' : ''}>다시 보기</button></div>`; }).join('')}<div class="modal-actions"><button id="exportLearning" class="neutral">학습 기록 내려받기</button><button id="sourceBtn" class="neutral">학습 자료 출처</button></div><p class="footer-note">이 기록만으로 성취기준 도달을 확정하지 않아요. 학생의 설명과 지연 확인을 함께 살펴보세요.</p>`, () => {

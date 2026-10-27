@@ -65,6 +65,16 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
     const [sx, sy, sw, sh] = crop, h = width * sh / sw;
     ctx.drawImage(sheet, sx, sy, sw, sh, x, bottom - h, width, h);
   }
+  // 울릉도: 가파른 초록 산(성인봉 쪽)과 바닷가 절벽. 장면에 island: 'ulleung'을 적으면 독도 바위 대신 그려요.
+  function hills(x, bottom, width) {
+    const h = width * .5, peak = x + width * .45;
+    ctx.fillStyle = '#2f5a3c'; ctx.beginPath(); ctx.moveTo(x, bottom); ctx.lineTo(x + width * .12, bottom - h * .55); ctx.lineTo(peak - width * .12, bottom - h * .88); ctx.lineTo(peak, bottom - h);
+    ctx.lineTo(peak + width * .16, bottom - h * .8); ctx.lineTo(x + width * .86, bottom - h * .5); ctx.lineTo(x + width, bottom); ctx.fill();
+    ctx.fillStyle = '#3f7a4a'; ctx.beginPath(); ctx.moveTo(x + width * .05, bottom); ctx.lineTo(x + width * .2, bottom - h * .45); ctx.lineTo(peak - width * .02, bottom - h * .8); ctx.lineTo(x + width * .62, bottom - h * .55); ctx.lineTo(x + width * .8, bottom); ctx.fill();
+    for (let i = 0; i < 9; i++) R(x + width * (.1 + i * .09), bottom - h * (.25 + (i % 3) * .1), 4, 3, '#5f9a5f');
+    R(x, bottom - 6, width, 6, '#8a8276'); for (let i = 0; i < width; i += 9) R(x + i, bottom - 6, 5, 2, '#a9a196');
+  }
+  const backdrop = (s, x, bottom, width, crop) => s.def.island === 'ulleung' ? hills(x, bottom, width) : peaks(x, bottom, width, crop);
   function person(c, t) {
     const size = c.size || 52, hop = c.hopAt ? Math.max(0, Math.sin(Math.min(1, (t - c.hopAt) / 450) * Math.PI)) * 10 : 0;
     const x = c.x - size / 2, y = c.y - size * .9375 - hop;
@@ -153,7 +163,7 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
       sky.forEach((c, i) => R(0, i * 30, SW, 30, c));
       if (!night) { R(262, 14, 18, 18, '#fff3c4'); R(265, 11, 12, 24, '#fff3c4'); for (let i = 0; i < 3; i++) { const cx = (i * 120 + t / 90) % 380 - 50; R(cx, 18 + i * 12, 34, 6, '#ffffff'); R(cx + 8, 14 + i * 12, 18, 6, '#ffffff'); } }
       else for (let i = 0; i < 40; i++) R((i * 71) % SW, (i * 23) % 80, 1, 1, '#e7f4ff');
-      peaks(196, 92, 104);
+      backdrop(s, 196, 92, 104);
       R(0, 90, SW, 90, night ? '#123049' : '#2f7f95');
       for (let y = 92; y < 180; y += 6) for (let x = ((y * 13 + Math.floor(t / 90)) % 24) - 24; x < SW; x += 24) R(x, y, 8, 1, night ? '#2a5a7a' : '#7cc0cc');
       if (s.cues.glint) {
@@ -172,10 +182,11 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
         R(46, y0 + 6, 3, 3, '#e2b84f'); R(186, y0 + 6, 18, 2, '#2c5e8a');
       }
     },
-    dock(t) {
+    dock(t, s) {
       R(0, 0, SW, 56, '#a6dbe6'); R(0, 0, SW, 22, '#8fcfdf');
       R(0, 56, SW, 40, '#2f7f95'); for (let y = 58; y < 96; y += 6) for (let x = ((y * 7 + Math.floor(t / 110)) % 20) - 20; x < SW; x += 20) R(x, y, 7, 1, '#7cc0cc');
-      peaks(-10, 96, 150); peaks(200, 92, 90, [110, 185, 590, 575]);
+      if (s.def.island === 'ulleung') { hills(-30, 98, 160); hills(150, 98, 190); }
+      else { peaks(-10, 96, 150); peaks(200, 92, 90, [110, 185, 590, 575]); }
       tiles('sand', 0, 96, SW, 112); tiles('dock', 0, 112, SW, SH);
       R(0, 110, SW, 2, '#674d38');
       for (let x = 20; x < SW; x += 90) { R(x, 104, 6, 14, '#4a2c1a'); R(x - 1, 102, 8, 3, '#6a4126'); }
@@ -185,7 +196,7 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
       R(0, 0, SW, 60, '#a6dbe6'); R(0, 0, SW, 24, '#8fcfdf');
       for (let i = 0; i < 2; i++) { const cx = (i * 170 + t / 110) % 380 - 50; R(cx, 12 + i * 14, 30, 5, '#ffffff'); R(cx + 7, 9 + i * 14, 16, 5, '#ffffff'); }
       R(0, 60, SW, 40, '#2f7f95'); for (let y = 62; y < 100; y += 6) for (let x = ((y * 7 + Math.floor(t / 110)) % 20) - 20; x < SW; x += 20) R(x, y, 7, 1, '#7cc0cc');
-      peaks(150, 100, 130); tiles('sand', 0, 100, SW, 116); tiles('dock', 0, 116, SW, SH); R(0, 114, SW, 2, '#674d38');
+      backdrop(s, 150, 100, 150); tiles('sand', 0, 100, SW, 116); tiles('dock', 0, 116, SW, SH); R(0, 114, SW, 2, '#674d38');
       // tent
       for (let i = 0; i < 46; i++) { const w = 20 + i * 1.6; R(52 - w / 2, 66 + i, w, 1, i % 9 < 1 ? '#c9d8c0' : '#e9efe2'); }
       R(20, 112, 64, 4, '#9aa79a'); R(45, 84, 14, 28, '#3d5a52'); R(47, 86, 10, 26, '#5d7d74');
@@ -205,7 +216,7 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
       }
     },
     field(t, s) {
-      R(0, 0, SW, 48, '#a6dbe6'); peaks(180, 52, 120);
+      R(0, 0, SW, 48, '#a6dbe6'); backdrop(s, 180, 52, 120);
       R(0, 44, SW, 10, '#2f7f95');
       tiles('grass', 0, 54, SW, SH);
       tiles('path', 60, 128, 220, 160);
