@@ -315,3 +315,43 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
 @media(max-width:600px){.wm-town i{width:26px;height:26px;font-size:12px;border-width:2px}.wm-town span{font-size:10px;padding:1px 5px}.wm-route{display:none}.wm-island{font-size:11px}}
 /* v0.31 — four choices: keep all of them on screen on short (phone landscape) screens */
 @media (max-height:460px){.battle-screen.dq.quiz-open .dq-answers{display:grid;grid-template-columns:1fr 1fr;gap:6px}.battle-screen.dq.quiz-open .dq-answer{min-height:0!important;padding:6px 10px!important;font-size:14px!important}.battle-screen.dq.quiz-open .quiz-rule{display:none}.battle-screen.dq.quiz-open .dq-quiz-head{margin-bottom:2px}}
+
+/* v0.33 — explorer drawings in the character choice (512-px pictures drawn smoothly when scaled down) */
+.explorer-portrait{image-rendering:auto;background:linear-gradient(#eef6f1,#dcebe4);border-radius:10px}
+
+/* v0.34 — every screen size: phones, iPad / Galaxy Tab (portrait and landscape) and monitors */
+/* the frame is exactly the visible part of the browser (Safari toolbars excluded), even without 100dvh support */
+#gameApp.screen-frame,#gameApp.screen-frame.battling{height:var(--app-h,100dvh)}
+.modal-panel{max-height:calc(var(--app-h,100vh) - 2 * max(24px,env(safe-area-inset-top)))}
+@media(max-width:600px){.modal-panel{max-height:calc(var(--app-h,100vh) - 24px)}}
+/* practice-duel tips: a row of its own between the field and the windows */
+.dq-coach,.battle-screen.dq.quiz-open .dq-coach{position:relative;left:auto;top:auto;transform:none;flex:0 0 auto;align-self:center;width:max-content;max-width:min(100%,680px);margin:-2px 0}
+@keyframes coach-pop{from{transform:translateY(-6px);opacity:0}to{transform:none;opacity:1}}
+@media (max-width:600px),(max-height:560px){.dq-coach,.battle-screen.dq.quiz-open .dq-coach{padding:4px 8px 4px 4px;gap:8px}.dq-coach canvas,.battle-screen.dq.quiz-open .dq-coach canvas{width:30px;height:30px;flex-basis:30px}.dq-coach p,.battle-screen.dq.quiz-open .dq-coach p{font-size:13px;line-height:1.4}.dq-coach-skip{font-size:11px;padding:5px 7px}}
+/* phones held sideways (300–420 px tall): slimmer windows, commands in two columns */
+@media (max-height:420px){
+  #gameApp.screen-frame.battling .battle-screen.dq{gap:5px;padding-top:max(5px,env(safe-area-inset-top));padding-bottom:max(5px,env(safe-area-inset-bottom))}
+  .dq-top{gap:8px}.dq-status,.dq-foe{padding:3px 10px 4px}.dq-ally{width:28px;height:28px;flex-basis:28px}
+  .dq-status strong,.dq-foe strong{font-size:15px}.dq-lv{font-size:12px}.dq-hp{font-size:13px}.dq-hp b{font-size:14px}
+  .dq-party,.dq-gauge-label,.dq-foe small{display:none}.dq-bar{height:6px;margin-top:2px}
+  .dq-stage{min-height:56px}.dq-label{font-size:11px;top:4px;padding:2px 8px}
+  .dq-bottom{min-height:0;max-height:none;flex:0 1 auto}.dq-message{padding:6px 12px 22px;font-size:15px;line-height:1.55}
+  .dq-command{flex:0 0 46%;padding:4px}.dq-command-title{font-size:11px;padding:0 8px 3px;margin-bottom:2px}
+  .dq-command .dq-options{display:grid;grid-template-columns:1fr 1fr;gap:0 4px}.dq-option{font-size:15px;padding:4px 6px;gap:4px}.dq-option small{font-size:10px}.dq-option.back{font-size:13px}
+  .dq-next{bottom:2px;font-size:16px}
+}
+/* portrait phones: while a question is open the four answers come first (the field returns after answering) */
+@media (max-width:600px) and (max-height:800px){.battle-screen.dq.quiz-open .dq-stage{display:none}.battle-screen.dq.quiz-open .dq-bottom{max-height:none}.dq-quiz .quiz-rule{font-size:12px;margin:4px 0 0}.dq-quiz #battleQuestionTitle{margin:2px 0 8px}}
+@media (max-width:600px) and (max-height:800px){.battle-screen.dq.quiz-open .dq-bottom{min-height:0;flex:1 1 0}.battle-screen.dq.quiz-open .dq-message{min-height:0}}
+/* wide but not very tall screens (iPad / Galaxy Tab landscape, laptops): answers in two columns leave room for the field */
+@media (min-width:900px) and (max-height:820px){.battle-screen.dq.quiz-open .dq-answers{grid-template-columns:1fr 1fr}.battle-screen.dq.quiz-open .dq-answer{min-height:0}}
+/* answers wrap onto a second line instead of running off narrow screens */
+.dq-answer>span:not(.dq-cursor){white-space:normal;word-break:keep-all;overflow-wrap:anywhere;min-width:0}
+/* portrait tablets (iPad, Galaxy Tab): plenty of room, so larger questions and answers */
+@media (min-width:700px) and (min-height:900px){
+  .dq-quiz #battleQuestionTitle{font-size:24px}.dq-quiz .quiz-rule{font-size:15px}.dq-quiz-head{font-size:15px}
+  .dq-answer{font-size:20px;padding:13px 16px}.dq-answer b{width:28px;height:28px;flex-basis:28px}
+  .dq-message{font-size:20px}.dq-explain,.dq-hint{font-size:17px}.dq-result-text{font-size:20px}
+  .dq-option{font-size:21px;padding:10px 12px}.dq-coach p{font-size:17px}
+  .cs-text{font-size:22px}
+}

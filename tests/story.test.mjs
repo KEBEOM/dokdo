@@ -1,12 +1,12 @@
 // Cutscene scripts and Korean particles.
 import assert from 'node:assert/strict';
-import { OPENING, GUIDE, LEGEND, ARRIVALS, arrivalScene, BOSS_REVEAL, BOSS_FALL, EPILOGUE, VILLAIN_TALES } from '../dist/story.js';
+import { OPENING, STARTER_MEET, GUIDE, LEGEND, ARRIVALS, arrivalScene, BOSS_REVEAL, BOSS_FALL, TREE_JOINS, EPILOGUE, VILLAIN_TALES } from '../dist/story.js';
 import { josa, fillJosa } from '../dist/text.js';
 import { MAPS } from '../dist/maps.js';
-import { ZONES } from '../dist/data.js';
+import { ZONES, STARTERS } from '../dist/data.js';
 
-const BGS = new Set(['stage', 'sea', 'dock', 'field', 'crisis', 'title', 'summit']);
-const CUES = /^(confetti|spot|jump|glint|rustle|pop|surprise|aura|device|kim-turn|night|rise|machine|machine-off|blueprint|dark|records|panel:(sea|rock|grass))$/;
+const BGS = new Set(['stage', 'sea', 'dock', 'field', 'crisis', 'title', 'summit', 'camp']);
+const CUES = /^(confetti|spot|jump|glint|rustle|pop|surprise|aura|device|kim-turn|night|rise|machine|machine-off|machine-quiet|blueprint|dark|records|glow|picture:professor|picture-off|(show|hop|come|calm):[a-z0-9]+|panel:(sea|rock|grass))$/;
 function check(script) {
   assert.ok(script.id && script.scenes.length);
   for (const s of script.scenes) {
@@ -17,11 +17,20 @@ function check(script) {
     for (const l of lines) {
       assert.ok(typeof l.text === 'string' && l.text.length > 0 && l.text.length <= 70, `${script.id}: short, readable line (${l.text})`);
       if (l.cue) assert.match(l.cue, CUES);
+      const target = /^(show|hop|come|calm):(.+)$/.exec(l.cue || '');
+      if (target) { const c = (s.cast || []).find(c => c.id === target[2]); assert.ok(c, `${script.id}: ${l.cue} names someone in the scene`); if (target[1] === 'come') assert.ok(c.comeTo); }
     }
     for (const l of s.lines) if (l.choice) { assert.ok(l.choice.length >= 2); l.choice.forEach(c => assert.ok(c.label && c.reply?.length)); }
   }
 }
-[OPENING, GUIDE, LEGEND, BOSS_REVEAL, BOSS_FALL, EPILOGUE].forEach(check);
+[OPENING, STARTER_MEET, GUIDE, LEGEND, BOSS_REVEAL, BOSS_FALL, TREE_JOINS, EPILOGUE].forEach(check);
+// v0.33: 김박사's picture at the first meeting, the three starters in their own scene, 사철나무 with 백무 사장
+assert.ok(OPENING.scenes.some(s => s.lines.some(l => l.cue === 'picture:professor') && s.lines.some(l => l.cue === 'picture-off')), 'the 김박사 picture comes and goes');
+assert.deepEqual(STARTER_MEET.scenes[0].cast.filter(c => c.who.startsWith('monster:')).map(c => Number(c.who.slice(8))), STARTERS, 'all three starters are introduced');
+assert.ok(STARTER_MEET.scenes[0].cast.filter(c => c.hidden).every(c => STARTER_MEET.scenes[0].lines.some(l => l.cue === `show:${c.id}`)), 'every starter is shown');
+assert.match(fillJosa(GUIDE.scenes[0].lines[0].text, { starter: '해국' }), /해국과 함께라면/);
+assert.ok(BOSS_REVEAL.scenes[0].cast.some(c => c.who === 'monster:18' && c.aura), '사철나무 stands with 백무 사장');
+assert.ok(TREE_JOINS.scenes[0].lines.some(l => l.cue === 'calm:tree'));
 // The 백무단 story: clues in chapters 1–7, then the truth, the excuse and the answer on 대한봉.
 assert.equal(VILLAIN_TALES.length, 8); VILLAIN_TALES.slice(0, 7).forEach(v => assert.ok(v.before.length && v.after.length)); assert.equal(VILLAIN_TALES[7], null);
 const reveal = BOSS_REVEAL.scenes.flatMap(s => s.lines).map(l => l.text).join(' ');
@@ -32,7 +41,7 @@ assert.ok(OPENING.scenes.flatMap(s => s.lines).some(l => l.text.includes('아직
 assert.deepEqual(OPENING.scenes.map(s => s.bg), ['stage', 'sea', 'dock', 'field', 'crisis', 'dock']);
 assert.ok(OPENING.scenes.at(-1).lines.some(l => l.choice?.length === 2));
 assert.ok(OPENING.scenes.flatMap(s => s.lines).some(l => l.who === '김박사'));
-assert.ok(GUIDE.scenes[0].lines.at(-1).text.includes('단서'));
+assert.ok(GUIDE.scenes.at(-1).lines.at(-1).text.includes('단서'));
 for (const t of MAPS.filter(m => m.kind === 'town' && m.zone > 0)) { check(arrivalScene(t.zone, ZONES[t.zone], t)); assert.ok(ARRIVALS[t.zone]); }
 
 for (const [w, a, b, c] of [['해국', '해국이', '해국을', '해국과'], ['괭이갈매기', '괭이갈매기가', '괭이갈매기를', '괭이갈매기와'], ['돌돔', '돌돔이', '돌돔을', '돌돔과'], ['독도새우', '독도새우가', '독도새우를', '독도새우와']]) {

@@ -1,22 +1,23 @@
-// 독도 탐험대 v0.32 — screens, movement between maps, story cutscenes and Dragon Quest–style quiz battles.
+// 독도 탐험대 v0.34 — screens, movement between maps, story cutscenes and Dragon Quest–style quiz battles.
+import { worldScale } from './layout.js';
 import { MONSTERS, ZONES, TYPES, STARTERS, getSpecies, isUnique } from './data.js';
 import { CONCEPTS, QUESTIONS, SOURCES } from './learning.js';
 import { newState, validateSave, createMonster, damage, enemyHit, healAll, gainXP, captureChance, addMonster, recordAnswer, knownSkills, learnedBetween } from './engine.js';
 import { portrait } from './sprites.js';
 import { onAssetReady, preloadMonsters, assetImage } from './assets.js';
 import { VILLAIN_ATLASES } from './villain-atlases.js';
-import { EXPLORERS, paintExplorerCard, paintExplorerPortrait, drawResident } from './characters.js';
+import { EXPLORERS, PROFESSOR_PICTURE, paintExplorerCard, paintExplorerPortrait, drawResident } from './characters.js';
 import { createNPCMotion } from './npc-motion.js';
 import { MOVE_DURATION, moveView } from './movement.js';
 import { selectBattleQuestion, shuffledChoices } from './battle-quiz.js';
 import { createMap, npcs, blocked, pathfind, drawWorld, drawActors, TILE, W, H, wantedRole, VILLAIN_BY_ZONE } from './world.js';
 import { MAPS, getMapDef, townId, nextMapId, prevMapId } from './maps.js';
 import { createCutscenePlayer } from './cutscene.js';
-import { OPENING, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_FALL, EPILOGUE } from './story.js';
+import { OPENING, STARTER_MEET, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_FALL, TREE_JOINS, EPILOGUE } from './story.js';
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.32';
+const VERSION = '0.34';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -44,9 +45,13 @@ const name = m => getSpecies(m.id).name;
 const busy = () => !state.started || !$('#modal').classList.contains('hidden') || !!dialogueState || !!battle || cutscenes.active() || transition;
 function liveNPCs() { const base = npcs(map, progress(), state.flags); npcMotion.sync(map.id, base); return npcMotion.snapshot(base); }
 
+// The visible height of the browser window (iPad/iPhone Safari toolbars excluded), also for browsers without 100dvh.
+function setAppHeight() { document.documentElement.style.setProperty('--app-h', `${Math.round(window.innerHeight)}px`); }
+setAppHeight(); window.addEventListener('resize', setAppHeight); window.addEventListener('orientationchange', () => setTimeout(setAppHeight, 250));
+window.visualViewport?.addEventListener('resize', setAppHeight);
 function resizeScene() {
   const bounds = scene.getBoundingClientRect(), w = Math.max(1, Math.round(bounds.width || 768)), h = Math.max(1, Math.round(bounds.height || 480));
-  sceneScale = Math.max(1, Math.round(Math.min(w, h) / 440), Math.ceil(w / (W * TILE)), Math.ceil(h / (H * TILE)));
+  sceneScale = worldScale(w, h, { dpr: Math.min(3, Math.max(1, window.devicePixelRatio || 1)), tile: TILE, mapW: W, mapH: H });
   sceneWidth = Math.ceil(w / sceneScale); sceneHeight = Math.ceil(h / sceneScale);
   canvas.width = sceneWidth; canvas.height = sceneHeight; canvas.style.width = sceneWidth * sceneScale + 'px'; canvas.style.height = sceneHeight * sceneScale + 'px'; ctx.imageSmoothingEnabled = false;
   actorPixelRatio = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
@@ -169,8 +174,8 @@ function paintExplorerChoices(now = 0) {
   $$('canvas[data-explorer-sprite]').forEach(c => paintExplorerCard(c, c.dataset.explorerSprite, now, avatarChoice?.selected === c.dataset.explorerSprite));
 }
 function chooseAvatar(onChoose = null, canClose = true) {
-  let selected = null;
-  openModal(head('어떤 탐험대원으로 떠날까요?', '독도 탐험대 · 캐릭터 선택', canClose) + `<p class="explorer-intro">마음에 드는 탐험대원을 골라 주세요. 두 캐릭터의 능력과 이야기는 같아요.</p><div class="explorer-grid">${EXPLORERS.map(e => `<button class="explorer-card" data-avatar="${e.id}" aria-pressed="false"><canvas class="explorer-portrait" data-explorer-portrait="${e.id}" width="256" height="256" aria-label="${e.label} 캐릭터"></canvas><div class="explorer-card-footer"><canvas data-explorer-sprite="${e.id}" width="64" height="64" aria-hidden="true"></canvas><strong>${e.label}</strong><span class="explorer-selected">✓</span></div></button>`).join('')}</div><p class="explorer-choice-status" id="avatarStatus" role="status">캐릭터를 누르면 걷는 모습을 볼 수 있어요.</p><div class="modal-actions"><button id="avatarConfirm" class="primary" disabled>이 캐릭터로 시작 →</button></div>`, () => {
+  let selected = null; EXPLORERS.forEach(e => assetImage(e.picture));
+  openModal(head('어떤 탐험대원으로 떠날까요?', '독도 탐험대 · 캐릭터 선택', canClose) + `<p class="explorer-intro">마음에 드는 탐험대원을 골라 주세요. 두 캐릭터의 능력과 이야기는 같아요.</p><div class="explorer-grid">${EXPLORERS.map(e => `<button class="explorer-card" data-avatar="${e.id}" aria-pressed="false"><canvas class="explorer-portrait" data-explorer-portrait="${e.id}" width="512" height="512" aria-label="${e.label} 탐험대원 그림"></canvas><div class="explorer-card-footer"><canvas data-explorer-sprite="${e.id}" width="64" height="64" aria-hidden="true"></canvas><strong>${e.label}</strong><span class="explorer-selected">✓</span></div></button>`).join('')}</div><p class="explorer-choice-status" id="avatarStatus" role="status">캐릭터를 누르면 걷는 모습을 볼 수 있어요.</p><div class="modal-actions"><button id="avatarConfirm" class="primary" disabled>이 캐릭터로 시작 →</button></div>`, () => {
     avatarChoice = { selected: null };
     $$('[data-avatar]').forEach(b => b.onclick = () => {
       selected = b.dataset.avatar; avatarChoice.selected = selected;
@@ -183,8 +188,9 @@ function chooseAvatar(onChoose = null, canClose = true) {
 async function beginOpening(avatar) {
   resetTransient(); state = newState(); state.avatar = avatar; map = createMap('town0'); view = { x: state.x, y: state.y };
   $('#titleScreen').classList.add('hidden'); scene.classList.add('story');
-  preloadMonsters([...STARTERS, 34, 55, 9]);
+  preloadMonsters([...STARTERS, 34, 55, 9]); assetImage(PROFESSOR_PICTURE);
   await playStory(OPENING);
+  await playStory(STARTER_MEET); // 김박사의 연구 기지에서 세 친구를 만나요
   chooseStarter(avatar);
 }
 function chooseStarter(avatar) {
@@ -541,6 +547,11 @@ function villainPortrait(actor) {
   const role = actor === 'villain-leader' ? 'boss' : actor.startsWith('villain-exec') ? 'exec' : 'grunt';
   return `characters/baekmudan-${role}-portrait`;
 }
+// 백무 사장은 마지막에 전설의 독도몬 사철나무를 내보내요. 정화하면 동료가 돼요(게임 전체에 한 마리).
+const TREE = 18;
+const ownsTree = () => [...state.party, ...state.storage].some(m => m.id === TREE);
+const bossTeam = () => [43, 58, ownsTree() ? 26 : TREE];
+let testQuestion = null; // screen-size checks (?test) ask the longest question on purpose
 function startBattle(kind, id, opts = {}) {
   if (battle || !state.started) return;
   settleMovement(); path = []; pathAction = null; keys.clear();
@@ -555,7 +566,7 @@ function startBattle(kind, id, opts = {}) {
     const foe = createMonster(id, 3), mine = state.party[state.active] || state.party[0];
     foe.maxHp = foe.hp = damage(mine, foe, 1.2, () => .5).amount * 2 - 1; foe.attack = 3; enemies = [foe];
   }
-  else if (kind === 'enemy') { const pool = z().wild.filter(i => !STARTERS.includes(i)); enemies = (state.zone === 7 ? [43, 58, 26] : [pool[2] || pool[0] || 21]).map(i => createMonster(i, base)); }
+  else if (kind === 'enemy') { const pool = z().wild.filter(i => !STARTERS.includes(i)); enemies = (state.zone === 7 ? bossTeam() : [pool[2] || pool[0] || 21]).map(i => createMonster(i, base + (i === TREE ? 2 : 0))); }
   else if (kind === 'trainer') enemies = (opts.npc.team?.length ? opts.npc.team : [z().wild.filter(i => !STARTERS.includes(i))[3]]).map(i => createMonster(i, base));
   else enemies = z().bossTeam.slice(0, kind === 'rematch' ? 3 : 2).map(i => createMonster(i, base + 1 + (kind === 'rematch' ? 2 : 0)));
   for (const m of enemies) if (!state.seen.includes(m.id)) state.seen.push(m.id);
@@ -579,7 +590,7 @@ function refreshBattle() {
 }
 function explanationHTML(q) { return `<p class="dq-explain">${esc(q.explanation)}</p><a class="source-link" href="${q.source}" target="_blank" rel="noopener">자료 확인 ↗</a>`; }
 async function askQuiz(b, phase, header) {
-  const q = selectBattleQuestion(state), order = shuffledChoices(q);
+  const q = testQuestion || selectBattleQuestion(state), order = shuffledChoices(q);
   b.quiz = { q, phase, order, answered: false, assisted: false };
   const rule = phase === 'attack'
     ? (berserk(b) ? '맞히면 검은 기운을 걷어 내요. 틀리면 마음이 닿지 않아요.' : '맞히면 상대의 기운이 줄어요. 틀리면 빗나가요.')
@@ -696,6 +707,10 @@ async function enemyFainted(b) {
   if (b.index + 1 < b.enemies.length) {
     b.index++; b.turn++; refreshBattle();
     if (b.kind === 'enemy' || b.kind === 'trainer') battleUI.portraitFlash(); else battleUI.enemyEnter();
+    if (getSpecies(enemy().id).legendary) {
+      await battleUI.say(`${josa(opponentName(b), '이/가')} 마지막으로 전설의 독도몬 ${josa(name(enemy()), '을/를')} 내보냈다!`); if (battle !== b) return false;
+      await battleUI.say(`오랜 세월을 견딘 ${josa(name(enemy()), '이/가')} 검은 기운에 괴로워하고 있다. 정화해서 구해 주자!`, { tone: 'dark' }); return true;
+    }
     await battleUI.say(berserk(b) ? `${josa(opponentName(b), '이/가')} 사나워진 ${josa(name(enemy()), '을/를')} 내보냈다!` : `${josa(opponentName(b), '은/는')} ${josa(name(enemy()), '을/를')} 내보냈다!`); return true;
   }
   await victory(b); return false;
@@ -759,9 +774,9 @@ function finishBattle(win, escaped = false, info = {}) {
   else if (win) {
     if (kind === 'enemy') {
       progress().enemy = true; state.items.heal += 2;
-      if (state.zone === 7) bossFall();
+      if (state.zone === 7) bossFall(b);
       else talk(z().enemy, VILLAIN_TALES[state.zone].after, () => talk('서하', [z().story, '쉼터에서 동료를 회복하고 수호관으로 가 보세요.']), '몽땅랜드 · 창작 대화', VILLAIN_BY_ZONE[state.zone]);
-    } else if (kind === 'legend') legendJoins(b);
+    }
     else if (kind === 'tutorial') finishTutorialBattle();
     else if (kind === 'trainer') { setFlag(b.npc.flag); talk(b.npc.name, b.npc.after || ['다음엔 지지 않을 거야!'], null, '몽땅랜드 · 창작 대화', b.npc.actor); }
     else if (kind === 'boss') {
@@ -778,17 +793,18 @@ function finishBattle(win, escaped = false, info = {}) {
   } else toast('사나워진 독도몬에게서 잠시 물러났어요.');
   updateUI(); save();
 }
-async function bossFall() {
+async function bossFall(b) {
   await playStory(BOSS_FALL);
+  const tree = b?.enemies.find(m => m.id === TREE);
+  if (tree && !ownsTree()) await treeJoins(tree);
   if (!state.legend) await legendEncounter();
   else talk('서하', [z().story, '쉼터에서 동료를 회복하고 수호관으로 가 보세요.']);
 }
-// 사철나무: 정화하면 동료가 되어 함께해요 (게임 전체에 한 마리).
-function legendJoins(b) {
-  const e = b.enemies[0]; setFlag(b.npc.flag);
-  if (![...state.party, ...state.storage].some(m => m.id === e.id)) addMonster(state, createMonster(e.id, e.level));
-  save();
-  openModal(head('오래된 사철나무', `전설의 독도몬 · NO.${String(e.id).padStart(3, '0')}`) + `<div class="end-screen"><canvas data-portrait="${e.id}" width="160" height="160"></canvas><p>검은 기운이 걷히자 사철나무가 잎을 흔들며 인사했어요.<br>이제 당신과 함께 독도를 지키고 싶어 해요.</p><div class="fact-box">독도의 사철나무는 동도 천장굴 위쪽 비탈에서 100년 넘게 자란, 독도에서 가장 오래된 나무예요. 2012년 천연기념물 제538호로 지정되었어요. 게임 속 모습은 창작이에요.</div><div class="modal-actions"><button id="legendTreeOK" class="primary">함께 가자 →</button></div></div>`, () => { paintPortraits(); $('#legendTreeOK').onclick = () => { closeModal(); updateUI(); save(); }; });
+// 사철나무: 백무 사장에게서 정화하면 동료가 되어 함께해요 (게임 전체에 한 마리).
+async function treeJoins(e) {
+  addMonster(state, createMonster(e.id, e.level)); if (!state.caught.includes(e.id)) state.caught.push(e.id); save();
+  await playStory(TREE_JOINS);
+  await new Promise(done => openModal(head('오래된 사철나무', `전설의 독도몬 · NO.${String(e.id).padStart(3, '0')}`) + `<div class="end-screen"><canvas data-portrait="${e.id}" width="160" height="160"></canvas><p>검은 기운이 걷히자 사철나무가 잎을 흔들며 인사했어요.<br>이제 당신과 함께 독도를 지키고 싶어 해요.</p><div class="fact-box">독도의 사철나무는 동도 천장굴 위쪽 비탈에서 100년 넘게 자란, 독도에서 가장 오래된 나무예요. 2012년 천연기념물 제538호로 지정되었어요. 게임 속 모습은 창작이에요.</div><div class="modal-actions"><button id="legendTreeOK" class="primary">함께 가자 →</button></div></div>`, () => { paintPortraits(); $('#legendTreeOK').onclick = () => { closeModal(); updateUI(); save(); done(); }; }));
 }
 async function legendEncounter() {
   state.legend = true; addMonster(state, createMonster(100, 34)); save();
@@ -875,7 +891,7 @@ function drawWorldMap(c) {
 }
 function showMap() {
   const towns = MAPS.filter(m => m.kind === 'town'), routes = MAPS.filter(m => m.kind === 'route');
-  const pct = ([x, y]) => `left:${(x / 320 * 100).toFixed(2)}%;top:${(y / 200 * 100).toFixed(2)}%`;
+  const pct = ([x, y]) => `left:${Math.min(92, Math.max(8, x / 320 * 100)).toFixed(2)}%;top:${Math.min(87, Math.max(13, y / 200 * 100)).toFixed(2)}%`; // markers stay inside the picture
   const routeSpot = r => { const a = WORLD_SPOTS[`town${r.zone}`], b = WORLD_SPOTS[`town${r.zone + 1}`], bend = ROUTE_BENDS[r.id]?.[0]; return bend || [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; };
   const townMarks = towns.map((t, i) => {
     const visited = state.visited.includes(t.zone), here = map.id === t.id, badge = state.badges.includes(t.zone);
@@ -915,7 +931,7 @@ function showMenu() {
   openModal(head('모험 메뉴', `DOKDO EXPLORERS · BUILD ${VERSION}`) + `<div class="settings-grid"><button id="menuSave" class="neutral" ${!state.started ? 'disabled' : ''}>▣ 지금 저장하기</button><button id="exportSave" class="neutral" ${!state.started ? 'disabled' : ''}>↓ 저장 파일 내려받기</button><label class="neutral">↑ 저장 파일 불러오기 <input id="importSave" type="file" accept="application/json,.json"></label><button id="menuLearn" class="neutral">✎ 배움의 기록 · 교사용 내보내기</button><button id="menuSources" class="neutral">학습 자료와 출처</button><button id="menuHelp" class="neutral">조작 방법</button><button id="menuOpening" class="neutral" ${!state.started ? 'disabled' : ''}>오프닝 다시 보기</button><button id="menuTutorial" class="neutral" ${!state.started ? 'disabled' : ''}>튜토리얼 다시 하기</button><button id="menuAvatar" class="neutral" ${!state.started ? 'disabled' : ''}>탐험대원 바꾸기</button><button id="restartBtn" class="neutral danger">새로운 모험</button></div><p class="footer-note">진행은 현재 브라우저에 저장돼요. 다른 기기에서는 저장 파일을 불러와 이어갈 수 있어요. 서버에 학생 이름이나 기록을 전송하지 않아요.</p>`, () => {
     $('#menuSave').onclick = () => save(true); $('#exportSave').onclick = () => download('dokdomon-save.json', JSON.stringify(state, null, 2));
     $('#menuLearn').onclick = showNotebook; $('#menuSources').onclick = showSources;
-    $('#menuOpening').onclick = async () => { closeModal(); await playStory(OPENING); };
+    $('#menuOpening').onclick = async () => { closeModal(); await playStory({ id: 'opening', scenes: [...OPENING.scenes, ...STARTER_MEET.scenes] }); };
     $('#menuTutorial').onclick = () => { closeModal(); state.tutorial = { battle: false, walk: 0 }; save(); renderCoachPanel(); startTutorial(); };
     $('#menuAvatar').onclick = () => chooseAvatar(id => { state.avatar = id; save(); updateUI(); toast('탐험대원을 바꿨어요.'); });
     $('#restartBtn').onclick = () => { saved = state.started ? state : saved; startNew(); };
@@ -950,6 +966,9 @@ if (typeof location !== 'undefined' && new URLSearchParams(location.search).has(
   window.__dokdo = {
     get state() { return state; }, get battle() { return battle; }, get busy() { return busy(); }, get transition() { return transition; }, get talk() { return dialogueState; }, get map() { return map; },
     cutscene: () => cutscenes.current, people: liveNPCs, guide, interact, nextTalk, startBattle, closeModal, travel, changeMap, save, continueGame,
-    motion: () => ({ view: { ...view }, walkDistance, moving }), npcs: () => npcs(map, progress(), state.flags)
+    motion: () => ({ view: { ...view }, walkDistance, moving }), npcs: () => npcs(map, progress(), state.flags),
+    playStory, stories: { OPENING, STARTER_MEET, GUIDE, BOSS_REVEAL, BOSS_FALL, TREE_JOINS },
+    get longestQuestion() { return QUESTIONS.reduce((m, q) => (q.prompt.length + q.options.join('').length + q.explanation.length > m.prompt.length + m.options.join('').length + m.explanation.length ? q : m)); },
+    set forceQuestion(q) { testQuestion = q; }, closeBattleForTest: () => { if (battle) closeBattle(); }
   };
 }

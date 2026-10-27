@@ -78,11 +78,13 @@ await page.goto(url); await page.evaluate(() => localStorage.clear()); await pag
 
 // ── 1. New game: avatar → opening (read line by line) → choice → starter → guide ──
 await page.click('#startBtn'); assert.equal(await page.locator('[data-avatar]').count(), 2); assert.ok(await page.isDisabled('#avatarConfirm'));
+// the explorer drawings fill the choice cards (512-px pictures, not the small walking sprite)
+await until(() => [...document.querySelectorAll('canvas[data-explorer-portrait]')].every(c => { const d = c.getContext('2d').getImageData(0, 0, 512, 512).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return n > 20000; }), 10000);
 await page.click('[data-avatar="girl"]'); await page.click('#avatarConfirm');
 await until(() => window.__dokdo.cutscene() === 'opening');
 assert.ok(await page.isHidden('#titleScreen')); assert.equal(await G(() => window.__dokdo.state.started), false, 'the world stays locked during the opening');
 let lines = 0, choiceSeen = false, prev = '';
-for (let i = 0; i < 400 && await G(() => !!window.__dokdo.cutscene()); i++) {
+for (let i = 0; i < 400 && await G(() => window.__dokdo.cutscene() === 'opening'); i++) {
   if (await page.$('.cs-choice')) {
     choiceSeen = true; assert.equal(await page.locator('.cs-choice').count(), 2);
     await page.waitForTimeout(500); await page.click('.cs-choice[data-choice="1"]');
@@ -94,6 +96,12 @@ for (let i = 0; i < 400 && await G(() => !!window.__dokdo.cutscene()); i++) {
   await page.click('.cs-box').catch(() => { });
 }
 assert.ok(choiceSeen, 'the mission choice appeared'); assert.ok(lines >= 30, `opening lines read: ${lines}`);
+// then the three starters are introduced one by one at 김박사's research base
+await until(() => window.__dokdo.cutscene() === 'starters' || !!document.querySelector('[data-start]'), 10000);
+assert.equal(await G(() => window.__dokdo.cutscene()), 'starters', 'a starter cutscene before choosing');
+let starterText = '';
+for (let i = 0; i < 200 && await G(() => window.__dokdo.cutscene() === 'starters'); i++) { starterText += ' ' + await page.textContent('.cs-text'); await page.click('.cs-box').catch(() => { }); }
+for (const n of ['해국', '괭이갈매기', '독도새우']) assert.ok(starterText.includes(n), `${n} is introduced`);
 await page.waitForSelector('[data-start]');
 await page.click('[data-start="1"]');
 await until(() => window.__dokdo.cutscene() === 'guide');
@@ -189,8 +197,16 @@ for (let zone = 0; zone < 8; zone++) {
   assert.ok(await G(r => window.__dokdo.battle && document.querySelector('.dq-portrait canvas').getContext('2d').getImageData(0, 0, 384, 384).data.some((v, i) => i % 4 === 3 && v), role), 'the picture is drawn');
   for (let i = 0; i < 20 && !(await page.$('.dq-portrait.leave')); i++) { await page.click('#dqMessage'); await page.waitForTimeout(120); } assert.ok(await page.$('.dq-portrait.leave'), 'the picture fades out'); await until(() => !document.querySelector('.dq-enemy').classList.contains('waiting'), 5000);
   assert.match(await page.textContent('#dqFoe'), /사나워짐/); assert.match(await page.textContent('#dqFoe'), /검은 기운/);
+  if (zone === 7) assert.deepEqual(await G(() => window.__dokdo.battle.enemies.map(m => m.id)), [43, 58, 18], '백무 사장 sends out 사철나무 last');
   totalTurns += await fight(); assert.equal(await G(() => window.__dokdo.state.progress[window.__dokdo.state.zone].enemy), true, `enemy ${zone}`);
-  if (zone === 7) { assert.equal(await G(() => window.__dokdo.cutscene()), 'boss-fall'); await skipCutscene(); await skipCutscene(); await page.click('#legendOK'); await dismiss(); assert.ok(await G(() => window.__dokdo.state.legend)); }
+  if (zone === 7) {
+    // 사철나무 was in 백무 사장's team: purified, it joins (one in the whole game), then 강치
+    assert.equal(await G(() => window.__dokdo.cutscene()), 'boss-fall'); await skipCutscene();
+    assert.equal(await G(() => window.__dokdo.cutscene()), 'tree-joins'); await skipCutscene();
+    await until(() => !!document.querySelector('#legendTreeOK'), 10000); await page.click('#legendTreeOK');
+    assert.equal(await G(() => [...window.__dokdo.state.party, ...window.__dokdo.state.storage].filter(m => m.id === 18).length), 1, 'one 사철나무 joined');
+    await skipCutscene(); await page.click('#legendOK'); await dismiss(); assert.ok(await G(() => window.__dokdo.state.legend));
+  }
   await npc('shop'); await page.click('#healAll');
   await npc('boss'); await answerStudy(); totalTurns += await fight(); assert.ok(await G(() => window.__dokdo.state.badges.includes(window.__dokdo.state.zone)), `badge ${zone}`);
   if (zone === 7) { assert.equal(await G(() => window.__dokdo.cutscene()), 'epilogue'); await skipCutscene(); await page.click('#endContinue'); break; }
@@ -207,11 +223,8 @@ for (let zone = 0; zone < 8; zone++) {
     await npc('trainer'); totalTurns += await fight(); assert.ok(await G(() => window.__dokdo.state.flags['route0:4']), 'trainer beaten once');
   }
   if (zone === 1) {
-    // the legendary 사철나무: calm it once and it joins; afterwards only the place remains
-    await npc('legend'); await until(() => !!window.__dokdo.battle, 10000); assert.equal(await G(() => window.__dokdo.battle.kind), 'legend');
-    totalTurns += await fight(); await until(() => !!document.querySelector('#legendTreeOK'), 10000); await page.click('#legendTreeOK');
-    assert.equal(await G(() => [...window.__dokdo.state.party, ...window.__dokdo.state.storage].filter(m => m.id === 18).length), 1, 'one 사철나무 joined');
-    await npc('legend'); assert.equal(await G(() => !!window.__dokdo.battle), false, 'the legend does not come back'); await dismiss();
+    // the real 사철나무 is only observed from afar here; its record has been taken (it waits with 백무 사장)
+    await npc('observe'); assert.equal(await G(() => !!window.__dokdo.battle), false, 'no battle at the tree'); assert.ok(await G(() => window.__dokdo.state.seen.includes(18)));
   }
   await walkTo(`town${zone + 1}`); await skipCutscene();
   assert.ok(await G(() => window.__dokdo.state.visited.includes(window.__dokdo.state.zone)));
@@ -239,4 +252,4 @@ assert.deepEqual(st, { map: 'town3', visited: 8, onSpawn: true });
 
 assert.deepEqual(errors, [], 'no browser errors');
 await browser.close(); server.close();
-console.log(`PASS: 백무 사장 reveal/fall/epilogue scenes, 사나워진 독도몬 duels with 검은 기운 gauges, 몽땅랜드 designs in battle, softened hits on correct defence, opening read line by line with the mission choice, starter + guide, key walking, closed bridge, guide, DQ commands (정화하기 with two starting skills, guard skill, item, orb, switch, run), my 독도몬 drawn from behind, 백무단 pictures fading out, legendary 사철나무 once, practice duel and walking tutorial, clickable picture map, easy words (사나워진 독도몬 · 검은 기운 · 몽땅랜드 컴퍼니), quiz rules (wrong attack = miss, correct defence = light hit), hints, KO recovery, route objects, trainer, memory stone, 8 chapters walked through 7 routes, first-arrival scenes, fast travel, legend, ending, saves and a v0.21 save; ${totalTurns} battle turns.`);
+console.log(`PASS: 백무 사장 reveal/fall/epilogue scenes, 사나워진 독도몬 duels with 검은 기운 gauges, 몽땅랜드 designs in battle, softened hits on correct defence, opening read line by line with the mission choice, starter + guide, key walking, closed bridge, guide, DQ commands (정화하기 with two starting skills, guard skill, item, orb, switch, run), my 독도몬 drawn from behind, 백무단 pictures fading out, explorer drawings in the character choice, 김박사 picture and starter cutscene, 사철나무 purified from 백무 사장 and joining once, practice duel and walking tutorial, clickable picture map, easy words (사나워진 독도몬 · 검은 기운 · 몽땅랜드 컴퍼니), quiz rules (wrong attack = miss, correct defence = light hit), hints, KO recovery, route objects, trainer, memory stone, 8 chapters walked through 7 routes, first-arrival scenes, fast travel, legend, ending, saves and a v0.21 save; ${totalTurns} battle turns.`);

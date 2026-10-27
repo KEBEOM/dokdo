@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {npcs,BUILDINGS,PROP_KINDS} from '../dist/world.js';
 import {MAPS} from '../dist/maps.js';
-import {EXPLORERS,RESIDENTS} from '../dist/characters.js';
+import {EXPLORERS,RESIDENTS,PROFESSOR_PICTURE} from '../dist/characters.js';
 import {drawMonster} from '../dist/sprites.js';
 import {drawAsset,onAssetReady,monsterAssetKey,assetStatus,preloadMonsters} from '../dist/assets.js';
 import {TERRAIN_ATLAS} from '../dist/terrain-atlas.js';
@@ -21,7 +21,7 @@ globalThis.DOKDOMON_EMBEDDED_ASSETS={'monsters/003':'data:image/png;base64,examp
 const keys=[];for(let id=1;id<=100;id++)keys.push(monsterAssetKey(id),monsterAssetKey(id,true));
 for(const dir of ['down','up','left','right'])for(let step=0;step<2;step++)keys.push(`player/${dir}-${step}`);
 for(const def of MAPS)for(const n of npcs(def.id,{enemy:false}))if(!['board','wild',...PROP_KINDS].includes(n.kind)&&!n.actor)keys.push(n.sprite);
-keys.push(TERRAIN_ATLAS.key,SCENERY_ATLAS.key,SCENERY_ATLAS.monument.key);keys.push(...EXPLORERS.flatMap(p=>[p.sheet,p.portrait]),...RESIDENTS.map(p=>p.sheet));assert.equal(new Set(keys).size,224);
+keys.push(TERRAIN_ATLAS.key,SCENERY_ATLAS.key,SCENERY_ATLAS.monument.key);keys.push(...EXPLORERS.flatMap(p=>[p.sheet,p.picture]),PROFESSOR_PICTURE,...RESIDENTS.map(p=>p.sheet));assert.equal(new Set(keys).size,227);
 for(const key of keys){const jpg=key.endsWith('.jpg');const bytes=fs.readFileSync(new URL('../dist/assets/'+key+(jpg?'':'.png'),import.meta.url));if(jpg){assert.equal(bytes.readUInt16BE(0),0xffd8);}else{assert.equal(bytes.subarray(1,4).toString(),'PNG');assert.ok(bytes.readUInt32BE(16)>0);assert.ok(bytes.readUInt32BE(20)>0);}}
 const count=images.length;preloadMonsters([1,1,4]);assert.equal(images.length,count+3,'preload reuses cached front and deduplicates IDs');
 assert.ok(images.some(i=>i.src==='assets/monsters/back/004.png'));

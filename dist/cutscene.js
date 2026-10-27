@@ -1,16 +1,19 @@
 // Reusable story cutscenes: pixel scene + Pokémon-style dialogue box with typing, ▼, fades, choices and skip.
 // Scripts live in story.js. Usage: const result = await cutscenes.play(OPENING, { vars, avatar });
 import { createTypewriter } from './typewriter.js';
+import { cutsceneLayout } from './layout.js';
 import { fillJosa } from './text.js';
 import { assetImage } from './assets.js';
 import { TERRAIN_ATLAS } from './terrain-atlas.js';
 import { SCENERY_ATLAS } from './scenery-atlas.js';
 import { terrainSample } from './terrain.js';
-import { drawExplorer, drawResident } from './characters.js';
+import { drawExplorer, drawResident, PROFESSOR_PICTURE } from './characters.js';
 import { drawMonster } from './sprites.js';
 import { preloadMonsters } from './assets.js';
 
 const SW = 320, SH = 180, FADE = 380;
+// Large pictures that slide in beside the scene (cue 'picture:professor', then 'picture-off').
+const PICTURES = { professor: { key: PROFESSOR_PICTURE, name: '김박사', role: '독도 생물 연구자' } };
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
 export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } = {}) {
@@ -37,13 +40,12 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
     const r = root.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = Math.max(1, Math.round(r.width * dpr)); canvas.height = Math.max(1, Math.round(r.height * dpr));
     canvas.style.width = r.width + 'px'; canvas.style.height = r.height + 'px';
-    const k = Math.min(r.width / SW, r.height / SH), sw = SW * k, sh = SH * k;
-    const boxH = box.offsetHeight || 150;
-    const oy = Math.max(0, Math.min((r.height - sh) / 2, r.height - boxH - 24 - sh * .8));
-    view = { k, ox: (r.width - sw) / 2, oy, dpr, sw, sh };
+    const boxH = box.offsetHeight || 150, L = cutsceneLayout(r.width, r.height, boxH);
+    const { k, oy } = L, sw = L.pw, sh = L.ph;
+    view = { k, ox: L.ox, oy, dpr, sw, sh };
     Object.assign(overlay.style, { left: view.ox + 'px', top: view.oy + 'px', width: sw + 'px', height: sh + 'px' });
-    // Tall screens (portrait tablets): keep the dialogue box right under the picture.
-    box.style.bottom = Math.max(16, r.height - (oy + sh) - boxH - 22) + 'px';
+    // The dialogue box sits right under the picture whenever the screen has room (tablets, monitors).
+    box.style.bottom = L.boxBottom + 'px';
   }
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { if (running) resize(); }).observe(root);
 
@@ -69,9 +71,39 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
     if (c.who === 'player') drawExplorer(ctx, c.avatar, x, y, size, c.dir, !!c.walking, c.dist || 0);
     else if (c.who.startsWith('actor:')) drawResident(ctx, c.who.slice(6), x, y, size, t, c.dir, !!c.walking, c.dist || 0);
     else if (c.who.startsWith('monster:')) {
-      const bob = Math.sin(t / 260) * 1.5;
-      drawMonster(ctx, Number(c.who.slice(8)), c.x - size / 2, c.y - size - hop + bob, size, t / 1000);
+      const bob = Math.sin(t / 260) * 1.5, skip = c.walking ? Math.abs(Math.sin(t / 110)) * 5 : 0;
+      const shown = c.showAt ? Math.min(1, (t - c.showAt) / 650) : 1;
+      if (c.showAt && t - c.showAt < 900) { // a column of light where it appears
+        const k = Math.max(0, 1 - (t - c.showAt) / 900); ctx.globalAlpha = .55 * k;
+        R(c.x - size * .32, 0, size * .64, c.y, '#c8fbff'); R(c.x - size * .16, 0, size * .32, c.y, '#ffffff'); ctx.globalAlpha = 1;
+      }
+      if (c.aura && !c.calmAt) auraAround(c, size, t);
+      ctx.globalAlpha = shown;
+      drawMonster(ctx, Number(c.who.slice(8)), c.x - size / 2, c.y - size - hop + bob - skip - (1 - shown) * 10, size, t / 1000);
+      ctx.globalAlpha = 1;
+      if (c.calmAt && t - c.calmAt < 1300) { const a = (t - c.calmAt) / 1300; for (let i = 0; i < 12; i++) { ctx.globalAlpha = 1 - a; R(c.x + Math.cos(i * .52) * a * size * .9, c.y - size / 2 + Math.sin(i * .52) * a * size * .7, 3, 3, '#ffe9a6'); } ctx.globalAlpha = 1; }
     }
+  }
+  function auraAround(c, size, t) { // dark energy swirling around a cast member (cast option aura: true, cue calm:<id>)
+    for (let i = 0; i < 24; i++) {
+      const age = (t / 16 + i * 29) % 90, x = c.x + Math.sin(i * 2.3 + t / 380) * size * .5, y = c.y - age * size / 90;
+      ctx.globalAlpha = .62 * (1 - age / 90); R(x - 3, y - 3, 7, 7, i % 2 ? '#3b1d5c' : '#120b1f');
+    }
+    ctx.globalAlpha = 1;
+  }
+  function picture(t, s) {
+    const p = s.picture, info = p && PICTURES[p.id], img = info && assetImage(info.key); if (!img) return;
+    const inP = Math.min(1, (t - p.at) / 450), outP = p.offAt ? Math.min(1, (t - p.offAt) / 350) : 0, a = inP * (1 - outP);
+    if (a <= 0) return;
+    const e = 1 - Math.pow(1 - inP, 3), dx = (1 - e) * 46;
+    ctx.save(); ctx.globalAlpha = a * .42; R(0, 0, SW, SH, '#08121c');
+    ctx.globalAlpha = a; ctx.fillStyle = '#1f5f6e'; ctx.beginPath(); ctx.moveTo(204 + dx, 0); ctx.lineTo(SW, 0); ctx.lineTo(SW, SH); ctx.lineTo(160 + dx, SH); ctx.fill();
+    ctx.fillStyle = '#7fe3ea'; ctx.beginPath(); ctx.moveTo(200 + dx, 0); ctx.lineTo(204 + dx, 0); ctx.lineTo(160 + dx, SH); ctx.lineTo(156 + dx, SH); ctx.fill();
+    const h = 178; ctx.imageSmoothingEnabled = true; ctx.drawImage(img, 248 - h / 2 + dx, SH - h + 4, h, h); ctx.imageSmoothingEnabled = false;
+    R(14 + dx / 2, 30, 104, 30, '#10202b'); R(15 + dx / 2, 31, 102, 28, '#fff8e1'); R(15 + dx / 2, 31, 4, 28, '#e07a3a');
+    ctx.fillStyle = '#10202b'; ctx.textBaseline = 'alphabetic'; ctx.font = 'bold 12px sans-serif'; ctx.fillText(info.name, 25 + dx / 2, 46);
+    ctx.fillStyle = '#3d6b63'; ctx.font = '7px sans-serif'; ctx.fillText(info.role, 25 + dx / 2, 55);
+    ctx.restore();
   }
   function bubble(x, y, t0, t) {
     if (!t0 || t - t0 > 1400) return;
@@ -147,6 +179,30 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
       tiles('sand', 0, 96, SW, 112); tiles('dock', 0, 112, SW, SH);
       R(0, 110, SW, 2, '#674d38');
       for (let x = 20; x < SW; x += 90) { R(x, 104, 6, 14, '#4a2c1a'); R(x - 1, 102, 8, 3, '#6a4126'); }
+    },
+    camp(t, s) {
+      // 김박사의 연구 기지: a tent and three round platforms on the dock, the islands behind
+      R(0, 0, SW, 60, '#a6dbe6'); R(0, 0, SW, 24, '#8fcfdf');
+      for (let i = 0; i < 2; i++) { const cx = (i * 170 + t / 110) % 380 - 50; R(cx, 12 + i * 14, 30, 5, '#ffffff'); R(cx + 7, 9 + i * 14, 16, 5, '#ffffff'); }
+      R(0, 60, SW, 40, '#2f7f95'); for (let y = 62; y < 100; y += 6) for (let x = ((y * 7 + Math.floor(t / 110)) % 20) - 20; x < SW; x += 20) R(x, y, 7, 1, '#7cc0cc');
+      peaks(150, 100, 130); tiles('sand', 0, 100, SW, 116); tiles('dock', 0, 116, SW, SH); R(0, 114, SW, 2, '#674d38');
+      // tent
+      for (let i = 0; i < 46; i++) { const w = 20 + i * 1.6; R(52 - w / 2, 66 + i, w, 1, i % 9 < 1 ? '#c9d8c0' : '#e9efe2'); }
+      R(20, 112, 64, 4, '#9aa79a'); R(45, 84, 14, 28, '#3d5a52'); R(47, 86, 10, 26, '#5d7d74');
+      R(51, 52, 2, 16, '#6b7280'); R(53, 52, 12, 7, '#e07a3a');
+      // sign board
+      R(90, 92, 2, 24, '#5a4030'); R(130, 92, 2, 24, '#5a4030'); R(82, 84, 58, 14, '#5a4030'); R(83, 85, 56, 12, '#f1e4c2');
+      ctx.fillStyle = '#5a4030'; ctx.font = 'bold 6px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('독도몬 연구 기지', 111, 91); ctx.textAlign = 'left';
+      // table with a monitor and jars
+      R(138, 104, 34, 4, '#8a5a34'); R(140, 108, 2, 10, '#6a4126'); R(168, 108, 2, 10, '#6a4126');
+      R(142, 92, 14, 11, '#232634'); R(143, 93, 12, 8, s.cues.device ? (Math.sin(t / 160) > 0 ? '#7fe3ea' : '#3f8189') : '#3f8189'); R(148, 103, 2, 2, '#232634');
+      R(159, 97, 4, 7, '#9fd6c9'); R(164, 99, 4, 5, '#e2b84f');
+      // three platforms
+      const glow = s.cues.glow ? .6 + .4 * Math.sin(t / 180) : s.cues.device ? .35 : .15;
+      for (const x of [196, 244, 292]) {
+        R(x - 19, 148, 38, 6, '#4a505e'); R(x - 18, 144, 36, 5, '#7a8192'); R(x - 16, 143, 32, 2, '#9aa3b4');
+        ctx.globalAlpha = glow; R(x - 15, 144, 30, 2, '#7fe3ea'); ctx.globalAlpha = 1;
+      }
     },
     field(t, s) {
       R(0, 0, SW, 48, '#a6dbe6'); peaks(180, 52, 120);
@@ -258,6 +314,7 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
     if (s.def.bg === 'field') PAINT.fieldFront(t, s);
     if (s.def.bg === 'summit') PAINT.summitFront(t, s);
     if (s.def.bg === 'sea' && s.cast.get('gangchi') && !s.cast.get('gangchi').hidden) { R(170, 128, 90, 6, '#2f7f95'); }
+    picture(t, s);
     const player = s.cast.get('player');
     if (player && !player.hidden) bubble(player.x, player.y - (player.size || 52), s.cues.surprise, t);
     const kim = s.cast.get('kim');
@@ -278,6 +335,15 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
     if (name === 'jump') { const p = s.cast.get('player'); if (p) p.hopAt = t; }
     if (name === 'pop') { const m = s.cast.get('mon'); if (m) { m.hidden = false; m.baseX = m.x; m.baseY = m.y; m.popAt = t; } const p = s.cast.get('player'); if (p) s.cues.surprise = t; }
     if (name === 'kim-turn') { const k = s.cast.get('kim'); if (k) k.dir = 'right'; }
+    // show:<id> appear in a column of light · hop:<id> a little jump · come:<id> walk to comeTo · calm:<id> the dark aura clears
+    const [verb, arg] = name.split(':'), who = arg && s.cast.get(arg);
+    if (verb === 'show' && who) { who.hidden = false; who.showAt = t; }
+    if (verb === 'hop' && who) who.hopAt = t;
+    if (verb === 'come' && who?.comeTo) who.walk = { fx: who.x, fy: who.y, tx: who.comeTo[0], ty: who.comeTo[1], start: t, ms: who.walkMs || 900 };
+    if (verb === 'calm' && who) who.calmAt = t;
+    if (verb === 'picture' && PICTURES[arg]) { s.picture = { id: arg, at: t }; assetImage(PICTURES[arg].key); }
+    if (name === 'picture-off' && s.picture) s.picture.offAt = t;
+    if (name === 'machine-quiet') { s.cues.machine = t - 1e4; s.cues['machine-off'] = t - 1e4; } // already stopped, no sparks
     if (name === 'rise') { const m = s.cast.get('gangchi'); if (m) { m.hidden = false; m.baseY = m.y; m.riseAt = t; } }
   }
 
@@ -294,6 +360,7 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
     titleEl.innerHTML = def.title ? `<small>${esc(def.title.kicker)}</small><strong>${esc(def.title.name)}</strong><span>${esc(def.title.sub || '')}</span>` : '';
     titleEl.classList.toggle('show', !!def.title);
     for (const c of def.start || []) cue(c, t);
+    for (const line of def.lines || []) { const m = /^picture:(\w+)/.exec(line.cue || ''); if (m && PICTURES[m[1]]) assetImage(PICTURES[m[1]].key); }
     const ids = [...cast.values()].map(c => c.who).filter(w => w.startsWith('monster:')).map(w => Number(w.slice(8)));
     if (ids.length) preloadMonsters(ids);
   }

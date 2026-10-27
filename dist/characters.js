@@ -5,14 +5,16 @@ import {NPC_ATLASES as RESIDENT_ATLASES} from './npc-atlases.js';
 import {VILLAIN_ATLASES} from './villain-atlases.js';
 // Residents plus the 몽땅랜드 designs; every NPC sheet shares one format.
 export const NPC_ATLASES={...RESIDENT_ATLASES,...VILLAIN_ATLASES};
-export const EXPLORERS=[{id:'girl',label:'여학생',portrait:EXPLORER_ATLAS.key,sheet:EXPLORER_ATLAS.key},{id:'boy',label:'남학생',portrait:EXPLORER_ATLAS.key,sheet:EXPLORER_ATLAS.key}];
+// picture: the large drawing shown in the character choice window (scripts/import-heroes.py)
+export const EXPLORERS=[{id:'girl',label:'여학생',picture:'characters/explorer-girl-portrait-v33',sheet:EXPLORER_ATLAS.key},{id:'boy',label:'남학생',picture:'characters/explorer-boy-portrait-v33',sheet:EXPLORER_ATLAS.key}];
+export const PROFESSOR_PICTURE='characters/professor-portrait-v33';
 export const RESIDENTS=[
  {id:'child-boy',label:'남자아이',sheet:'characters/child-boy-atlas-v18'},
  {id:'child-girl',label:'여자아이 · 양갈래 머리',sheet:'characters/child-girl-atlas-v18'},
  {id:'child-girl-ribbon',label:'여자아이 · 리본',sheet:'characters/child-girl-ribbon-atlas-v18'},
  {id:'man',label:'아저씨',sheet:'characters/man-atlas-v18'},
  {id:'woman',label:'아줌마',sheet:'characters/woman-atlas-v18'},
- {id:'professor',label:'김박사',sheet:'characters/professor-atlas-v19'},
+ {id:'professor',label:'김박사',sheet:'characters/professor-atlas-v33'},
  ...Object.entries(VILLAIN_ATLASES).map(([id,a])=>({id,label:a.label,sheet:a.key,villain:true}))
 ];
 export const CHARACTER_SIZE=48;
@@ -53,7 +55,14 @@ export function paintExplorerCard(canvas,id,time=0,walking=false){
  const c=canvas.getContext('2d');c.clearRect(0,0,canvas.width,canvas.height);
  return drawExplorer(c,id,0,0,canvas.width,'down',walking,time/MOVE_DURATION*32);
 }
+// Large pictures (512×512, feet on the same line): the explorer drawings and 김박사.
+export function paintPicture(canvas,key){
+ const c=canvas.getContext('2d'),img=assetImage(key);c.clearRect(0,0,canvas.width,canvas.height);if(!img)return false;
+ c.imageSmoothingEnabled=false;const s=Math.min(canvas.width/img.width,canvas.height/img.height);
+ c.drawImage(img,Math.round((canvas.width-img.width*s)/2),Math.round(canvas.height-img.height*s),Math.round(img.width*s),Math.round(img.height*s));return true;
+}
 export function paintExplorerPortrait(canvas,id){
- const c=canvas.getContext('2d');c.clearRect(0,0,canvas.width,canvas.height);
+ if(paintPicture(canvas,explorerInfo(id).picture))return true;
+ const c=canvas.getContext('2d');c.clearRect(0,0,canvas.width,canvas.height); // until the picture loads: the walking sprite
  return drawExplorer(c,id,0,0,canvas.width,'down',false,0,false);
 }

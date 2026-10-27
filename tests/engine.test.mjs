@@ -119,9 +119,11 @@ test('skills: two at first, more as the 독도몬 grows; 정화 skills only', ()
   assert.equal(skills(m).length, 4); assert.deepEqual(m.pp, PP_MAX);
   const grown = createMonster(1, 7); let before = grown.level; gainXP(grown, 7 * 13); assert.equal(grown.level, 8); assert.equal(learnedBetween(grown, before, grown.level).length, 1);
 });
-test('no wild 독도몬 stand on the grass; the legendary tree waits on 천장굴', () => {
+test('no wild 독도몬 stand on the grass; the legendary tree is only seen on 천장굴 and joins from 백무 사장', () => {
   const p = { met: true, studied: 2, enemy: false, boss: false };
   for (const def of MAPS) for (const n of npcs(createMap(def.id), p, {})) assert.notEqual(n.kind, 'wild', `${def.id}: no monster standing on the grass`);
   const legends = MAPS.flatMap(def => npcs(createMap(def.id), p, {}).filter(n => n.kind === 'legend').map(n => [def.id, n.species]));
-  assert.deepEqual(legends, [['route1', 18]]);
+  assert.deepEqual(legends, [], 'no legend waits on the map: 사철나무 is in 백무 사장\'s team');
+  const tree = MAPS.flatMap(def => npcs(createMap(def.id), p, {}).filter(n => n.kind === 'observe' && n.species === 18).map(() => def.id));
+  assert.deepEqual(tree, ['route1'], 'the real tree can be observed from afar on 천장굴 길');
 });

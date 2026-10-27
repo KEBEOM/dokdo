@@ -2,11 +2,12 @@
 // 컷신 대본 (v0.22) — 대사와 장면을 여기에서 고치면 게임에 바로 반영됩니다.
 //
 // 장면(scene)
-//   bg       배경 이름: stage(시상식) sea(배 위) dock(선착장) field(풀밭) crisis(위기) title(지역 소개) summit(대한봉 정상)
+//   bg       배경 이름: stage(시상식) sea(배 위) dock(선착장) field(풀밭) crisis(위기) title(지역 소개) summit(대한봉 정상) camp(김박사 연구 기지)
 //   caption  화면 왼쪽 위에 잠깐 보이는 장면 제목
 //   cast     등장인물. who: 'player'(주인공) | 'actor:professor' 같은 인물 그림 | 'monster:67' 같은 독도몬
 //            x, y는 320×180 장면 안의 발 위치, dir은 down·left·right·up, size는 키(기본 52)
 //            hidden: true면 처음엔 숨기고, cue로 등장시킵니다. walkTo:[x,y], walkMs로 걸어 들어옵니다.
+//            comeTo:[x,y]는 'come:아이디' 연출 때 걸어갈 곳, aura: true면 검은 기운이 감돕니다('calm:아이디'로 걷힘).
 //   start    장면이 시작될 때 실행할 연출(cue) 목록
 //   lines    대사 목록
 //
@@ -15,6 +16,8 @@
 //   text     대사. {starter}처럼 쓰면 고른 독도몬 이름이 들어갑니다. {starter}와(과)처럼 조사도 맞춰 줍니다.
 //   cue      대사가 시작될 때 연출: confetti spot jump glint rustle pop surprise aura device panel:sea …
 //            summit 전용: machine(장치 가동) blueprint(설계도) dark(검은 기운) machine-off(장치 정지) records(기록 복구)
+//            인물 연출: show:아이디(빛기둥과 함께 등장) hop:아이디(폴짝) come:아이디(comeTo로 이동) calm:아이디(검은 기운 걷힘)
+//            큰 그림: picture:professor(김박사 그림이 옆에서 들어옴) picture-off(사라짐) · camp 전용: glow(받침대 빛)
 //   choice   선택지 [{ label, reply: [대사…] }] — 고른 뒤 reply를 보여 주고 다음 대사로 이어집니다.
 //
 // 역사 인물과의 만남은 김박사의 탐사 장치가 보여 주는 ‘기억의 세계’로 표현합니다(실제 시간 여행이 아님).
@@ -55,9 +58,9 @@ export const OPENING = {
       ],
       lines: [
         { who: '김박사', text: '독도에 오신 것을 환영합니다!' },
-        { who: '김박사', text: '저는 독도의 자연과 생물을 연구하고 있는 김박사라고 합니다.' },
+        { who: '김박사', text: '저는 독도의 자연과 생물을 연구하고 있는 김박사라고 합니다.', cue: 'picture:professor' },
         { who: '김박사', text: '혹시 이번 독도 사랑 대회에서 우승한 학생인가요?' },
-        { who: '@player', text: '네! 그런데 제가 누군지 어떻게 아세요?' },
+        { who: '@player', text: '네! 그런데 제가 누군지 어떻게 아세요?', cue: 'picture-off' },
         { who: '김박사', text: '하하! 이야기를 많이 들었거든요.' },
         { who: '김박사', text: '독도를 무척 사랑하고, 독도에 관해서도 아주 많이 알고 있는 학생이라고요.' },
         { who: '김박사', text: '사실 오늘 여러분을 기다리고 있었습니다.' }
@@ -120,19 +123,62 @@ export const OPENING = {
   ]
 };
 
-// 독도몬을 고른 뒤 김박사의 조작 안내. {starter}는 고른 독도몬 이름입니다.
+// 오프닝 바로 뒤, 스타팅 독도몬 세 친구를 만나는 장면. 끝나면 고르는 창이 열립니다.
+export const STARTER_MEET = {
+  id: 'starters',
+  scenes: [
+    {
+      bg: 'camp', caption: '김박사의 독도몬 연구 기지',
+      cast: [
+        { id: 'player', who: 'player', x: 52, y: 152, dir: 'right' },
+        { id: 'kim', who: 'actor:professor', x: 108, y: 152, dir: 'right' },
+        { id: 's1', who: 'monster:1', x: 196, y: 144, size: 42, hidden: true },
+        { id: 's2', who: 'monster:67', x: 244, y: 144, size: 42, hidden: true },
+        { id: 's3', who: 'monster:66', x: 292, y: 144, size: 42, hidden: true }
+      ],
+      lines: [
+        { who: '김박사', text: '여기는 제 연구 기지예요. 독도몬을 돌보며 관찰하는 곳이죠.' },
+        { who: '@player', text: '받침대 세 개가 반짝이고 있어요!' },
+        { who: '김박사', text: '이곳의 세 친구는 검은 기운에 물들지 않았어요. 한 친구씩 불러 볼게요!', cue: 'device' },
+        { who: '김박사', text: '첫 번째, 해국! 바닷가 바위틈에서 보랏빛 꽃을 피우는 해국을 닮았어요.', cue: 'show:s1' },
+        { who: null, text: '해국이 꽃잎을 활짝 펴며 인사했다.', cue: 'hop:s1' },
+        { who: '김박사', text: '두 번째, 괭이갈매기! 독도 하늘을 누비는 바닷새를 닮았지요.', cue: 'show:s2' },
+        { who: '@player', text: '고양이처럼 우는 그 새요? 날개가 정말 멋져요!', cue: 'hop:s2' },
+        { who: '김박사', text: '세 번째, 독도새우! 독도 둘레의 깊고 차가운 바다에 사는 새우를 닮았어요.', cue: 'show:s3' },
+        { who: '@player', text: '긴 더듬이가 쫑긋쫑긋해요. 다들 너무 귀엽다!', cue: 'hop:s3' },
+        { who: '김박사', text: '세 친구 모두 독도를 지키고 싶어 해요. 하지만 모험은 한 친구와 먼저 떠나야 해요.', cue: 'glow' },
+        { who: '김박사', text: '마음이 가는 친구를 골라 주세요. 다른 친구들은 기지에서 응원할 거예요!' }
+      ]
+    }
+  ]
+};
+
+// 독도몬을 고른 뒤: 고른 친구가 다가오고, 김박사가 조작을 안내합니다. {starter}는 고른 독도몬 이름입니다.
 export const GUIDE = {
   id: 'guide',
   scenes: [
     {
-      bg: 'dock', caption: '첫 번째 동료',
+      bg: 'camp', caption: '첫 번째 동료',
+      start: ['glow'],
+      cast: [
+        { id: 'player', who: 'player', x: 52, y: 152, dir: 'right' },
+        { id: 'kim', who: 'actor:professor', x: 132, y: 152, dir: 'left' },
+        { id: 'buddy', who: 'monster:{starterId}', x: 244, y: 144, size: 42, comeTo: [90, 156], walkMs: 1300 }
+      ],
+      lines: [
+        { who: '김박사', text: '좋은 선택이에요! {starter}와(과) 함께라면 든든하겠어요.', cue: 'come:buddy' },
+        { who: null, text: '{starter}이(가) 기쁜 듯 폴짝 뛰어와 곁에 섰다.', cue: 'hop:buddy' },
+        { who: '@player', text: '잘 부탁해, {starter}!' }
+      ]
+    },
+    {
+      bg: 'dock', caption: '모험 준비',
       cast: [
         { id: 'player', who: 'player', x: 120, y: 140, dir: 'right' },
         { id: 'buddy', who: 'monster:{starterId}', x: 82, y: 142, size: 40 },
         { id: 'kim', who: 'actor:professor', x: 196, y: 140, dir: 'left' }
       ],
       lines: [
-        { who: '김박사', text: '이제 준비가 끝났군요! {starter}와(과) 함께라면 든든하겠어요.' },
         { who: '김박사', text: '방향키나 화면의 이동 조작으로 움직일 수 있습니다.' },
         { who: '김박사', text: '사람들에게 말을 걸면 새로운 정보를 얻거나 임무를 받을 수 있어요.' },
         { who: '김박사', text: '사나워진 독도몬을 만나면 ‘정화하기’에서 기술을 골라 문제를 풀어요.' },
@@ -213,12 +259,14 @@ const SUMMIT_CAST = [
   { id: 'g1', who: 'actor:villain-grunt-m', x: 252, y: 142, dir: 'left', size: 46 },
   { id: 'g2', who: 'actor:villain-grunt-f', x: 286, y: 144, dir: 'left', size: 46 }
 ];
+// 백무 사장이 데리고 있는 전설의 독도몬 사철나무 (처음엔 숨어 있다가 show:tree로 등장).
+const SUMMIT_TREE = { id: 'tree', who: 'monster:18', x: 150, y: 152, size: 46, hidden: true, aura: true };
 
 // 대한봉 정상, 백무 사장과의 결투 직전.
 export const BOSS_REVEAL = {
   id: 'boss-reveal',
   scenes: [{
-    bg: 'summit', caption: '대한봉 정상', start: ['machine'], cast: SUMMIT_CAST,
+    bg: 'summit', caption: '대한봉 정상', start: ['machine'], cast: [...SUMMIT_CAST, SUMMIT_TREE],
     lines: [
       { who: null, text: '대한봉 정상. 거대한 장치가 보랏빛 연기를 뿜으며 웅웅거린다.' },
       { who: null, text: '뒤따라 올라온 김박사가 숨을 고른다.' },
@@ -229,6 +277,10 @@ export const BOSS_REVEAL = {
       { who: '김박사', text: '그래서 기록을 모았군요. 장치가 읽은 기록은 하얗게 지워지고….' },
       { who: '백무 사장', text: '기록 몇 장쯤이야. 이걸 보게, ‘독도몬 테마파크’ 설계도라네!', cue: 'blueprint' },
       { who: '백무 사장', text: '동도엔 회전목마, 서도엔 롤러코스터, 바닷속엔 수족관 터널! 손님이 줄을 서겠지.' },
+      { who: '백무 사장', text: '그리고 이 녀석을 보게! 천장굴 위 사철나무의 기록으로 만든 전설의 독도몬이지.', cue: 'show:tree' },
+      { who: '백무 사장', text: '백 년 넘게 바위에서 버틴 나무라니, 테마파크 입구에 세우면 딱이야!' },
+      { who: '@player', text: '사철나무가 검은 기운 때문에 괴로워하고 있어요!', cue: 'surprise' },
+      { who: '김박사', text: '독도의 사철나무는 천연기념물이에요. 기념품처럼 가져다 쓸 수 있는 게 아니에요!' },
       { who: '@player', text: '그래서 길마다 바위를 깎고 풀숲을 파헤쳤던 거예요?' },
       { who: '백무 사장', text: '공사 준비였지. 돈이 산더미처럼 쌓일 계획이었네.' },
       { who: '김박사', text: '그럼 독도몬이 사나워진 것도… 저 장치 때문인가요?' },
@@ -247,7 +299,7 @@ export const BOSS_REVEAL = {
         ]
       },
       { who: '백무 사장', text: '흥, 어린 녀석이 뭘 안다고! 장치야, 더 힘을 내라!', cue: 'dark' },
-      { who: null, text: '장치에서 쏟아진 검은 기운이 독도몬들을 감싼다. 결투로 진정시켜야 한다!' }
+      { who: null, text: '장치에서 쏟아진 검은 기운이 사철나무와 독도몬들을 감싼다. 결투로 정화해야 한다!' }
     ]
   }]
 };
@@ -269,6 +321,27 @@ export const BOSS_FALL = {
       { who: '백무 사장', text: '지운 기록을 되돌리는 일, 이제부터 내가 돕겠네. 사나워졌던 독도몬들에게도 미안하구나.' },
       { who: '김박사', text: '독도몬들은 이제 원래대로 돌아왔어요. 어디서 왔든, 함께 지켜 갈 친구들이에요.' },
       { who: null, text: '그때, 바다 쪽에서 푸른빛이 다시 피어올랐다….', cue: 'glint' }
+    ]
+  }]
+};
+
+// 백무 사장의 독도몬을 모두 정화한 뒤, 사철나무가 동료가 될 때.
+export const TREE_JOINS = {
+  id: 'tree-joins',
+  scenes: [{
+    bg: 'summit', caption: '되찾은 사철나무', start: ['machine-quiet'],
+    cast: [
+      { id: 'kim', who: 'actor:professor', x: 54, y: 150, dir: 'right' },
+      { id: 'player', who: 'player', x: 90, y: 150, dir: 'right' },
+      { id: 'tree', who: 'monster:18', x: 168, y: 146, size: 48, aura: true, comeTo: [122, 152], walkMs: 1200 },
+      { id: 'boss', who: 'actor:villain-leader', x: 220, y: 148, dir: 'left', size: 58 }
+    ],
+    lines: [
+      { who: null, text: '사철나무를 감싸던 마지막 검은 기운이 바람에 흩어졌다.', cue: 'calm:tree' },
+      { who: '백무 사장', text: '그 나무는… 처음부터 내 것이 아니었지. 독도의 것이었어.' },
+      { who: '김박사', text: '사철나무가 탐험대원을 바라보고 있어요. 함께 가고 싶은가 봐요.', cue: 'come:tree' },
+      { who: '@player', text: '같이 가자, 사철나무! 이제 우리가 지켜 줄게.', cue: 'hop:tree' },
+      { who: '김박사', text: '실제 사철나무는 동도 천장굴 위쪽 비탈에서 100년 넘게 자랐어요. 우리는 멀리서 지켜봐요.' }
     ]
   }]
 };

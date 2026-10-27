@@ -49,7 +49,7 @@ for (const def of MAPS) {
   for (const o of p.objects) {
     assert.ok(o.name && Array.isArray(o.lines) && o.lines.length, `${def.id}:${o.key} has text`);
     assert.ok(!blocked(map, o.x, o.y, [], true) || o.type === 'landmark', `${def.id}:${o.key} stands on land`);
-    if (o.type === 'observe') assert.ok(MONSTERS.some(m => m.id === o.species && !m.legendary));
+    if (o.type === 'observe') assert.ok(MONSTERS.some(m => m.id === o.species)); // 관찰만 하는 곳(사철나무 비탈 포함)
     if (o.type === 'legend') assert.ok(MONSTERS.some(m => m.id === o.species && m.legendary));
     if (o.type === 'trainer') { assert.ok(o.team.length >= 1); o.team.forEach(id => assert.ok(!getSpecies(id).legendary && getSpecies(id).id === id)); assert.ok(o.after?.length); }
     if (o.type === 'box' || (o.type === 'person' && o.give)) assert.ok(Object.values(o.give).every(n => Number.isInteger(n) && n > 0));

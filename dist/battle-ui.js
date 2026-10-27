@@ -31,8 +31,8 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
         <div class="dq-enemy ${aura ? 'aura' : ''}"><i class="dq-shadow" aria-hidden="true"></i><canvas id="enemySprite" class="battle-mon enemy" width="160" height="160" aria-label="상대 독도몬"></canvas><span class="dq-dmg" aria-hidden="true"></span></div>
         <div class="dq-mine"><i class="dq-shadow" aria-hidden="true"></i><canvas id="allySprite" class="dq-ally-mon" width="160" height="160" aria-label="내 독도몬 (뒷모습)"></canvas></div>
         <span class="dq-label">${esc(label)}</span>
-        <div class="dq-coach" hidden><canvas width="64" height="64" aria-hidden="true"></canvas><p></p><button type="button" class="dq-coach-skip" hidden>연습 건너뛰기</button></div>
       </div>
+      <div class="dq-coach" hidden><canvas width="64" height="64" aria-hidden="true"></canvas><p></p><button type="button" class="dq-coach-skip" hidden>연습 건너뛰기</button></div>
       <div class="dq-bottom">
         <div class="dq-window dq-command" id="dqCommand" hidden></div>
         <div class="dq-window dq-message" id="dqMessage" role="status" aria-live="polite">
@@ -211,7 +211,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
     w.classList.remove('lunge', 'hit', 'enter'); if (kind !== 'tired') w.classList.remove('tired');
     void w.offsetWidth; w.classList.add(kind);
   }
-  // 연습 대결: 김박사's tip above the field. text null hides it; onSkip shows the skip button.
+  // 연습 대결: 김박사's tip between the field and the windows (its own row, so it is never cut off on small screens). text null hides it; onSkip shows the skip button.
   function coach(text, { onSkip = null } = {}) {
     const c = els.coach; if (!c) return;
     if (!text) { c.hidden = true; return; }
