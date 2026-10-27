@@ -1,5 +1,7 @@
-// 독도 탐험대 v0.34 — screens, movement between maps, story cutscenes and Dragon Quest–style quiz battles.
+// 독도 탐험대 v0.35 — screens, movement between maps, story cutscenes and Dragon Quest–style quiz battles.
 import { worldScale } from './layout.js';
+import { createJoystick } from './joystick.js';
+import { roomId, parseRoomId } from './interiors.js';
 import { MONSTERS, ZONES, TYPES, STARTERS, getSpecies, isUnique } from './data.js';
 import { CONCEPTS, QUESTIONS, SOURCES } from './learning.js';
 import { newState, validateSave, createMonster, damage, enemyHit, healAll, gainXP, captureChance, addMonster, recordAnswer, knownSkills, learnedBetween } from './engine.js';
@@ -17,7 +19,7 @@ import { OPENING, STARTER_MEET, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.34';
+const VERSION = '0.35';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -61,6 +63,11 @@ resizeScene(); window.addEventListener('resize', resizeScene); if (typeof Resize
 
 function exitLabels() {
   const out = [];
+  if (map.kind === 'room') {
+    for (const d of map.doors) out.push({ name: '밖으로 ▼', x: d.x * TILE + 16, y: d.y * TILE + 26, exit: true });
+    for (const s of map.stairs) out.push({ name: s.dir === 'up' ? `${map.def.floor + 1}층 ▲` : `${map.def.floor - 1}층 ▼`, x: s.x * TILE + 16, y: s.y * TILE - 12, exit: true });
+    return out;
+  }
   for (const dir of ['prev', 'next']) {
     const tiles = [...map.exits].filter(([, d]) => d === dir).map(([k]) => k.split(',').map(Number)); if (!tiles.length) continue;
     const target = getMapDef(dir === 'next' ? nextMapId(map.id) : prevMapId(map.id)), locked = dir === 'next' && map.kind === 'town' && !state.badges.includes(state.zone);
@@ -237,7 +244,7 @@ function updateUI() {
   scene.classList.toggle('playing', state.started);
   const def = map.def;
   $('#chapterTitle').textContent = state.started ? `${String(state.zone + 1).padStart(2, '0')} · ${z().subtitle}` : '독도로 떠나는 모험';
-  $('#regionTag').textContent = def.kind === 'town' ? `CHAPTER ${String(state.zone + 1).padStart(2, '0')} · ${def.island}` : `${def.island} · 길`;
+  $('#regionTag').textContent = def.kind === 'town' ? `CHAPTER ${String(state.zone + 1).padStart(2, '0')} · ${def.island}` : def.kind === 'room' ? `${def.island} · ${def.townName}` : `${def.island} · 길`;
   $('#locationName').textContent = def.name; $('#weather').textContent = z().sky;
   $('#questCounter').textContent = String(state.zone + 1).padStart(2, '0');
   const q = questInfo();
@@ -255,7 +262,7 @@ function updateUI() {
   paintPortraits();
 }
 function showPlaceBanner(def) {
-  const b = $('#placeBanner'); b.querySelector('small').textContent = def.kind === 'town' ? `${def.island} · CHAPTER ${String(def.zone + 1).padStart(2, '0')}` : `${def.island} · 길`;
+  const b = $('#placeBanner'); b.querySelector('small').textContent = def.kind === 'town' ? `${def.island} · CHAPTER ${String(def.zone + 1).padStart(2, '0')}` : def.kind === 'room' ? `${def.townName} · 건물 안` : `${def.island} · 길`;
   b.querySelector('strong').textContent = def.name; b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
   clearTimeout(showPlaceBanner.t); showPlaceBanner.t = setTimeout(() => b.classList.remove('show'), 2600);
 }
@@ -264,6 +271,10 @@ function showPlaceBanner(def) {
 function exitTile(dir = 'next') { const k = [...map.exits].find(([, d]) => d === dir)?.[0]; if (!k) return null; const [x, y] = k.split(',').map(Number); return { exit: dir, x, y, name: getMapDef(dir === 'next' ? nextMapId(map.id) : prevMapId(map.id)).name }; }
 function targetNPC() {
   if (map.kind === 'route') return exitTile('next');
+  if (map.kind === 'room') { // inside: down the stairs, then out of the door
+    const down = map.stairs.find(s => s.dir === 'down'), door = map.doors[0];
+    return down ? { exit: 'room', x: down.x, y: down.y, name: '아래층 계단' } : door ? { exit: 'room', x: door.x, y: door.y, name: '문' } : null;
+  }
   const role = wantedRole(progress());
   if (!role) return state.zone < 7 ? exitTile('next') : null;
   return liveNPCs().find(n => n.id === role);
@@ -304,8 +315,15 @@ function giveItems(give = {}) {
   if (parts.length) { toast(`${parts.join(', ')}를 받았어요!`); beep(860, .15); }
 }
 function setFlag(flag) { if (flag) state.flags[flag] = true; labelKey = ''; }
-function interact(n = nearestNPC()) {
-  if (!n || busy()) return;
+// The person or object right in front of you (not just beside you).
+function facingNPC() { const [dx, dy] = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[state.dir] || [0, 1]; return liveNPCs().find(n => n.x === state.x + dx && n.y === state.y + dy) || null; }
+function interact(n) {
+  if (!n) { // E / ‘대화’: facing a door with nobody right in front of you means going in
+    const b = !busy() && doorAhead();
+    if (b && !facingNPC()) { enterBuilding(b); return; }
+    n = nearestNPC(); if (!n) return;
+  }
+  if (busy()) return;
   n = liveNPCs().find(p => p.uid === n.uid) || n; npcFocus = n.uid; npcMotion.face(npcFocus, state);
   const p = progress();
   switch (n.id) {
@@ -324,6 +342,14 @@ function interact(n = nearestNPC()) {
       if (p.boss) return talk(`관장 ${z().boss}`, ['인증을 받은 뒤에도 새로운 상황에 배운 내용을 적용해 봐요. 다시 대련하고 싶다면 준비할게요.'], () => startBattle('rematch'));
       return talk(`관장 ${z().boss}`, ['잘 왔어요. 먼저 여행에서 배운 사실을 하나 확인해 볼까요?', '그다음에는 독도몬과 호흡을 맞춰 봐요. 준비된 동료와 함께 도전하세요!'], () => beginStudy('boss'));
     case 'shop': return showShop();
+    case 'shopkeeper': return talk(n.name, n.lines, () => showShop(), '쉼터 · 회복과 준비', n.actor);
+    case 'storage': return showStorage();
+    case 'dex': return showDex();
+    case 'rest': return talk(n.name, ['포근한 자리에서 잠깐 쉬었어요.', '동료들이 모두 기운을 되찾았어요!'], () => { healAll(state); beep(660, .15); updateUI(); save(); }, '쉬어 가기');
+    case 'badges': {
+      const got = state.badges.slice().sort((a, b) => a - b).map(i => `${ZONES[i].badge}(${ZONES[i].name})`);
+      return talk(n.name, got.length ? [`지금까지 받은 인증 ${got.length}개: ${got.join(', ')}`, '인증을 받을 때마다 진열장에 이름이 새겨져요.'] : ['아직 받은 인증이 없어요.', `관장 ${z().boss}의 시험을 통과하면 여기에 ‘${z().badge}’ 인증이 새겨져요.`], null, '수호관 · 인증 진열장');
+    }
     case 'wild': return startBattle('wild', n.species);
     case 'sign': return talk(n.name, n.lines, () => setFlag(n.flag), '안내판 · 실제 지명 정보');
     case 'landmark': return talk(n.name, n.lines, () => setFlag(n.flag), '실제 지명 · 지도 위 그림은 게임용');
@@ -349,12 +375,32 @@ function interact(n = nearestNPC()) {
   }
 }
 
+// ── buildings: doors, floors and stairs ────────────────────────────────────────
+// A building's door is the middle of its bottom row (both middle columns for even widths).
+const doorCols = b => b.w % 2 ? [b.x + Math.floor(b.w / 2)] : [b.x + b.w / 2 - 1, b.x + b.w / 2];
+function buildingDoorAt(x, y) { return map.kind === 'town' ? map.buildings.find(b => y === b.y + b.h - 1 && doorCols(b).includes(x)) : null; }
+function doorAhead() { return map.kind === 'town' && state.dir === 'up' ? buildingDoorAt(state.x, state.y - 1) : null; }
+function doorFront(b, people = liveNPCs()) { return doorCols(b).map(x => ({ x, y: b.y + b.h })).find(p => !blocked(map, p.x, p.y, people)) || { x: doorCols(b)[0], y: b.y + b.h }; }
+let stairHold = false; // after stairs, wait until the stick / keys are let go (no bouncing between floors)
+function enterBuilding(b) { beep(520, .05); changeMap(roomId(state.zone, b.kind, 1), 'a', { dir: 'up' }); }
+function leaveBuilding() {
+  const def = map.def, town = createMap(def.town), b = town.buildings.find(b => b.kind === def.building);
+  const front = b ? doorCols(b).map(x => ({ x, y: b.y + b.h })).find(p => !blocked(town, p.x, p.y)) : null;
+  changeMap(def.town, front ? { ...front, dir: 'down' } : 'a');
+}
+function useStairs(s) {
+  const def = map.def, floor = def.floor + (s.dir === 'up' ? 1 : -1), target = createMap(roomId(def.zone, def.building, floor));
+  const land = target.stairs.find(t => t.dir === (s.dir === 'up' ? 'down' : 'up'))?.land || target.spawns.a;
+  stairHold = true; beep(s.dir === 'up' ? 700 : 500, .06); changeMap(target.id, { ...land, dir: 'down' });
+}
+
 // ── walking, exits and encounters ──────────────────────────────────────────────
 function exitLocked(x, y) { return map.exits.get(`${x},${y}`) === 'next' && map.kind === 'town' && !state.badges.includes(state.zone); }
 function move(dx, dy, now) {
   if (moving || busy() || Math.abs(dx) + Math.abs(dy) !== 1) return false;
   const nx = state.x + dx, ny = state.y + dy; state.dir = dx < 0 ? 'left' : dx > 0 ? 'right' : dy < 0 ? 'up' : 'down';
   if (exitLocked(nx, ny)) { if (!move.warned || now - move.warned > 1500) { toast(`관장 ${z().boss}의 인증을 받으면 다리 건너 길이 열려요.`); move.warned = now; } return false; }
+  if (dy === -1) { const b = buildingDoorAt(nx, ny); if (b) { enterBuilding(b); return true; } } // walking up into a door
   if (blocked(map, nx, ny, liveNPCs())) return false;
   moving = { fromX: state.x, fromY: state.y, toX: nx, toY: ny, start: now }; return true;
 }
@@ -364,6 +410,10 @@ function arrive() {
   if (walks % 10 === 0) save();
   const exit = map.exits.get(`${state.x},${state.y}`);
   if (exit) { changeMap(exit === 'next' ? nextMapId(map.id) : prevMapId(map.id), exit === 'next' ? 'a' : 'z'); return; }
+  if (map.kind === 'room') {
+    if (map.doors.some(d => d.x === state.x && d.y === state.y)) { leaveBuilding(); return; }
+    const s = map.stairs.find(s => s.x === state.x && s.y === state.y); if (s) { useStairs(s); return; }
+  }
   if (map[state.y][state.x] === 3 && walks - lastEncounter > 8 && Math.random() < .18 && !pathAction) {
     lastEncounter = walks; path = [];
     const lo = map.kind === 'route' ? state.zone : Math.max(0, state.zone - 2), hi = map.kind === 'route' ? Math.min(6, state.zone + 1) : state.zone;
@@ -371,14 +421,14 @@ function arrive() {
     startBattle('wild', pool[Math.floor(Math.random() * pool.length)].id);
   }
 }
-async function changeMap(id, spawnKey = 'a', { heal = false, instant = false } = {}) {
+async function changeMap(id, spawnKey = 'a', { heal = false, instant = false, dir = null } = {}) {
   if (!id || transition) return;
   transition = true; settleMovement(); path = []; pathAction = null; keys.clear();
   if (!instant) { scene.classList.add('map-fading'); await wait(260); }
   const def = getMapDef(id);
   state.map = def.id; state.zone = def.zone; map = createMap(def.id);
-  const spot = map.spawns[spawnKey] || map.spawns.a; state.x = spot.x; state.y = spot.y; view = { x: spot.x, y: spot.y };
-  state.dir = spawnKey === 'z' ? 'left' : 'right';
+  const spot = typeof spawnKey === 'object' ? spawnKey : map.spawns[spawnKey] || map.spawns.a; state.x = spot.x; state.y = spot.y; view = { x: spot.x, y: spot.y };
+  state.dir = dir || spot.dir || (spawnKey === 'z' ? 'left' : 'right');
   npcMotion.reset(); npcFocus = null; labelKey = ''; walks = 0; lastEncounter = 0;
   if (heal) healAll(state);
   const first = def.kind === 'town' && !state.visited.includes(def.zone);
@@ -395,6 +445,13 @@ canvas.addEventListener('pointerdown', e => {
   const tx = Math.floor(((e.clientX - bounds.left) * canvas.width / bounds.width + camera.x) / 32), ty = Math.floor(((e.clientY - bounds.top) * canvas.height / bounds.height + camera.y) / 32);
   const people = liveNPCs(), n = people.find(n => Math.abs((n.drawX ?? n.x) - tx) <= .65 && Math.abs((n.drawY ?? n.y) - ty) <= 1);
   if (n) { moveToNPC(n); return; }
+  const b = map.kind === 'town' && map.buildings.find(b => tx >= b.x && tx < b.x + b.w && ty >= b.y - 1 && ty < b.y + b.h);
+  if (b) { // tap a building: walk to its door and go in
+    const f = doorFront(b, people), sx = moving?.toX ?? state.x, sy = moving?.toY ?? state.y;
+    if (sx === f.x && sy === f.y) { if (!moving) enterBuilding(b); else { path = []; pathAction = () => enterBuilding(b); } return; }
+    const p = pathfind(map, sx, sy, f.x, f.y, people); if (p.length) { path = p; pathAction = () => enterBuilding(b); }
+    return;
+  }
   const next = pathfind(map, moving?.toX ?? state.x, moving?.toY ?? state.y, tx, ty, people);
   if (next.length) { path = next; pathAction = null; }
   canvas.focus({ preventScroll: true });
@@ -418,11 +475,9 @@ window.addEventListener('keydown', e => {
   }
 });
 window.addEventListener('keyup', e => keys.delete(e.key)); window.addEventListener('blur', () => keys.clear());
-$$('[data-dir]').forEach(b => {
-  const key = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' }[b.dataset.dir];
-  b.onpointerdown = e => { e.preventDefault(); b.setPointerCapture(e.pointerId); keys.add(key); path = []; pathAction = null; };
-  b.onpointerup = b.onpointercancel = () => keys.delete(key);
-});
+// 가상 조이스틱: 누른 채로 밀면 그쪽으로 한 칸씩 걸어요. 대각선으로 밀면 막힌 쪽 대신 다른 쪽으로 미끄러지듯 걸어요.
+const joystick = createJoystick($('#joystick'), dir => { if (dir) { path = []; pathAction = null; } });
+window.addEventListener('blur', () => joystick.reset());
 $('#interactBtn').onclick = () => dialogueState ? nextTalk() : interact();
 
 function frame(now) {
@@ -434,7 +489,11 @@ function frame(now) {
   let nextStart = now;
   if (moving) { const result = moveView(view, moving, now); walkDistance += result.distance; if (result.complete) { nextStart = Math.max(moving.start + MOVE_DURATION, now - MOVE_DURATION); arrive(); } }
   if (!moving && !busy()) {
-    if (keys.size) { const k = [...keys].find(k => vectors[k]); if (k) move(...vectors[k], nextStart); }
+    const stick = stairHold ? null : joystick.direction;
+    if (stairHold && !joystick.direction && !keys.size) stairHold = false;
+    if (stairHold) { /* let go first */ }
+    else if (stick) { if (!move(...stick.primary, nextStart) && stick.secondary) move(...stick.secondary, nextStart); }
+    else if (keys.size) { const k = [...keys].find(k => vectors[k]); if (k) move(...vectors[k], nextStart); }
     else if (path.length) { const [x, y] = path.shift(); if (!move(x - state.x, y - state.y, nextStart)) { path = []; pathAction = null; } }
     else if (pathAction) { const fn = pathAction; pathAction = null; fn(); }
   }
@@ -448,8 +507,9 @@ function frame(now) {
     drawActors(actorCtx, state, view, now, { walking, distance: walkDistance }, people, map); actorCtx.restore(); paintWorldLabels(people);
   }
   if (avatarChoice) $$('canvas[data-explorer-sprite]').forEach(c => paintExplorerCard(c, c.dataset.explorerSprite, now, avatarChoice.selected === c.dataset.explorerSprite));
-  const n = !busy() && nearestNPC(); $('#interactionPrompt').classList.toggle('hidden', !n);
-  if (n) $('#interactionPrompt').textContent = `${matchMedia('(pointer:coarse)').matches ? '대화' : 'E'} · ${n.name}`;
+  const door = !busy() && !facingNPC() && doorAhead(), n = !door && !busy() && nearestNPC(); $('#interactionPrompt').classList.toggle('hidden', !n && !door);
+  if (door) $('#interactionPrompt').textContent = `${matchMedia('(pointer:coarse)').matches ? '대화' : 'E'} · ${door.name} 들어가기`;
+  else if (n) $('#interactionPrompt').textContent = `${matchMedia('(pointer:coarse)').matches ? '대화' : 'E'} · ${n.name}`;
   requestAnimationFrame(frame);
 }
 
@@ -506,7 +566,7 @@ function finishTutorialBattle() {
 }
 const touchy = () => typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
 const WALK_STEPS = [
-  { title: '걸어 보기', text: () => touchy() ? '화면의 방향 버튼을 누르거나 가고 싶은 곳을 눌러서 세 걸음 걸어 보세요.' : '방향키나 W·A·S·D 키로 세 걸음 걸어 보세요. 가고 싶은 곳을 마우스로 눌러도 돼요.', glow: null },
+  { title: '걸어 보기', text: () => touchy() ? '왼쪽 아래 조이스틱을 누른 채로 밀거나, 가고 싶은 곳을 눌러서 세 걸음 걸어 보세요.' : '방향키나 W·A·S·D 키로 세 걸음 걸어 보세요. 가고 싶은 곳을 마우스로 눌러도 돼요.', glow: null },
   { title: '말 걸기', text: () => `노란 ! 표시가 있는 사람에게 다가가 ${touchy() ? '‘대화’ 버튼' : 'E 키나 스페이스'}를 눌러 말을 걸어요.`, glow: '#interactBtn' },
   { title: '모험 수첩', text: () => '아래쪽 ‘모험 수첩’을 눌러 지금 할 일을 확인해요.', glow: '#questBtn' },
   { title: '목적지 안내', text: () => '수첩의 ‘목적지 안내’를 누르면 가야 할 곳까지 저절로 걸어가요.', glow: '#guideBtn' }
@@ -762,7 +822,7 @@ async function runBattle(b) {
 }
 function closeBattle() { battle = null; battleUI.destroy(); $('#battleScreen').classList.add('hidden'); scene.classList.remove('battling'); lastEncounter = walks; }
 function returnToShelter() {
-  if (map.kind === 'route') { const def = getMapDef(townId(state.zone)); state.map = def.id; map = createMap(def.id); npcMotion.reset(); labelKey = ''; }
+  if (map.kind !== 'town') { const def = getMapDef(townId(state.zone)); state.map = def.id; map = createMap(def.id); npcMotion.reset(); labelKey = ''; }
   const shop = map.parsed.roles.shop, people = npcs(map, progress(), state.flags);
   const spot = shop && [[0, 1], [1, 0], [-1, 0], [0, -1]].map(([dx, dy]) => ({ x: shop.x + dx, y: shop.y + dy })).find(p => !blocked(map, p.x, p.y, people) && !map.exits.has(`${p.x},${p.y}`));
   const s = spot || map.spawns.a; state.x = s.x; state.y = s.y; view = { x: s.x, y: s.y };
@@ -894,7 +954,7 @@ function showMap() {
   const pct = ([x, y]) => `left:${Math.min(92, Math.max(8, x / 320 * 100)).toFixed(2)}%;top:${Math.min(87, Math.max(13, y / 200 * 100)).toFixed(2)}%`; // markers stay inside the picture
   const routeSpot = r => { const a = WORLD_SPOTS[`town${r.zone}`], b = WORLD_SPOTS[`town${r.zone + 1}`], bend = ROUTE_BENDS[r.id]?.[0]; return bend || [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; };
   const townMarks = towns.map((t, i) => {
-    const visited = state.visited.includes(t.zone), here = map.id === t.id, badge = state.badges.includes(t.zone);
+    const visited = state.visited.includes(t.zone), here = (map.def.town || map.id) === t.id, badge = state.badges.includes(t.zone);
     const status = here ? '지금 여기' : visited ? '눌러서 바로 이동' : '아직 가 보지 않은 곳';
     return `<button class="wm-town ${here ? 'here' : ''} ${visited ? 'visited' : 'locked'}" style="${pct(WORLD_SPOTS[t.id])}" data-zone="${t.zone}" ${!visited || here ? 'disabled' : ''} aria-label="${esc(t.name)} · ${status}"><i>${here ? '★' : visited ? (badge ? '✓' : ZONES[t.zone].icon) : '?'}</i><span>${String(i + 1).padStart(2, '0')} ${esc(visited ? t.name : '???')}</span></button>`;
   }).join('');
@@ -935,7 +995,7 @@ function showMenu() {
     $('#menuTutorial').onclick = () => { closeModal(); state.tutorial = { battle: false, walk: 0 }; save(); renderCoachPanel(); startTutorial(); };
     $('#menuAvatar').onclick = () => chooseAvatar(id => { state.avatar = id; save(); updateUI(); toast('탐험대원을 바꿨어요.'); });
     $('#restartBtn').onclick = () => { saved = state.started ? state : saved; startNew(); };
-    $('#menuHelp').onclick = () => openModal(head('천천히, 함께 탐험해요') + '<div class="fact-box">이동: 방향키 / WASD / 지도 화면 누르기<br>대화·조사: 가까이에서 E·스페이스 / 대화 버튼<br>자동 안내: 수첩의 목적지 안내<br>다음 지역: 관장 인증 후 마을 오른쪽 다리 → 길을 따라 걷기<br>세계 지도: 가 본 마을로 바로 이동<br>결투 명령: 정화하기 · 도구 · 동료 · 물러나기<br>정화하기: 배운 기술 중 하나를 골라 문제를 풀어요. 처음엔 기술 2가지, 레벨 8과 12에 새 기술을 배워요<br>사나워진 독도몬: 문제를 맞히면 검은 기운을 걷어 내요. 모두 걷히면 평온을 되찾아요<br>정화 기술: 틀리면 마음이 닿지 않아요(피해 없음)<br>날뛰는 독도몬의 문제: 맞히면 조금만 아프고, 틀리면 그대로 충격을 받아요<br>관장과는 인증 결투로 겨뤄요<br>힌트: 문제 아래 기록 힌트 · 학습 기록에 도움 표시<br>대화와 컷신: 클릭·엔터·스페이스로 넘기기</div><p>길에서는 표지판, 관찰 지점, 기억 비석, 조사 상자, 길에서 만난 사람과 몽땅랜드 직원을 찾아봐요. 사나워진 야생 독도몬은 풀숲에서 만나요.</p>');
+    $('#menuHelp').onclick = () => openModal(head('천천히, 함께 탐험해요') + '<div class="fact-box">이동: 방향키 / WASD / 조이스틱(터치 화면) / 지도 화면 누르기<br>건물: 문 바로 아래에서 위로 걸으면(또는 건물을 누르면) 들어가요. 계단을 밟으면 위아래 층으로, 문 깔개를 밟으면 밖으로 나가요<br>대화·조사: 가까이에서 E·스페이스 / 대화 버튼<br>자동 안내: 수첩의 목적지 안내<br>다음 지역: 관장 인증 후 마을 오른쪽 다리 → 길을 따라 걷기<br>세계 지도: 가 본 마을로 바로 이동<br>결투 명령: 정화하기 · 도구 · 동료 · 물러나기<br>정화하기: 배운 기술 중 하나를 골라 문제를 풀어요. 처음엔 기술 2가지, 레벨 8과 12에 새 기술을 배워요<br>사나워진 독도몬: 문제를 맞히면 검은 기운을 걷어 내요. 모두 걷히면 평온을 되찾아요<br>정화 기술: 틀리면 마음이 닿지 않아요(피해 없음)<br>날뛰는 독도몬의 문제: 맞히면 조금만 아프고, 틀리면 그대로 충격을 받아요<br>관장과는 인증 결투로 겨뤄요<br>힌트: 문제 아래 기록 힌트 · 학습 기록에 도움 표시<br>대화와 컷신: 클릭·엔터·스페이스로 넘기기</div><p>길에서는 표지판, 관찰 지점, 기억 비석, 조사 상자, 길에서 만난 사람과 몽땅랜드 직원을 찾아봐요. 사나워진 야생 독도몬은 풀숲에서 만나요.</p>');
     $('#importSave').onchange = async e => { const file = e.target.files[0]; if (!file) return; try { if (file.size > 3e6) throw new Error('파일이 너무 커요.'); const parsed = validateSave(JSON.parse(await file.text())); saved = parsed; closeModal(); continueGame(); toast('저장한 모험을 불러왔어요.'); } catch (err) { toast(err.message || '저장 파일을 확인해 주세요.'); } };
   });
 }
@@ -954,7 +1014,7 @@ $('#questBtn').onclick = $('#questPeek').onclick = showQuest; $('#partyBtn').onc
 $('#fullscreenBtn').onclick = toggleFullscreen;
 $('#soundBtn').onclick = () => { state.sound = !state.sound; if (state.sound) beep(660, .15); updateUI(); save(); };
 window.addEventListener('beforeunload', () => save());
-document.addEventListener('visibilitychange', () => { if (document.hidden) { keys.clear(); save(); } });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { keys.clear(); joystick.reset(); save(); } });
 setInterval(() => { if (state.started && !battle && !document.hidden) save(); }, 30000);
 onAssetReady(() => { paintResidentPortrait(); paintPortraits(); paintExplorerChoices(performance.now()); if (battle) refreshBattle(); });
 for (const a of Object.values(VILLAIN_ATLASES)) assetImage(a.key); // 몽땅랜드 sheets, ready before the first fight
@@ -969,6 +1029,10 @@ if (typeof location !== 'undefined' && new URLSearchParams(location.search).has(
     motion: () => ({ view: { ...view }, walkDistance, moving }), npcs: () => npcs(map, progress(), state.flags),
     playStory, stories: { OPENING, STARTER_MEET, GUIDE, BOSS_REVEAL, BOSS_FALL, TREE_JOINS },
     get longestQuestion() { return QUESTIONS.reduce((m, q) => (q.prompt.length + q.options.join('').length + q.explanation.length > m.prompt.length + m.options.join('').length + m.explanation.length ? q : m)); },
-    set forceQuestion(q) { testQuestion = q; }, closeBattleForTest: () => { if (battle) closeBattle(); }
+    set forceQuestion(q) { testQuestion = q; }, closeBattleForTest: () => { if (battle) closeBattle(); },
+    screenOf(x, y) { const r = canvas.getBoundingClientRect(); return { x: r.left + (x * TILE + 16 - camera.x) * sceneScale, y: r.top + (y * TILE + 16 - camera.y) * sceneScale }; },
+    standAtDoor(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b); settleMovement(); state.x = f.x; state.y = f.y; view = { x: f.x, y: f.y }; state.dir = 'up'; return f; },
+    goInside(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b), p = pathfind(map, state.x, state.y, f.x, f.y, liveNPCs()); if (state.x === f.x && state.y === f.y) enterBuilding(b); else { path = p; pathAction = () => enterBuilding(b); } return p.length; },
+    walkToTile(x, y) { const p = pathfind(map, moving?.toX ?? state.x, moving?.toY ?? state.y, x, y, liveNPCs()); path = p; pathAction = null; return p.length; }
   };
 }

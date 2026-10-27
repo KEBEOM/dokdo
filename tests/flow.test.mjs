@@ -210,6 +210,24 @@ for (let zone = 0; zone < 8; zone++) {
   await npc('shop'); await page.click('#healAll');
   await npc('boss'); await answerStudy(); totalTurns += await fight(); assert.ok(await G(() => window.__dokdo.state.badges.includes(window.__dokdo.state.zone)), `badge ${zone}`);
   if (zone === 7) { assert.equal(await G(() => window.__dokdo.cutscene()), 'epilogue'); await skipCutscene(); await page.click('#endContinue'); break; }
+  if (zone === 0) {
+    // buildings: walk in through the door, climb the stairs, read, review and walk back out with the guide
+    const inside = async id => until(id => window.__dokdo.map.id === id && !window.__dokdo.transition, 20000, id);
+    const leave = async () => { for (let i = 0; i < 6 && await G(() => window.__dokdo.map.kind === 'room'); i++) { const id = await G(() => window.__dokdo.map.id); await G(() => window.__dokdo.guide()); await until(id => window.__dokdo.map.id !== id && !window.__dokdo.transition, 20000, id); } };
+    await G(() => window.__dokdo.goInside('lab')); await inside('town0/lab/1');
+    assert.equal(await G(() => window.__dokdo.state.dir), 'up', 'you come in facing the room');
+    await npc('dex'); assert.equal(await page.locator('[data-dex]').count(), 100, 'the dex terminal opens the dex'); await G(() => window.__dokdo.closeModal());
+    const up = await G(() => window.__dokdo.map.stairs.find(s => s.dir === 'up'));
+    await page.evaluate(([x, y]) => window.__dokdo.walkToTile(x, y), [up.x, up.y]); await inside('town0/lab/2');
+    await npc('sign'); await npc('stone'); await answerStudy(); assert.ok(await G(() => window.__dokdo.state.flags['town0/lab/2:3']), 'the review desk in the library');
+    await leave(); assert.equal(await G(() => window.__dokdo.map.id), 'town0', 'stairs down, then out of the door');
+    assert.equal(await G(() => window.__dokdo.state.dir), 'down', 'you come out facing the town');
+    // standing under the painted door and pressing ↑ walks in
+    const front = await G(() => window.__dokdo.standAtDoor('shop')); await until(() => /쉼터 · 상점 들어가기/.test(document.querySelector('#interactionPrompt').textContent), 5000);
+    await page.keyboard.down('ArrowUp'); await inside('town0/shop/1'); await page.keyboard.up('ArrowUp'); void front;
+    await G(() => { window.__dokdo.state.party[0].hp = 1; }); await npc('rest'); assert.ok(await G(() => window.__dokdo.state.party.every(m => m.hp === m.maxHp)), 'a rest on the shelter bed heals');
+    await leave(); assert.equal(await G(() => window.__dokdo.map.id), 'town0');
+  }
   await walkTo(`route${zone}`);
   if (zone === 0) {
     // every kind of route object
@@ -252,4 +270,4 @@ assert.deepEqual(st, { map: 'town3', visited: 8, onSpawn: true });
 
 assert.deepEqual(errors, [], 'no browser errors');
 await browser.close(); server.close();
-console.log(`PASS: 백무 사장 reveal/fall/epilogue scenes, 사나워진 독도몬 duels with 검은 기운 gauges, 몽땅랜드 designs in battle, softened hits on correct defence, opening read line by line with the mission choice, starter + guide, key walking, closed bridge, guide, DQ commands (정화하기 with two starting skills, guard skill, item, orb, switch, run), my 독도몬 drawn from behind, 백무단 pictures fading out, explorer drawings in the character choice, 김박사 picture and starter cutscene, 사철나무 purified from 백무 사장 and joining once, practice duel and walking tutorial, clickable picture map, easy words (사나워진 독도몬 · 검은 기운 · 몽땅랜드 컴퍼니), quiz rules (wrong attack = miss, correct defence = light hit), hints, KO recovery, route objects, trainer, memory stone, 8 chapters walked through 7 routes, first-arrival scenes, fast travel, legend, ending, saves and a v0.21 save; ${totalTurns} battle turns.`);
+console.log(`PASS: 백무 사장 reveal/fall/epilogue scenes, 사나워진 독도몬 duels with 검은 기운 gauges, 몽땅랜드 designs in battle, softened hits on correct defence, opening read line by line with the mission choice, starter + guide, key walking, closed bridge, guide, DQ commands (정화하기 with two starting skills, guard skill, item, orb, switch, run), my 독도몬 drawn from behind, 백무단 pictures fading out, explorer drawings in the character choice, buildings with floors (door, stairs, dex, books, review desk, rest), 김박사 picture and starter cutscene, 사철나무 purified from 백무 사장 and joining once, practice duel and walking tutorial, clickable picture map, easy words (사나워진 독도몬 · 검은 기운 · 몽땅랜드 컴퍼니), quiz rules (wrong attack = miss, correct defence = light hit), hints, KO recovery, route objects, trainer, memory stone, 8 chapters walked through 7 routes, first-arrival scenes, fast travel, legend, ending, saves and a v0.21 save; ${totalTurns} battle turns.`);

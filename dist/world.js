@@ -5,6 +5,7 @@ import { drawTerrain } from './terrain.js';
 import { drawExplorer, drawResident, CHARACTER_SIZE } from './characters.js';
 import { parseMap, getMapDef, MAP_W, MAP_H } from './maps.js';
 import { drawProp } from './props.js';
+import { drawInterior, drawFurniture, FURNITURE_DEPTH } from './interior-art.js';
 
 export const TILE = 32, W = MAP_W, H = MAP_H;
 export const PROP_KINDS = ['sign', 'landmark', 'box', 'trash', 'observe', 'stone', 'legend'];
@@ -18,7 +19,8 @@ export function createMap(ref = 0) {
   return Object.assign(grid, {
     id: def.id, def, zone: def.zone, kind: def.kind, name: def.name,
     solid: parsed.solid, exits: parsed.exits, spawns: parsed.spawns,
-    buildings: parsed.buildings, decor: parsed.decor, rockTiles: parsed.rockTiles, keepClear, parsed
+    buildings: parsed.buildings, decor: parsed.decor, rockTiles: parsed.rockTiles, keepClear, parsed,
+    doors: parsed.doors || [], stairs: parsed.stairs || [], focus: parsed.focus || null
   });
 }
 // Buildings of the first town (kept for older code and tests).
@@ -78,7 +80,7 @@ export function npcs(ref = 0, progress = {}, flags = {}) {
 export function blocked(map, x, y, people = [], ignorePeople = false) {
   if (x < 0 || y < 0 || x >= W || y >= H) return true;
   const t = map[y][x];
-  if (t === 0 || t === 5 || t === 7 || map.solid?.has(`${x},${y}`)) return true;
+  if (t === 0 || t === 5 || t === 7 || t === 8 || t === 9 || map.solid?.has(`${x},${y}`)) return true;
   return !ignorePeople && people.some(n => (n.occupied || [n]).some(p => p.x === x && p.y === y));
 }
 
@@ -94,7 +96,8 @@ export function pathfind(map, sx, sy, tx, ty, people = []) {
     }
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const nx = x + dx, ny = y + dy, k = key(nx, ny);
-      if (!seen.has(k) && !blocked(map, nx, ny, people)) { seen.add(k); prev.set(k, key(x, y)); queue.push([nx, ny]); }
+      const portal = map[ny]?.[nx] >= 13 && map[ny]?.[nx] <= 15 && !(nx === tx && ny === ty); // doors and stairs only as the goal
+      if (!seen.has(k) && !portal && !blocked(map, nx, ny, people)) { seen.add(k); prev.set(k, key(x, y)); queue.push([nx, ny]); }
     }
   }
   return [];
@@ -106,8 +109,11 @@ export function drawTreeDefault(ctx, x, y) {
   const r = (a, b, w, h, c) => rect(ctx, x + a, y + b, w, h, c);
   r(-9, 15, 29, 8, '#375e4a22'); r(4, 0, 7, 24, '#816f50'); r(-8, -22, 30, 27, '#427e65'); r(-13, -14, 40, 20, '#427e65'); r(-3, -29, 20, 10, '#73a97a');
 }
+// The door in each building picture sits right above the middle tile (buildings are an odd number of tiles wide);
+// these few pixels line the painted door up exactly with the tile you stand on to go in.
+const DOOR_NUDGE = { lab: -4, shop: -3, gym: 1, home: 0 };
 function house(ctx, b, labels = true) {
-  if (!drawScenery(ctx, b.kind, b.x * TILE - 8, b.y * TILE - 40, b.w * TILE + 16, b.h * TILE + 40)) { drawHouseDefault(ctx, b, labels); return; }
+  if (!drawScenery(ctx, b.kind, b.x * TILE - 8 + (DOOR_NUDGE[b.kind] || 0), b.y * TILE - 40, b.w * TILE + 16, b.h * TILE + 40)) { drawHouseDefault(ctx, b, labels); return; }
   if (!labels) return;
   ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#345c52'; ctx.fillText(b.name, (b.x + b.w / 2) * TILE, (b.y + b.h) * TILE + 14);
 }
@@ -118,18 +124,27 @@ export function drawHouseDefault(ctx, b, labels = true) {
   if (labels) { ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#345c52'; ctx.fillText(b.name, x + w / 2, y + h + 14); }
 }
 
-export function cameraFor(view, width = 768, height = 480) {
+// Inside a building (focus = the room): a room smaller than the screen sits in the middle,
+// a bigger one scrolls but never shows more than a tile of darkness beyond its walls.
+export function cameraFor(view, width = 768, height = 480, focus = null) {
+  const axis = (p, size, lo, len, total) => {
+    if (!focus) return Math.max(0, Math.min(total - size, p * TILE - size / 2 + 16));
+    const a = lo * TILE, span = len * TILE;
+    if (span + 2 * TILE <= size) return a + span / 2 - size / 2;
+    return Math.max(a - TILE, Math.min(a + span + TILE - size, p * TILE - size / 2 + 16));
+  };
   return {
-    x: Math.floor(Math.max(0, Math.min(W * TILE - width, view.x * TILE - width / 2 + 16))),
-    y: Math.floor(Math.max(0, Math.min(H * TILE - height, view.y * TILE - height / 2 + 16)))
+    x: Math.floor(axis(view.x, width, focus?.x, focus?.w, W * TILE)),
+    y: Math.floor(axis(view.y, height, focus?.y, focus?.h, H * TILE))
   };
 }
 
 export function drawWorld(ctx, map, state, view, time, target = null, motion = { walking: false, distance: 0 }, viewport = { width: 768, height: 480, labels: true }, people = npcs(map, state.progress[state.zone], state.flags)) {
-  const z = ZONES[state.zone], { width, height } = viewport, { x: camX, y: camY } = cameraFor(view, width, height);
-  ctx.clearRect(0, 0, width, height); ctx.fillStyle = z.color; ctx.fillRect(0, 0, width, height);
+  const z = ZONES[state.zone], { width, height } = viewport, room = map.kind === 'room', { x: camX, y: camY } = cameraFor(view, width, height, room ? map.focus : null);
+  ctx.clearRect(0, 0, width, height); ctx.fillStyle = room ? '#0e1418' : z.color; ctx.fillRect(0, 0, width, height);
   ctx.save(); ctx.translate(-camX, -camY);
-  drawTerrain(ctx, map, time, { x: camX, y: camY, width, height });
+  if (room) drawInterior(ctx, map, time, { x: camX, y: camY, width, height });
+  else drawTerrain(ctx, map, time, { x: camX, y: camY, width, height });
   if (target) { ctx.fillStyle = '#fff1b440'; ctx.fillRect(target.x * 32, target.y * 32, 32, 32); ctx.strokeStyle = '#f6d37d'; ctx.lineWidth = 2; ctx.strokeRect(target.x * 32 + 3, target.y * 32 + 3, 26, 26); }
   if (viewport.actors !== false) drawActors(ctx, state, view, time, motion, people, map);
   if (viewport.labels) for (const n of people) if (n.actor) drawNPCNameplate(ctx, n.name, (n.drawX ?? n.x) * 32 + 16, (n.drawY ?? n.y) * 32 + 35, camX, camY);
@@ -169,7 +184,8 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
   for (const n of sceneDrawOrder(people, view, map)) {
     if (n.scenery) { drawDecor(ctx, n, map, time); continue; }
     const fx = n.x * 32 + (32 - CHARACTER_SIZE) / 2, fy = n.y * 32 + 28 - CHARACTER_SIZE;
-    if (n.kind === 'board') drawScenery(ctx, 'board', n.x * 32 - 8, n.y * 32 - 16, 48, 54);
+    if (n.furniture) drawFurniture(ctx, n.furniture, n.x, n.y, time, { open: n.used, glow: n.kind === 'rest' });
+    else if (n.kind === 'board') drawScenery(ctx, 'board', n.x * 32 - 8, n.y * 32 - 16, 48, 54);
     else if (n.kind === 'wild') { darkWisps(ctx, n.x, n.y, time); drawMonster(ctx, n.species, n.x * 32 - 6, n.y * 32 - 12, 44, time / 1000); }
     else if (n.kind === 'legend') { drawProp(ctx, 'observe', n.x, n.y, { time }); if (!n.used) marker(ctx, n.x, n.y, time, '#ffe9a0'); }
     else if (PROP_KINDS.includes(n.kind)) drawProp(ctx, n.kind, n.x, n.y, { open: n.used, art: n.art, time, water: map[n.y]?.[n.x] === 0 });
@@ -183,6 +199,7 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
 
 function drawDecor(ctx, n, map, time) {
   if (n.building) return house(ctx, n.building, false);
+  if (n.scenery in FURNITURE_DEPTH) return drawFurniture(ctx, n.scenery, n.x, n.y, time);
   switch (n.scenery) {
     case 'tree': return tree(ctx, n.x * 32, n.y * 32);
     case 'fence': return drawScenery(ctx, 'fence', n.x * 32, n.y * 32 - 6, n.w * 32, 36);
@@ -201,7 +218,7 @@ export function sceneDrawOrder(people, view, map = createMap(0)) {
   for (const b of map.buildings) items.push({ scenery: b.kind, building: b, depth: (b.y + b.h) * TILE });
   for (const d of map.decor) {
     if (d.kind === 'fence') { for (let i = 0; i < d.len; i += 2) items.push({ scenery: 'fence', x: d.x + i, y: d.y, w: Math.min(2, d.len - i), depth: d.y * TILE + 27 }); continue; }
-    const depth = { tree: 24, planter: 29, monument: 32, boat: 70, rock: 26, crag: 30 }[d.kind] ?? 24;
+    const depth = { tree: 24, planter: 29, monument: 32, boat: 70, rock: 26, crag: 30, ...FURNITURE_DEPTH }[d.kind] ?? 24;
     items.push({ scenery: d.kind, x: d.x, y: d.y, w: d.w, h: d.h, depth: d.y * TILE + depth });
   }
   return items.sort((a, b) => a.depth - b.depth);

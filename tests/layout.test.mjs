@@ -25,3 +25,17 @@ for (const [w, h] of [[1180, 740], [820, 1100], [1133, 664], [1280, 720], [1366,
 // only phones held sideways (very little height) let the box overlap the picture's lower part
 assert.equal(cutsceneLayout(844, 340, 110).overlap, true);
 console.log('layout: zoom and story-scene rules hold on phones, tablets and monitors');
+
+// virtual joystick: four directions with a dead centre, stickiness near diagonals, a second direction for sliding
+import { joystickDirection } from '../dist/joystick.js';
+const R = 50;
+assert.equal(joystickDirection(5, 5, R), null, 'small pushes do nothing');
+assert.deepEqual(joystickDirection(40, 0, R).primary, [1, 0]);
+assert.deepEqual(joystickDirection(0, -40, R).primary, [0, -1]);
+assert.deepEqual(joystickDirection(-30, 10, R).primary, [-1, 0]);
+assert.equal(joystickDirection(40, 5, R).secondary, null, 'a straight push has no second direction');
+const diag = joystickDirection(30, 28, R); assert.deepEqual(diag.primary, [1, 0]); assert.deepEqual(diag.secondary, [0, 1], 'diagonal: slide down when right is blocked');
+const right = joystickDirection(40, 0, R);
+assert.deepEqual(joystickDirection(30, 33, R, right).primary, [1, 0], 'near a diagonal the direction does not flicker');
+assert.deepEqual(joystickDirection(20, 40, R, right).primary, [0, 1], 'a clear change of direction switches');
+console.log('joystick: direction rules hold');

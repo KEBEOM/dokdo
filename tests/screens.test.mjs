@@ -46,7 +46,7 @@ export const DEVICES = [
 // Is every button / window fully on screen? An element inside a scrolling box only has to be reachable by scrolling.
 function cutOff(strict = '') {
   const out = [], vw = innerWidth, vh = innerHeight;
-  const sel = 'button, .dq-window, .cs-box, .modal-panel, .dialogue, .question-title, [data-answer], .dq-answer, .cs-choice, .hud-top, .game-dock, .touch-controls .dpad, .touch-a, h2, h3, .cs-text';
+  const sel = 'button, .dq-window, .cs-box, .modal-panel, .dialogue, .question-title, [data-answer], .dq-answer, .cs-choice, .hud-top, .game-dock, .touch-controls .joystick, .touch-a, h2, h3, .cs-text';
   for (const el of document.querySelectorAll(sel)) {
     const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
     if (!r.width || !r.height || cs.visibility === 'hidden' || el.closest('[hidden], .hidden') || +cs.opacity === 0) continue;
@@ -118,6 +118,16 @@ async function runDevice(d) {
   for (let i = 0; i < 10 && await page.$('#dialogue:not(.hidden) #nextTalk'); i++) await tap('#nextTalk');
   // walking screen, a conversation, the study quiz, the map, the dex
   await check('12-world', 500);
+  // touch screens: hold the joystick to the right and the explorer walks right
+  if (d.touch) {
+    const box = await page.locator('#joystick').boundingBox(); if (!box) throw new Error('no joystick on a touch screen');
+    const x0 = await G(() => window.__dokdo.state.x), cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+    await page.mouse.move(cx, cy); await page.mouse.down(); await page.mouse.move(cx + box.width * .4, cy, { steps: 4 });
+    await page.waitForTimeout(900); await page.mouse.up();
+    const after = await G(() => ({ x: window.__dokdo.state.x, dir: window.__dokdo.state.dir }));
+    if (!(after.dir === 'right' && after.x >= x0)) problems.push(`joystick: expected to face/walk right, got ${JSON.stringify(after)} from x=${x0}`);
+    await page.waitForTimeout(400);
+  }
   await G(() => { const d = window.__dokdo, n = d.npcs().find(n => n.id === 'history' || n.kind === 'history') || d.npcs().find(n => n.lines); d.interact(n); });
   await check('13-dialogue', 900);
   for (let i = 0; i < 10 && await page.$('#dialogue:not(.hidden) #nextTalk'); i++) await tap('#nextTalk');
@@ -127,6 +137,12 @@ async function runDevice(d) {
   await page.keyboard.press('Escape'); await page.waitForTimeout(300); await G(() => window.__dokdo.closeModal());
   await tap('#mapBtn'); await check('15-world-map', 600); await G(() => window.__dokdo.closeModal());
   await tap('#dexBtn'); await check('16-dex', 600); await G(() => window.__dokdo.closeModal());
+  // inside a building: the room sits in the middle of the screen with its labels
+  await G(() => window.__dokdo.goInside('lab')); await until(() => window.__dokdo.map.id === 'town0/lab/1' && !window.__dokdo.transition);
+  await check('18-inside', 2900);
+  const roomFit = await G(() => { const c = document.querySelector('#world').getBoundingClientRect(), f = window.__dokdo.map.focus; return { w: f.w * 32, h: f.h * 32, cw: c.width, ch: c.height }; });
+  void roomFit;
+  for (let i = 0; i < 6 && await G(() => window.__dokdo.map.kind === 'room'); i++) { const id = await G(() => window.__dokdo.map.id); await G(() => window.__dokdo.guide()); await page.waitForFunction(id => window.__dokdo.map.id !== id && !window.__dokdo.transition, id, { timeout: 20000 }); }
   await G(() => { window.__dokdo.playStory(window.__dokdo.stories.BOSS_REVEAL); }); await until(() => window.__dokdo.cutscene() === 'boss-reveal');
   for (let i = 0; i < 24; i++) { if (await page.$('.cs-choice')) break; await tap('.cs-box').catch(() => {}); await page.waitForTimeout(120); }
   await page.waitForSelector('.cs-choice', { timeout: 15000 }).catch(() => {}); await check('17-cutscene-choice', 600);
@@ -141,4 +157,4 @@ await Promise.all(Array.from({ length: 4 }, async () => { while (queue.length) a
 await browser.close(); server.close();
 const failed = report.filter(([, p]) => p.length);
 assert.equal(failed.length, 0, `cut-off screens on ${failed.map(([id]) => id).join(', ')}`);
-console.log(`PASS: ${report.length} screen sizes, 17 screens each — nothing cut off.`);
+console.log(`PASS: ${report.length} screen sizes, 18 screens each — nothing cut off.`);
