@@ -1,1 +1,1 @@
-export const TERRAIN_ATLAS={"key":"scenery/terrain-pixels-v21","width":1024,"height":1536,"frames":{"water":[10,32,320,640],"grass":[352,32,320,640],"tall":[694,32,320,640],"path":[10,800,320,640],"sand":[352,800,320,640],"dock":[694,800,320,640]}};
+export const TERRAIN_ATLAS={"key": "scenery/terrain-bw-v39", "width": 200, "height": 262, "frames": {"grass": [2, 2, 64, 128], "tall": [68, 2, 64, 128], "path": [134, 2, 64, 128], "sand": [2, 132, 64, 128], "water": [68, 132, 64, 128], "dock": [134, 132, 64, 128]}};

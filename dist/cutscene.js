@@ -263,11 +263,15 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
     },
     crisis(t, s) {
       const panel = s.panel || 'sea';
-      if (panel === 'sea') { R(0, 0, SW, 60, '#6c8ea0'); R(0, 60, SW, 120, '#24566a'); for (let y = 64; y < SH; y += 7) for (let x = ((y * 11 + Math.floor(t / 80)) % 26) - 26; x < SW; x += 26) R(x, y, 9, 1, '#5e93a3'); peaks(110, 72, 110); }
-      if (panel === 'rock') { R(0, 0, SW, SH, '#7b8f99'); peaks(-20, 182, 360); }
-      if (panel === 'grass') { R(0, 0, SW, 50, '#7f9fb0'); tiles('grass', 0, 50, SW, SH); tiles('tall', 40, 90, 280, 150); }
+      if (hasArt() && panel === 'sea') { skyDay(t, 60, false); seaStrip(60, 120, t); peaks(110, 72, 110); }
+      else if (hasArt() && panel === 'rock') { skyDay(t, 120, false); peaks(-20, 182, 360); }
+      else if (hasArt() && panel === 'grass') { skyDay(t, 50, false); art('meadow', 0, 50); tiles('tall', 40, 90, 280, 150); }
+      else if (panel === 'sea') { R(0, 0, SW, 60, '#6c8ea0'); R(0, 60, SW, 120, '#24566a'); for (let y = 64; y < SH; y += 7) for (let x = ((y * 11 + Math.floor(t / 80)) % 26) - 26; x < SW; x += 26) R(x, y, 9, 1, '#5e93a3'); peaks(110, 72, 110); }
+      else if (panel === 'rock') { R(0, 0, SW, SH, '#7b8f99'); peaks(-20, 182, 360); }
+      else if (panel === 'grass') { R(0, 0, SW, 50, '#7f9fb0'); tiles('grass', 0, 50, SW, SH); tiles('tall', 40, 90, 280, 150); }
       if (panel === 'dig') { // 울릉도 공사 현장: 파헤친 초록 산, 가림막, 안내판
-        R(0, 0, SW, SH, '#8fb6c4'); hills(-24, 150, 220); hills(150, 150, 196);
+        if (hasArt()) skyDay(t, 150, false); else R(0, 0, SW, SH, '#8fb6c4');
+        hills(-24, 150, 220); hills(150, 150, 196);
         ctx.fillStyle = '#9a7048'; ctx.beginPath(); ctx.moveTo(34, 150); ctx.lineTo(62, 108); ctx.lineTo(112, 100); ctx.lineTo(138, 150); ctx.fill();
         for (let i = 0; i < 6; i++) R(52 + i * 13, 118 + (i % 2) * 9, 7, 2, '#7a5536');
         R(0, 150, SW, 30, '#b9a27a');
@@ -343,6 +347,10 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
       if (s.cues.records) { const age = t - s.cues.records; for (let i = 0; i < 16; i++) { const x = 230 + Math.sin(i * 2.3) * 70 - age / 30 * (i % 3), y = 130 - age / (6 + i % 4) - i * 3; if (y > -10) { R(x, y, 7, 9, '#fbf8ee'); R(x + 1, y + 2, 5, 1, '#9aa3a8'); R(x + 1, y + 5, 4, 1, '#9aa3a8'); } } }
     },
     title(t, s) {
+      if (hasArt()) { // 장 제목: 노을 하늘과 바다 위의 독도, 글자가 잘 보이게 살짝 어둡게
+        art('sky-dusk', 0, 0, null, null, 100); seaStrip(100, 80, t, 'sea-dusk'); peaks(120, 103, 80);
+        ctx.globalAlpha = .28; R(0, 0, SW, SH, '#0b1630'); ctx.globalAlpha = 1; return;
+      }
       R(0, 0, SW, SH, '#123d52');
       for (let y = 100; y < SH; y += 6) for (let x = ((y * 9 + Math.floor(t / 100)) % 30) - 30; x < SW; x += 30) R(x, y, 12, 1, '#2f6f85');
       peaks(100, 100, 120);
@@ -362,7 +370,15 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
       ctx.fillStyle = '#7a2230'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('독도 사랑 대회 시상식', 160, 42); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
     },
     sea(t, s) {
-      if (s.cues.night || !hasArt()) return LEGACY.sea(t, s);
+      if (!hasArt()) return LEGACY.sea(t, s);
+      if (s.cues.night) { // 밤바다(강치의 기억): 별과 달, 어두운 물결
+        art('sky-night', 0, 0, null, null, 90);
+        for (let i = 0; i < 46; i++) { const on = Math.sin(t / 400 + i * 2.1) > -.3; if (on) R((i * 71) % SW, (i * 23) % 84, i % 5 ? 1 : 2, i % 5 ? 1 : 2, '#e7f4ff'); }
+        R(258, 14, 14, 14, '#fff3c4'); R(256, 17, 18, 8, '#fff3c4'); R(262, 14, 10, 8, '#ffe9a6');
+        backdrop(s, 196, 92, 104); seaStrip(90, 90, t, 'sea-night');
+        if (s.cues.glint) { const age = t - s.cues.glint; if (age < 1800) { const a = Math.max(0, 1 - age / 1800); ctx.globalAlpha = a; ctx.strokeStyle = '#8ff6ff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(232, 104, 8 + age / 30, 3 + age / 90, 0, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1; } }
+        return;
+      }
       skyDay(t, 90); backdrop(s, 196, 92, 104); seaStrip(90, 90, t);
       if (s.cues.glint) {
         const age = t - s.cues.glint;

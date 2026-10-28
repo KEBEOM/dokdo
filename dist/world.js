@@ -4,7 +4,9 @@ import { drawScenery, drawIslandArt } from './scenery.js';
 import { drawTerrain } from './terrain.js';
 import { drawExplorer, drawResident, CHARACTER_SIZE } from './characters.js';
 import { parseMap, getMapDef, MAP_W, MAP_H } from './maps.js';
-import { drawProp, drawGround } from './props.js';
+import { drawProp, drawGround, propArt } from './props.js';
+import { CUTSCENE_ATLAS } from './cutscene-atlas.js';
+import { assetImage } from './assets.js';
 import { drawInterior, drawFurniture, FURNITURE_DEPTH } from './interior-art.js';
 
 export const TILE = 32, W = MAP_W, H = MAP_H;
@@ -208,8 +210,12 @@ function drawDecor(ctx, n, map, time) {
   switch (n.scenery) {
     case 'tree': return tree(ctx, n.x * 32, n.y * 32, map);
     case 'fence': return drawIslandArt(ctx, ulleung(map) ? 'wall-stone' : 'rail-wood', n.x * 32, n.y * 32 - 6, 64, 36, n.w * 32);
-    case 'planter': return drawScenery(ctx, 'planter', n.x * 32 - 4, n.y * 32 + 3, 40, 28);
-    case 'monument': return drawScenery(ctx, 'monument', n.x * 32, (n.y + 1) * 32 - 80, 96, 80);
+    case 'planter': return propArt(ctx, 'planter', n.x * 32 + 16, n.y * 32 + 29) || drawScenery(ctx, 'planter', n.x * 32 - 4, n.y * 32 + 3, 40, 28);
+    case 'monument': { // 두 섬 조형물: 돌 받침대 위의 도트 독도(v0.39)
+      const pics = assetImage(CUTSCENE_ATLAS.key), f = CUTSCENE_ATLAS.frames['dokdo-224'];
+      if (pics && f && propArt(ctx, 'pedestal', n.x * 32 + 48, (n.y + 1) * 32 - 2)) { const w = 84, h = Math.round(w * f[3] / f[2]); ctx.drawImage(pics, f[0], f[1], f[2], f[3], n.x * 32 + 6, (n.y + 1) * 32 - 16 - h, w, h); return; }
+      return drawScenery(ctx, 'monument', n.x * 32, (n.y + 1) * 32 - 80, 96, 80);
+    }
     case 'boat': return drawScenery(ctx, 'boat', n.x * 32 - 16, n.y * 32 - 30, 64, 100);
     case 'rock': return drawProp(ctx, 'rock', n.x, n.y, { water: map[n.y]?.[n.x] === 0, time });
     case 'crag': return drawProp(ctx, 'crag', n.x, n.y, { w: n.w, h: n.h });

@@ -1,3 +1,5 @@
+import { PROPS_ATLAS } from './props-atlas.js';
+import { TERRAIN_ATLAS } from './terrain-atlas.js';
 // 독도 탐험대 v0.36 — screens, movement between maps, story cutscenes and Dragon Quest–style quiz battles.
 import { CUTSCENE_ATLAS } from './cutscene-atlas.js';
 import { worldScale } from './layout.js';
@@ -20,7 +22,7 @@ import { OPENING, STARTER_MEET, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.38';
+const VERSION = '0.39';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -204,7 +206,7 @@ function chooseAvatar(onChoose = null, canClose = true) {
 async function beginOpening(avatar) {
   resetTransient(); state = newState(); state.avatar = avatar; map = createMap('town0'); view = { x: state.x, y: state.y };
   $('#titleScreen').classList.add('hidden'); scene.classList.add('story');
-  preloadMonsters([...STARTERS, 34, 55, 9]); assetImage(PROFESSOR_PICTURE); assetImage(CUTSCENE_ATLAS.key);
+  preloadMonsters([...STARTERS, 34, 55, 9]); assetImage(PROFESSOR_PICTURE); assetImage(CUTSCENE_ATLAS.key); assetImage(PROPS_ATLAS.key); assetImage(TERRAIN_ATLAS.key);
   await playStory(OPENING);
   await playStory(STARTER_MEET); // 김박사의 연구 기지에서 세 친구를 만나요
   chooseStarter(avatar);
@@ -942,27 +944,35 @@ function drawWorldMap(c) {
       const r = 1 + .12 * Math.sin(ang * 5 + s.cx) + .07 * Math.sin(ang * 11 + s.cy) + .05 * (rnd(Math.round(ang * 30), s.cx) - .5);
       const d = 1 - Math.hypot(dx, dy) / r; if (d > land) { land = d; isl = s; }
     }
+    // v0.39 블랙/화이트 느낌: 밝고 평평한 색, 섬 둘레 진한 선과 흰 물거품
     if (land < 0) {
-      const wave = (x + y * 3) % 23 === 0 && rnd(x >> 2, y) > .55;
-      const near = land > -.08;
-      set(i, near ? [124, 196, 206] : wave ? [128, 194, 210] : (rnd(x >> 3, y >> 3) > .5 ? [50, 140, 166] : [46, 132, 158]));
-      if (land > -.03) set(i, [228, 242, 236]);
+      const wave = (x % 14 < 5) && (y + (x >> 3) * 3) % 11 === 0 && rnd(x >> 4, y) > .45;
+      if (land > -.016) set(i, [43, 38, 34]);                      // outline
+      else if (land > -.04) set(i, [255, 255, 255]);               // surf
+      else if (land > -.1) set(i, [142, 212, 239]);                // shallows
+      else set(i, wave ? [166, 220, 242] : [74, 169, 216]);        // open sea with little wave marks
       continue;
     }
     const pk = Math.hypot(x - isl.peak[0], y - isl.peak[1]) / 30;
-    if (land < .07) set(i, rnd(x, y) > .5 ? [128, 108, 90] : [110, 92, 78]);                 // cliffs
-    else if (pk < .35) set(i, rnd(x, y) > .4 ? [156, 150, 140] : [134, 128, 120]);            // rocky peak
-    else set(i, rnd(x >> 1, y >> 1) > .45 ? [126, 170, 92] : [108, 152, 80]);                 // grass
+    if (land < .03) set(i, [108, 85, 71]);                                                   // cliff foot
+    else if (land < .07) set(i, (x + y) % 5 === 0 ? [142, 112, 90] : [155, 125, 101]);       // cliffs
+    else if (land < .085) set(i, [95, 158, 71]);                                             // grass edge line
+    else if (pk < .3) set(i, (x * 3 + y) % 7 === 0 ? [142, 112, 90] : [179, 160, 138]);       // rocky peak
+    else if (pk < .36) set(i, [108, 85, 71]);
+    else set(i, (x * 7 + y * 3) % 23 === 0 ? [108, 179, 80] : [143, 209, 106]);             // bright grass with tufts
   }
   // little rocks around the islands
   for (const [x, y, r] of [[20, 150, 3], [28, 158, 2], [180, 30, 3], [290, 160, 3], [300, 150, 2], [170, 180, 2], [140, 172, 3], [280, 60, 2], [44, 20, 2]])
-    for (let yy = -r; yy <= r; yy++) for (let xx = -r; xx <= r; xx++) if (xx * xx + yy * yy <= r * r) set(((y + yy) * W + x + xx) * 4, xx + yy < 0 ? [150, 132, 112] : [112, 96, 82]);
+    for (let yy = -r - 1; yy <= r + 1; yy++) for (let xx = -r - 1; xx <= r + 1; xx++) { const d = xx * xx + yy * yy; if (d <= r * r) set(((y + yy) * W + x + xx) * 4, xx + yy < 0 ? [179, 160, 138] : [124, 99, 80]); else if (d <= (r + 1) * (r + 1)) set(((y + yy) * W + x + xx) * 4, [43, 38, 34]); }
   g.putImageData(img, 0, 0);
   // 울릉도 (작게 줄인 그림): 왼쪽 위 네모 안. 실제로는 독도에서 서북쪽으로 약 87.4km 떨어져 있어요.
-  g.fillStyle = '#2a7896'; g.fillRect(0, 0, 64, 46); g.strokeStyle = '#f7f1d8'; g.lineWidth = 2; g.strokeRect(1, 1, 62, 44);
-  g.fillStyle = '#3f7a4a'; g.beginPath(); g.ellipse(28, 24, 20, 15, -.3, 0, Math.PI * 2); g.fill();
-  g.fillStyle = '#2f5a3c'; g.beginPath(); g.ellipse(26, 20, 9, 7, -.3, 0, Math.PI * 2); g.fill();
-  g.fillStyle = '#e4f2ee'; g.fillRect(36, 34, 4, 2);
+  g.fillStyle = '#2b2622'; g.fillRect(0, 0, 66, 48); g.fillStyle = '#4aa9d8'; g.fillRect(2, 2, 62, 44); g.fillStyle = '#ffffff'; g.fillRect(2, 2, 62, 1);
+  g.fillStyle = '#2b2622'; g.beginPath(); g.ellipse(28, 24, 22, 17, -.3, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#9b7d65'; g.beginPath(); g.ellipse(28, 24, 21, 16, -.3, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#4f8a4a'; g.beginPath(); g.ellipse(28, 23, 18, 13, -.3, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#78ad5c'; g.beginPath(); g.ellipse(25, 20, 10, 7, -.3, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#2f5e3e'; g.fillRect(25, 18, 4, 3);
+  g.fillStyle = '#ffffff'; g.fillRect(36, 34, 4, 2);
   // the walking routes between towns (and the ferry)
   const towns = MAPS.filter(m => m.kind === 'town');
   g.lineWidth = 2; g.setLineDash([3, 3]);

@@ -2,6 +2,7 @@
 // Edit a bitmap below to change a prop. '.' is transparent.
 import { assetImage } from './assets.js';
 import { SCENERY_ATLAS } from './scenery-atlas.js';
+import { PROPS_ATLAS } from './props-atlas.js';
 import { CUTSCENE_ATLAS } from './cutscene-atlas.js';
 import { islandFrame } from './island-pictures.js';
 
@@ -169,6 +170,11 @@ function blit(ctx, name, cx, bottom, dot = 2) {
   if (b.canvas) ctx.drawImage(b.canvas, Math.round(cx - b.w / 2), Math.round(bottom - b.h));
   else ctx.fillRect(Math.round(cx - b.w / 2), Math.round(bottom - b.h), b.w, b.h); // node tests
 }
+// v0.39 블랙/화이트 느낌 소품 그림(scripts/draw-props-bw.py). 아래 가운데를 발 위치에 맞춰 그려요. 아직 없으면 false.
+export function propArt(ctx, name, cx, bottom) {
+  const sheet = assetImage(PROPS_ATLAS.key), f = PROPS_ATLAS.frames[name]; if (!sheet || !f) return false;
+  ctx.drawImage(sheet, f[0], f[1], f[2], f[3], Math.round(cx - f[2] / 2), Math.round(bottom + 2 - f[3]), f[2], f[3]); return true;
+}
 function shadow(ctx, cx, bottom, w) { ctx.fillStyle = '#1d3a3a33'; ctx.fillRect(Math.round(cx - w / 2), Math.round(bottom - 3), Math.round(w), 4); }
 
 // Crops of the two-islands artwork, used for real-place landmarks.
@@ -188,18 +194,18 @@ export function drawProp(ctx, kind, tx, ty, opts = {}) {
   const cx = tx * 32 + 16, bottom = ty * 32 + 30, t = opts.time || 0;
   ctx.save(); ctx.imageSmoothingEnabled = false;
   switch (kind) {
-    case 'sign': shadow(ctx, cx, bottom, 20); blit(ctx, 'sign', cx, bottom); break;
-    case 'box': shadow(ctx, cx, bottom, 26); blit(ctx, opts.open ? 'boxOpen' : 'box', cx, bottom); break;
-    case 'trash': blit(ctx, 'trash', cx, bottom); break;
-    case 'observe': shadow(ctx, cx, bottom, 22); blit(ctx, 'observe', cx + 4, bottom); break;
+    case 'sign': if (!propArt(ctx, 'sign', cx, bottom)) { shadow(ctx, cx, bottom, 20); blit(ctx, 'sign', cx, bottom); } break;
+    case 'box': if (!propArt(ctx, opts.open ? 'boxOpen' : 'box', cx, bottom)) { shadow(ctx, cx, bottom, 26); blit(ctx, opts.open ? 'boxOpen' : 'box', cx, bottom); } break;
+    case 'trash': if (!propArt(ctx, 'trash', cx, bottom)) blit(ctx, 'trash', cx, bottom); break;
+    case 'observe': if (!propArt(ctx, 'observe', cx + 2, bottom)) { shadow(ctx, cx, bottom, 22); blit(ctx, 'observe', cx + 4, bottom); } break;
     case 'stone': {
-      shadow(ctx, cx, bottom, 22); blit(ctx, 'stone', cx, bottom);
+      if (!propArt(ctx, 'stone', cx, bottom)) { shadow(ctx, cx, bottom, 22); blit(ctx, 'stone', cx, bottom); }
       if (!opts.open) { ctx.globalAlpha = .25 + .2 * Math.sin(t / 300); ctx.fillStyle = '#9ff6ff'; ctx.fillRect(cx - 7, bottom - 22, 14, 12); }
       break;
     }
     case 'rock': {
       if (opts.water) { ctx.fillStyle = '#d5e0bb'; ctx.fillRect(cx - 15, bottom - 4, 30, 2); ctx.fillRect(cx - 12, bottom - 1, 24, 2); }
-      blit(ctx, 'rock', cx + ((tx * 7 + ty * 3) % 5) - 2, bottom - 2); break;
+      if (!propArt(ctx, 'rock', cx + ((tx * 7 + ty * 3) % 5) - 2, bottom - 2)) blit(ctx, 'rock', cx + ((tx * 7 + ty * 3) % 5) - 2, bottom - 2); break;
     }
     case 'barrier': { // 몽땅랜드 공사 가림막: 노랑·검정 줄무늬 판과 기둥
       const x0 = tx * 32, top = bottom - 30;
@@ -229,8 +235,8 @@ export function drawProp(ctx, kind, tx, ty, opts = {}) {
       if (opts.water) { ctx.fillStyle = '#d5e0bb'; ctx.fillRect(cx - 26, bottom - 3, 52, 2); }
       if (art === 'peaks') drawPeaks(ctx, 'peaks', cx, bottom + 2, 104);
       else if (art === 'peak') drawPeaks(ctx, 'peak', cx, bottom + 2, 58);
-      else if (art === 'pillar') { shadow(ctx, cx, bottom, 22); blit(ctx, 'pillar', cx, bottom, 3); }
-      else if (art === 'arch') { shadow(ctx, cx, bottom, 60); blit(ctx, 'arch', cx, bottom, 3); }
+      else if (art === 'pillar') { if (!propArt(ctx, 'pillar', cx, bottom)) { shadow(ctx, cx, bottom, 22); blit(ctx, 'pillar', cx, bottom, 3); } }
+      else if (art === 'arch') { if (!propArt(ctx, 'arch', cx, bottom)) { shadow(ctx, cx, bottom, 60); blit(ctx, 'arch', cx, bottom, 3); } }
       else if (art === 'spring') { // 물골 샘: 콘크리트로 둘러싼 작은 샘
         const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
         shadow(ctx, cx, bottom + 1, 44);
@@ -239,7 +245,7 @@ export function drawProp(ctx, kind, tx, ty, opts = {}) {
         ctx.globalAlpha = .55 + .3 * Math.sin(t / 260); R(cx - 10 + (Math.floor(t / 400) % 3) * 6, bottom - 15, 6, 2, '#bfe9f4'); ctx.globalAlpha = 1;
         R(cx - 22, bottom - 6, 44, 6, '#857f74'); R(cx - 4, bottom - 34, 8, 8, '#6f6a61'); R(cx - 1, bottom - 26, 2, 6, '#79c3d8');
       }
-      else { shadow(ctx, cx, bottom, 34); blit(ctx, 'rock', cx, bottom, 3); }
+      else if (!propArt(ctx, 'rock', cx, bottom)) { shadow(ctx, cx, bottom, 34); blit(ctx, 'rock', cx, bottom, 3); }
       break;
     }
   }

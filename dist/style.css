@@ -508,3 +508,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
   .battle-screen.dq .dq-message{padding:8px 12px 22px}
   .battle-screen.dq .dq-coach{padding:3px 8px 3px 4px}.battle-screen.dq .dq-coach p{font-size:12px}.battle-screen.dq .dq-coach canvas{width:28px;height:28px;flex-basis:28px}
 }
+#gameApp .world-map{border:3px solid var(--px-line);border-radius:12px;box-shadow:0 4px 0 var(--px-shadow);overflow:hidden}
+#gameApp .world-map canvas{image-rendering:pixelated}
+#gameApp .wm-town i{border:2px solid var(--px-line);box-shadow:0 2px 0 var(--px-shadow)}
+#gameApp .wm-route,#gameApp .wm-island,#gameApp .wm-ferry{border:2px solid var(--px-line);border-radius:7px;box-shadow:0 2px 0 var(--px-shadow)}

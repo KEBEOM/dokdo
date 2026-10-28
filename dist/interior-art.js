@@ -10,11 +10,11 @@ const R = (ctx, x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x
 const floorish = t => t >= 10 && t <= 15;
 const hash = (x, y) => ((x * 73856093) ^ (y * 19349663)) >>> 0;
 
-function wood(ctx, px, py, x, y) {
+function wood(ctx, px, py, x, y) { // v0.39 밝은 나무 마루(블랙/화이트 느낌): 판마다 살짝 다른 색, 진한 이음선, 위쪽 밝은 줄
   for (let i = 0; i < 4; i++) {
-    const shade = (i + y) % 2 ? '#c38d5c' : '#cf9b6a';
-    R(ctx, px, py + i * 8, T, 8, shade); R(ctx, px, py + i * 8 + 7, T, 1, '#a8774a');
-    const joint = (hash(x, y * 4 + i) % 3) * 10 + 4; R(ctx, px + joint, py + i * 8, 2, 7, '#a8774a');
+    const shade = ['#e2b67e', '#d9ab72', '#e6bd88', '#dcb078'][(hash(x, y * 4 + i) >> 3) % 4];
+    R(ctx, px, py + i * 8, T, 8, shade); R(ctx, px, py + i * 8, T, 1, '#f0cc98'); R(ctx, px, py + i * 8 + 7, T, 1, '#a9784a');
+    const joint = (hash(x, y * 4 + i) % 3) * 10 + 4; R(ctx, px + joint, py + i * 8, 1, 7, '#a9784a'); R(ctx, px + joint + 1, py + i * 8 + 1, 1, 6, '#f0cc98');
   }
 }
 function stone(ctx, px, py, x, y) {
@@ -44,14 +44,16 @@ export function drawInterior(ctx, map, time, view) {
 }
 function wall(ctx, map, th, x, y, px, py) {
   if (floorish(map[y + 1]?.[x])) { // the back wall you look at: plaster with a wooden skirting
-    R(ctx, px, py, T, T, th.wall); R(ctx, px, py, T, 4, th.trim); R(ctx, px, py + 4, T, 2, '#00000014');
-    for (let i = 4; i < T; i += 8) R(ctx, px + i, py + 8, 1, 14, '#0000000d');
-    R(ctx, px, py + 22, T, 10, th.trim); R(ctx, px, py + 22, T, 2, '#ffffff33'); R(ctx, px, py + 30, T, 2, '#00000033');
+    // 무늬 벽지 + 굵은 몰딩 + 걸레받이 (블랙/화이트 느낌)
+    R(ctx, px, py, T, T, th.wall);
+    for (let i = 0; i < T; i += 8) { R(ctx, px + i + 3, py + 6, 2, 15, '#00000012'); R(ctx, px + i + 7, py + 9, 1, 1, '#ffffff66'); R(ctx, px + i + 7, py + 17, 1, 1, '#ffffff66'); }
+    R(ctx, px, py, T, 5, th.trim); R(ctx, px, py + 5, T, 1, '#2b2622'); R(ctx, px, py, T, 1, '#ffffff40');
+    R(ctx, px, py + 21, T, 11, th.trim); R(ctx, px, py + 21, T, 1, '#2b2622'); R(ctx, px, py + 22, T, 2, '#ffffff40'); R(ctx, px, py + 29, T, 3, '#00000040');
   } else { // tops of the side and front walls
-    R(ctx, px, py, T, T, '#4a3a30'); R(ctx, px + 2, py + 2, T - 4, T - 4, '#5d4a3d');
+    R(ctx, px, py, T, T, '#3f3a44'); R(ctx, px + 2, py + 2, T - 4, T - 4, '#55505c'); R(ctx, px + 2, py + 2, T - 4, 2, '#6a6572');
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, -1], [0, 1]]) if (floorish(map[y + dy]?.[x + dx])) {
-      if (dx === 1) R(ctx, px + T - 4, py, 4, T, '#7a6352'); if (dx === -1) R(ctx, px, py, 4, T, '#7a6352');
-      if (dy === -1) R(ctx, px, py, T, 4, '#7a6352'); if (dy === 1) R(ctx, px, py + T - 4, T, 4, '#7a6352');
+      if (dx === 1) { R(ctx, px + T - 4, py, 4, T, '#8a8494'); R(ctx, px + T - 5, py, 1, T, '#2b2622'); } if (dx === -1) { R(ctx, px, py, 4, T, '#8a8494'); R(ctx, px + 4, py, 1, T, '#2b2622'); }
+      if (dy === -1) { R(ctx, px, py, T, 4, '#8a8494'); R(ctx, px, py + 4, T, 1, '#2b2622'); } if (dy === 1) { R(ctx, px, py + T - 4, T, 4, '#8a8494'); R(ctx, px, py + T - 5, T, 1, '#2b2622'); }
     }
   }
 }
@@ -73,8 +75,26 @@ function stairs(ctx, up, px, py, time) {
   ctx.globalAlpha = 1;
 }
 
-// Furniture and room objects (drawn in the depth pass with people). x, y in tiles.
+// v0.39: 가구마다 1도트 진한 외곽선(블랙/화이트 느낌). 가구 모양을 한 번 그려 테두리만 만들어 두고(캐시), 매번 그 위에 가구를 그려요.
+const outlineCache = new Map();
+function outlineFor(kind, opts) {
+  if (typeof document === 'undefined') return null;
+  const key = kind + (opts.open ? ':o' : '') + (opts.glow ? ':g' : '');
+  if (outlineCache.has(key)) return outlineCache.get(key);
+  const W = T + 4, H = 3 * T, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d'); g.translate(2, 2 * T); drawFurnitureRaw(g, kind, 0, 0, 0, opts); g.setTransform(1, 0, 0, 1, 0, 0);
+  const src = g.getImageData(0, 0, W, H), out = g.createImageData(W, H), a = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? 0 : src.data[(y * W + x) * 4 + 3];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (a(x, y) < 128 && (a(x + 1, y) >= 128 || a(x - 1, y) >= 128 || a(x, y + 1) >= 128 || a(x, y - 1) >= 128)) { const i = (y * W + x) * 4; out.data[i] = 43; out.data[i + 1] = 38; out.data[i + 2] = 34; out.data[i + 3] = 255; }
+  const o = document.createElement('canvas'); o.width = W; o.height = H; o.getContext('2d').putImageData(out, 0, 0);
+  outlineCache.set(key, o); return o;
+}
 export function drawFurniture(ctx, kind, x, y, time = 0, opts = {}) {
+  const o = kind !== 'window' && outlineFor(kind, opts);
+  if (o) ctx.drawImage(o, x * T - 2, y * T - 2 * T);
+  drawFurnitureRaw(ctx, kind, x, y, time, opts);
+}
+// Furniture and room objects (drawn in the depth pass with people). x, y in tiles.
+function drawFurnitureRaw(ctx, kind, x, y, time = 0, opts = {}) {
   const px = x * T, py = y * T, r = (a, b, w, h, c) => R(ctx, px + a, py + b, w, h, c);
   const shadow = (w = 26) => { ctx.globalAlpha = .2; r((T - w) / 2, 27, w, 4, '#2b1d12'); ctx.globalAlpha = 1; };
   switch (kind) {

@@ -5,6 +5,7 @@ import {MAPS} from '../dist/maps.js';
 import {EXPLORERS,RESIDENTS,PROFESSOR_PICTURE} from '../dist/characters.js';
 import {ISLAND_ATLAS} from '../dist/island-atlas.js';
 import {CUTSCENE_ATLAS} from '../dist/cutscene-atlas.js';
+import {PROPS_ATLAS} from '../dist/props-atlas.js';
 import {drawMonster} from '../dist/sprites.js';
 import {drawAsset,onAssetReady,monsterAssetKey,assetStatus,preloadMonsters} from '../dist/assets.js';
 import {TERRAIN_ATLAS} from '../dist/terrain-atlas.js';
@@ -23,7 +24,7 @@ globalThis.DOKDOMON_EMBEDDED_ASSETS={'monsters/003':'data:image/png;base64,examp
 const keys=[];for(let id=1;id<=100;id++)keys.push(monsterAssetKey(id),monsterAssetKey(id,true));
 for(const dir of ['down','up','left','right'])for(let step=0;step<2;step++)keys.push(`player/${dir}-${step}`);
 for(const def of MAPS)for(const n of npcs(def.id,{enemy:false}))if(!['board','wild',...PROP_KINDS].includes(n.kind)&&!n.actor)keys.push(n.sprite);
-keys.push(TERRAIN_ATLAS.key,SCENERY_ATLAS.key,SCENERY_ATLAS.monument.key);keys.push(...EXPLORERS.flatMap(p=>[p.sheet,p.picture]),PROFESSOR_PICTURE,ISLAND_ATLAS.key,CUTSCENE_ATLAS.key,...RESIDENTS.map(p=>p.sheet));assert.equal(new Set(keys).size,229);
+keys.push(TERRAIN_ATLAS.key,SCENERY_ATLAS.key,SCENERY_ATLAS.monument.key);keys.push(...EXPLORERS.flatMap(p=>[p.sheet,p.picture]),PROFESSOR_PICTURE,ISLAND_ATLAS.key,CUTSCENE_ATLAS.key,PROPS_ATLAS.key,...RESIDENTS.map(p=>p.sheet));assert.equal(new Set(keys).size,230);
 for(const k of ['lab','gym','shop','home'])for(const isl of ['ulleung','dokdo']){const [,,w,h]=ISLAND_ATLAS.frames[`${isl}-${k}`];assert.equal(w,(k==='gym'?7:5)*32+16,`${isl} ${k}: plot + eaves wide`);assert.equal(h,(k==='gym'?5:4)*32+40);}
 for(const f of Object.values(CUTSCENE_ATLAS.frames)){const [x,y,w,h]=f;assert.ok(x>=0&&y>=0&&x+w<=CUTSCENE_ATLAS.width&&y+h<=CUTSCENE_ATLAS.height);}
 for(const f of Object.values(ISLAND_ATLAS.frames)){const [x,y,w,h]=f;assert.ok(x>=0&&y>=0&&x+w<=ISLAND_ATLAS.width&&y+h<=ISLAND_ATLAS.height);}

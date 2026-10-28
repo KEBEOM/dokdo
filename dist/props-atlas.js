@@ -1,0 +1,2 @@
+// 지도 위 소품 도트 그림의 자리. scripts/draw-props-bw.py가 만들어요.
+export const PROPS_ATLAS={"key": "scenery/props-bw-v39", "width": 460, "height": 52, "frames": {"sign": [2, 2, 28, 30], "box": [32, 2, 28, 24], "boxOpen": [62, 2, 28, 24], "trash": [92, 2, 28, 16], "observe": [122, 2, 28, 32], "stone": [152, 2, 24, 30], "rock": [178, 2, 28, 20], "pillar": [208, 2, 36, 48], "arch": [246, 2, 72, 48], "planter": [320, 2, 40, 28], "pedestal": [362, 2, 96, 24]}};

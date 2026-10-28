@@ -3,7 +3,7 @@ import {TERRAIN_ATLAS} from './terrain-atlas.js';
 
 const TILE=32;
 const kinds={0:'water',1:'grass',2:'path',3:'tall',4:'sand',5:'grass',6:'dock',7:'grass'};
-const colors={water:'#39818d',grass:'#a0af65',path:'#c9a572',tall:'#899a50',sand:'#efd099',dock:'#a1744f'};
+const colors={water:'#4aa9d8',grass:'#8fd16a',path:'#e2c88f',tall:'#4d9a43',sand:'#f4e2ae',dock:'#c28b54'};
 let cachedMap=null,cachedSheet=null,ground=null;
 const at=(map,x,y)=>map[y]?.[x];
 
@@ -25,37 +25,40 @@ function tile(ctx,sheet,kind,x,y){
  ctx.scale(f.flipX?-1:1,f.flipY?-1:1);ctx.drawImage(sheet,...f.rect,0,0,TILE,TILE);ctx.restore();
 }
 
+// v0.39 블랙/화이트 느낌의 경계: 흙길·모래 칸에 옆 풀밭이 살짝 덮이고(들쭉날쭉한 풀 끝 + 진한 선), 부두는 양옆이 진하게.
+const GRASSY=n=>n===1||n===3||n===5||n===7;
 function edging(ctx,map,x,y){
  const k=at(map,x,y),px=x*TILE,py=y*TILE;
  if(k===2||k===4){
-  // Small irregular earth pixels replace the straight colored grid boundary.
-  ctx.fillStyle=k===2?'#998456':'#b9a773';
   for(const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]){
-   const n=at(map,x+dx,y+dy);if(![1,3].includes(n))continue;
-   for(let i=0;i<8;i++){const inset=(x*3+y*5+i)%3;
-    if(dx)ctx.fillRect(px+(dx<0?0:30-inset),py+i*4,2+inset,4);
-    else ctx.fillRect(px+i*4,py+(dy<0?0:30-inset),4,2+inset);
+   const n=at(map,x+dx,y+dy);if(!GRASSY(n))continue;
+   for(let i=0;i<16;i++){
+    const h=((x*7+y*13+i*5)%3)+2;          // overhang 2–4 dots
+    const a=i*2;
+    if(dy){const yy=dy<0?py:py+32-h;ctx.fillStyle='#8fd16a';ctx.fillRect(px+a,yy,2,h);ctx.fillStyle='#5f9e47';ctx.fillRect(px+a,dy<0?py+h:py+32-h-1,2,1);if(dy<0){ctx.fillStyle=k===2?'#c9aa6d':'#e6cd92';ctx.fillRect(px+a,py+h+1,2,1);}}
+    else{const xx=dx<0?px:px+32-h;ctx.fillStyle='#8fd16a';ctx.fillRect(xx,py+a,h,2);ctx.fillStyle='#5f9e47';ctx.fillRect(dx<0?px+h:px+32-h-1,py+a,1,2);}
    }
   }
  }
  if(k===6){
-  ctx.fillStyle='#674d38';
+  ctx.fillStyle='#5e3c22';
   if(at(map,x-1,y)!==6)ctx.fillRect(px,py,2,32);
   if(at(map,x+1,y)!==6)ctx.fillRect(px+30,py,2,32);
+  if(at(map,x,y+1)!==6){ctx.fillRect(px,py+30,32,2);ctx.fillStyle='#00000030';ctx.fillRect(px,py+32,32,3);}
  }
 }
 
 // Textured rock outcrop tile (2px dots): highlight on top, cliff face below, outline where the outcrop ends.
-const ROCK=['#67626f','#7b7683','#918c99','#55505d','#a8a3af'];
+const ROCK=['#9b7d65','#a98a70','#8e705a','#a08068','#b3937a']; // 독도 바위 색(블랙/화이트 느낌으로 평평하게)
 function rockTile(ctx,map,x,y){
  const has=(dx,dy)=>map.rockTiles.has(`${x+dx},${y+dy}`),px=x*TILE,py=y*TILE,up=has(0,-1),down=has(0,1),left=has(-1,0),right=has(1,0);
  for(let cy=0;cy<16;cy++)for(let cx=0;cx<16;cx++){
   const h=((x*16+cx)*73856093^(y*16+cy)*19349663)>>>0;let c=ROCK[h%5];
-  if(!up&&cy<3)c=cy===0?'#2b2732':'#b7b2bd';
-  else if(!down&&cy>=11)c=cy===15?'#2b2732':(cx+h)%5===0?'#3f3a47':'#4f4a57';
-  if((!left&&cx===0)||(!right&&cx===15))c='#2b2732';
-  if(up&&!down&&cy===10&&h%3===0)c='#7f9a4a';
-  if(!up&&cy===3&&h%4===0)c='#8fa95a';
+  if(!up&&cy<3)c=cy===0?'#3a2e2a':'#d1b590';
+  else if(!down&&cy>=11)c=cy===15?'#3a2e2a':(cx+h)%5===0?'#5a463b':'#6c5547';
+  if((!left&&cx===0)||(!right&&cx===15))c='#3a2e2a';
+  if(up&&!down&&cy===10&&h%3===0)c='#7fb05a';
+  if(!up&&cy===3&&h%4===0)c='#8fd16a';
   ctx.fillStyle=c;ctx.fillRect(px+cx*2,py+cy*2,2,2);
  }
 }
@@ -85,9 +88,9 @@ export function drawTerrain(ctx,map,time,{x=0,y=0,width=768,height=480}={}){
   const px=xx*TILE,py=yy*TILE;
   for(const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]){
    const n=at(map,xx+dx,yy+dy);if(n===undefined||n===0||n===6)continue;
-   ctx.fillStyle='#70aaa4';
-   if(dx)ctx.fillRect(px+(dx<0?0:26),py,6,32);else ctx.fillRect(px,py+(dy<0?0:26),32,6);
-   ctx.fillStyle='#d5e0bb';
+   ctx.fillStyle='#8ed4ef';
+   if(dx)ctx.fillRect(px+(dx<0?0:27),py,5,32);else ctx.fillRect(px,py+(dy<0?0:27),32,5);
+   ctx.fillStyle='#ffffff';
    for(let i=0;i<8;i++){const bend=(i+xx+yy+phase)%4===0?2:0;
     if(dx)ctx.fillRect(px+(dx<0?1+bend:28-bend),py+i*4,2,4);
     else ctx.fillRect(px+i*4,py+(dy<0?1+bend:28-bend),4,2);
