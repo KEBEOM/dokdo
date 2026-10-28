@@ -5,6 +5,8 @@ import { portrait, battlePortrait } from './sprites.js';
 import { assetImage, drawAsset } from './assets.js';
 import { TERRAIN_ATLAS } from './terrain-atlas.js';
 import { SCENERY_ATLAS } from './scenery-atlas.js';
+import { CUTSCENE_ATLAS } from './cutscene-atlas.js';
+import { islandFrame } from './island-pictures.js';
 import { terrainSample } from './terrain.js';
 import { drawResident } from './characters.js';
 
@@ -16,7 +18,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
   let trainer = null, portraitKey = null, portraitTimer = 0;
   // foePortrait: the 몽땅랜드 member's large picture (assets key). It shows while they appear and fades out
   // when their 우산몬 comes out. Without it, the small walking sprite stands at the side instead.
-  function mount({ backdrop = 'field', sky = '#7fb7c4', aura = false, label = '', foeTrainer = null, foePortrait = null }) {
+  function mount({ backdrop = 'field', sky = '#7fb7c4', aura = false, label = '', foeTrainer = null, foePortrait = null, island = '' }) {
     trainer = foePortrait ? null : foeTrainer; portraitKey = foePortrait; clearTimeout(portraitTimer);
     root.classList.add('dq');
     root.innerHTML = `
@@ -28,8 +30,8 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
         <canvas class="dq-backdrop" width="320" height="140" aria-hidden="true"></canvas>
         ${trainer ? '<canvas class="dq-trainer" width="144" height="144" aria-hidden="true"></canvas>' : ''}
         ${foePortrait ? '<div class="dq-portrait" aria-hidden="true"><canvas width="384" height="384"></canvas></div>' : ''}
-        <div class="dq-enemy ${aura ? 'aura' : ''}"><i class="dq-shadow" aria-hidden="true"></i><canvas id="enemySprite" class="battle-mon enemy" width="160" height="160" aria-label="상대 우산몬"></canvas><span class="dq-dmg" aria-hidden="true"></span></div>
-        <div class="dq-mine"><i class="dq-shadow" aria-hidden="true"></i><canvas id="allySprite" class="dq-ally-mon" width="160" height="160" aria-label="내 우산몬 (뒷모습)"></canvas></div>
+        <div class="dq-enemy ${aura ? 'aura' : ''}"><canvas class="dq-pad" width="96" height="26" aria-hidden="true"></canvas><i class="dq-shadow" aria-hidden="true"></i><canvas id="enemySprite" class="battle-mon enemy" width="160" height="160" aria-label="상대 우산몬"></canvas><span class="dq-dmg" aria-hidden="true"></span></div>
+        <div class="dq-mine"><canvas class="dq-pad" width="96" height="26" aria-hidden="true"></canvas><i class="dq-shadow" aria-hidden="true"></i><canvas id="allySprite" class="dq-ally-mon" width="160" height="160" aria-label="내 우산몬 (뒷모습)"></canvas></div>
         <span class="dq-label">${esc(label)}</span>
       </div>
       <div class="dq-coach" hidden><canvas width="64" height="64" aria-hidden="true"></canvas><p></p><button type="button" class="dq-coach-skip" hidden>연습 건너뛰기</button></div>
@@ -51,14 +53,26 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
     writer = createTypewriter(els.text, { speed: 22, onChar: onBlip });
     els.message.addEventListener('click', e => { if (e.target.closest('a,button:not(#dqNext):not(.locked)')) return; confirm(); });
     els.next.addEventListener('click', e => { e.stopPropagation(); confirm(); });
-    paintBackdrop(backdrop, sky);
+    paintBackdrop(backdrop, sky, island);
   }
 
-  function paintBackdrop(kind, sky) {
+  function paintBackdrop(kind, sky, island = '') {
     const c = els.backdrop.getContext('2d'), sheet = assetImage(TERRAIN_ATLAS.key), monument = assetImage(SCENERY_ATLAS.monument.key);
     c.imageSmoothingEnabled = false;
+    // v0.38 포켓몬스터 블랙/화이트 느낌: 도트 하늘·먼 섬·바다·원근감 있는 바닥 + 우산몬이 서는 둥근 받침대
+    const pics = assetImage(CUTSCENE_ATLAS.key), F = CUTSCENE_ATLAS.frames;
+    if (pics) {
+      const ground = kind === 'shore' ? 'sand' : kind === 'town' ? 'path' : 'grass', blit = (k, x, y, crop) => { const f = F[k]; c.drawImage(pics, f[0], f[1], f[2], crop || f[3], x, y, f[2], crop || f[3]); };
+      c.clearRect(0, 0, 320, 140); blit('sky-day', 0, 0, 66);
+      const isl = islandFrame(island === '울릉도' ? 'ulleung' : 'dokdo', island === '울릉도' ? 104 : 96);
+      if (isl) c.drawImage(pics, isl[0], isl[1], isl[2], isl[3], 196, 66 - isl[3], isl[2], isl[3]);
+      blit('sea', 0, 64, 18); blit(`bground-${ground}`, 0, 82);
+      for (const pc of root.querySelectorAll('.dq-pad')) { const g = pc.getContext('2d'), f = F[`pad-${ground}`]; g.imageSmoothingEnabled = false; g.clearRect(0, 0, pc.width, pc.height); g.drawImage(pics, f[0], f[1], f[2], f[3], 0, 0, f[2], f[3]); }
+      root.classList.add('has-pads'); return;
+    }
     const R = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
     R(0, 0, 320, 140, sky); R(0, 0, 320, 26, shade(sky, -18)); R(0, 26, 320, 22, shade(sky, -8));
+    // far island on the horizon: 울릉도 in chapter 1, 독도 elsewhere (2D pixel pictures, v0.38)
     if (monument) c.drawImage(monument, 110, 185, 1130, 575, 196, 34, 96, 49);
     R(0, 64, 320, 18, '#2f7f95'); for (let x = 0; x < 320; x += 22) R(x + 4, 70, 9, 1, '#7cc0cc');
     const ground = kind === 'shore' ? 'sand' : kind === 'town' ? 'path' : 'grass';
@@ -71,7 +85,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
   }
   function shade(hex, amt) { const n = parseInt(hex.slice(1), 16); const f = v => Math.max(0, Math.min(255, v + amt)); return '#' + [f(n >> 16), f((n >> 8) & 255), f(n & 255)].map(v => v.toString(16).padStart(2, '0')).join(''); }
 
-  function bar(cur, max) { const r = Math.max(0, cur / max); return `<div class="dq-bar"><i style="width:${r * 100}%;background:${r < .3 ? '#e07a5f' : r < .6 ? '#e9c46a' : '#7bd88f'}"></i></div>`; }
+  function bar(cur, max, tag = 'HP') { const r = Math.max(0, cur / max); return `<div class="dq-barrow"><b class="dq-tag">${tag}</b><div class="dq-bar"><i style="width:${r * 100}%;background:${r < .3 ? '#e8503a' : r < .6 ? '#f2c230' : '#3fd16b'}"></i></div></div>`; }
   function setStatus(m, info, party) {
     els.status.innerHTML = `<div class="dq-status-row"><canvas class="dq-ally" width="48" height="48" aria-hidden="true"></canvas><div><strong>${esc(info.name)}</strong><span class="dq-lv">Lv ${m.level}</span>
       <div class="dq-hp">HP <b>${m.hp}</b> / ${m.maxHp}</div>${bar(m.hp, m.maxHp)}</div></div>
@@ -84,7 +98,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
     // 사나워진 우산몬: a purple 검은 기운 gauge; 관장 duels: a plain 기운 gauge
     const r = Math.max(0, e.hp / e.maxHp);
     const nums = `<b>${Math.ceil(Math.max(0, e.hp))}</b> / ${e.maxHp}`; // 퍼센트 대신 남은 수치 / 처음 수치
-    const gauge = info.dark ? `<div class="dq-gauge-label">${esc(info.gauge)} ${nums}</div><div class="dq-bar dark"><i style="width:${r * 100}%"></i></div>` : `<div class="dq-gauge-label">${esc(info.gauge || '기운')} ${nums}</div>${bar(e.hp, e.maxHp)}`;
+    const gauge = info.dark ? `<div class="dq-gauge-label">${esc(info.gauge)} ${nums}</div><div class="dq-barrow"><b class="dq-tag dark">기운</b><div class="dq-bar dark"><i style="width:${r * 100}%"></i></div></div>` : `<div class="dq-gauge-label">${esc(info.gauge || '기운')} ${nums}</div>${bar(e.hp, e.maxHp, '기운')}`;
     els.foe.innerHTML = `<strong>${info.dark && e.hp > 0 ? '<span class="dq-berserk">사나워짐</span> ' : ''}${esc(info.name)}</strong><span class="dq-lv">Lv ${e.level} · ${esc(info.type)}</span>${gauge}${extra ? `<small>${esc(extra)}</small>` : ''}`;
     battlePortrait(els.enemy, e.id); paintTrainer(); paintPortrait(); // the foe looks left
   }

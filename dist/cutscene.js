@@ -6,6 +6,8 @@ import { fillJosa } from './text.js';
 import { assetImage } from './assets.js';
 import { TERRAIN_ATLAS } from './terrain-atlas.js';
 import { SCENERY_ATLAS } from './scenery-atlas.js';
+import { CUTSCENE_ATLAS } from './cutscene-atlas.js';
+import { islandFrame } from './island-pictures.js';
 import { terrainSample } from './terrain.js';
 import { drawExplorer, drawResident, PROFESSOR_PICTURE } from './characters.js';
 import { drawMonster } from './sprites.js';
@@ -61,12 +63,43 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
     }
   }
   function peaks(x, bottom, width, crop = [110, 185, 1130, 575]) {
+    // v0.38: 2D 도트로 그린 독도(서도·동도). crop이 한 봉우리(590)면 서도만.
+    const pic = assetImage(CUTSCENE_ATLAS.key), f = islandFrame(crop[2] === 590 ? 'seodo' : 'dokdo', width);
+    if (pic && f) { const h = Math.round(width * f[3] / f[2]); ctx.drawImage(pic, f[0], f[1], f[2], f[3], Math.round(x), Math.round(bottom - h), width, h); return; }
     const sheet = assetImage(SCENERY_ATLAS.monument.key); if (!sheet) return;
     const [sx, sy, sw, sh] = crop, h = width * sh / sw;
     ctx.drawImage(sheet, sx, sy, sw, sh, x, bottom - h, width, h);
   }
+  // v0.38 도트 배경 그림(scripts/draw-cutscene-art.py). 그림이 아직 안 불러와졌으면 false → 예전 그리기로 대신해요.
+  function art(key, x, y, w = null, h = null, cropH = null) {
+    const sheet = assetImage(CUTSCENE_ATLAS.key), f = CUTSCENE_ATLAS.frames[key]; if (!sheet || !f) return false;
+    const [sx, sy, sw, sh0] = f, sh = cropH ? Math.min(cropH, sh0) : sh0;
+    ctx.drawImage(sheet, sx, sy, sw, sh, Math.round(x), Math.round(y), w ?? sw, h ?? sh); return true;
+  }
+  const hasArt = () => !!assetImage(CUTSCENE_ATLAS.key);
+  // 맑은 하늘(높이 h까지) + 흘러가는 구름 + 해
+  function skyDay(t, h, sun = true) {
+    art('sky-day', 0, 0, null, null, h);
+    if (sun) art('sun', 252, 2);
+    const drift = [['cloud-3', 0, 10, 140], ['cloud-1', 150, 22, 100], ['cloud-2', 260, 6, 120]];
+    for (const [k, x0, y, speed] of drift) { const [, , w] = CUTSCENE_ATLAS.frames[k]; const x = ((x0 + t / speed) % (SW + w + 40)) - w - 20; if (y < h - 6) art(k, x, y, null, null, Math.max(1, h - y)); }
+  }
+  // 바다 띠(y부터 h줄) + 반짝이는 물결
+  function seaStrip(y, h, t, key = 'sea') {
+    art(key, 0, y, null, null, h);
+    for (let i = 0; i < 18; i++) {
+      const yy = y + 3 + ((i * 7) % Math.max(4, h - 4)), x = (i * 53 + t / (60 + (i % 4) * 25)) % (SW + 20) - 10, on = Math.sin(t / 300 + i * 1.7) > .55;
+      if (on) { R(x, yy, 2 + (yy - y) / 14, 1, '#effcff'); }
+    }
+  }
   // 울릉도: 가파른 초록 산(성인봉 쪽)과 바닷가 절벽. 장면에 island: 'ulleung'을 적으면 독도 바위 대신 그려요.
   function hills(x, bottom, width) {
+    const sizes = [220, 196, 190, 160, 150, 120, 104], best = sizes.reduce((a, b) => Math.abs(b - width) < Math.abs(a - width) ? b : a);
+    const f = CUTSCENE_ATLAS.frames[`ulleung-${best}`];
+    if (f && art(`ulleung-${best}`, x, bottom - Math.round(f[3] * width / f[2]), width, Math.round(f[3] * width / f[2]))) return;
+    oldHills(x, bottom, width);
+  }
+  function oldHills(x, bottom, width) {
     const h = width * .5, peak = x + width * .45;
     ctx.fillStyle = '#2f5a3c'; ctx.beginPath(); ctx.moveTo(x, bottom); ctx.lineTo(x + width * .12, bottom - h * .55); ctx.lineTo(peak - width * .12, bottom - h * .88); ctx.lineTo(peak, bottom - h);
     ctx.lineTo(peak + width * .16, bottom - h * .8); ctx.lineTo(x + width * .86, bottom - h * .5); ctx.lineTo(x + width, bottom); ctx.fill();
@@ -122,7 +155,7 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
   }
 
   // ── backgrounds ──
-  const PAINT = {
+  const LEGACY = {
     stage(t, s) {
       for (let y = 0; y < 120; y += 4) R(0, y, SW, 4, y % 8 ? '#1d2b4f' : '#22345e');
       // spotlight cones
@@ -262,11 +295,17 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
     },
     summit(t, s) {
       // dusk sky over the summit of 대한봉
-      ['#f0b27a', '#d98f7e', '#a3779a', '#6c5a8a'].forEach((c, i) => R(0, i * 18, SW, 18, c));
-      R(40, 52, 22, 22, '#ffd59a'); R(36, 56, 30, 14, '#ffd59a');
-      R(0, 72, SW, 22, '#47507a'); for (let y = 74; y < 94; y += 5) for (let x = ((y * 9 + Math.floor(t / 120)) % 26) - 26; x < SW; x += 26) R(x, y, 9, 1, '#6c76a0');
-      tiles('grass', 0, 94, SW, SH); peaks(-40, 112, 120, [110, 185, 590, 575]); peaks(250, 106, 100, [110, 185, 590, 575]);
-      tiles('path', 40, 140, 320, SH);
+      if (hasArt()) {
+        art('sky-dusk', 0, 0, null, null, 72); R(40, 52, 22, 22, '#ffd59a'); R(36, 56, 30, 14, '#ffd59a'); R(38, 54, 26, 18, '#ffe6b8');
+        seaStrip(72, 22, t, 'sea-dusk'); art('rocky-top', 0, 94);
+        peaks(-40, 112, 120, [110, 185, 590, 575]); peaks(250, 106, 100, [110, 185, 590, 575]);
+      } else {
+        ['#f0b27a', '#d98f7e', '#a3779a', '#6c5a8a'].forEach((c, i) => R(0, i * 18, SW, 18, c));
+        R(40, 52, 22, 22, '#ffd59a'); R(36, 56, 30, 14, '#ffd59a');
+        R(0, 72, SW, 22, '#47507a'); for (let y = 74; y < 94; y += 5) for (let x = ((y * 9 + Math.floor(t / 120)) % 26) - 26; x < SW; x += 26) R(x, y, 9, 1, '#6c76a0');
+        tiles('grass', 0, 94, SW, SH); peaks(-40, 112, 120, [110, 185, 590, 575]); peaks(250, 106, 100, [110, 185, 590, 575]);
+        tiles('path', 40, 140, 320, SH);
+      }
       const on = s.cues.machine && !s.cues['machine-off'], off = s.cues['machine-off'], pulse = .5 + .5 * Math.sin(t / 140);
       // the blank machine (지우개 기계)
       const mx = 232, my = 50, shake = off && t - off < 900 ? Math.round(Math.sin(t / 25) * 1.5) : 0;
@@ -308,6 +347,59 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
       for (let y = 100; y < SH; y += 6) for (let x = ((y * 9 + Math.floor(t / 100)) % 30) - 30; x < SW; x += 30) R(x, y, 12, 1, '#2f6f85');
       peaks(100, 100, 120);
       R(0, 98, SW, 3, '#2f6f85');
+    }
+  };
+
+  // v0.38: 도트 그림으로 다시 그린 배경. 그림이 아직 없으면 예전 배경(LEGACY)을 그려요.
+  const PAINT = {
+    ...LEGACY,
+    stage(t, s) {
+      if (!art('stage-hall', 0, 0)) return LEGACY.stage(t, s);
+      const glow = s.cues.spot ? .2 + .08 * Math.sin(t / 200) : .1;
+      ctx.globalAlpha = glow; ctx.fillStyle = '#ffe9a6';
+      ctx.beginPath(); ctx.moveTo(124, 0); ctx.lineTo(172, 0); ctx.lineTo(200, 150); ctx.lineTo(96, 150); ctx.fill();
+      ctx.globalAlpha = glow * 1.4; ctx.beginPath(); ctx.ellipse(148, 140, 54, 9, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#7a2230'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('독도 사랑 대회 시상식', 160, 42); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    },
+    sea(t, s) {
+      if (s.cues.night || !hasArt()) return LEGACY.sea(t, s);
+      skyDay(t, 90); backdrop(s, 196, 92, 104); seaStrip(90, 90, t);
+      if (s.cues.glint) {
+        const age = t - s.cues.glint;
+        if (age < 1800) { const a = Math.max(0, 1 - age / 1800); ctx.globalAlpha = a; ctx.strokeStyle = '#8ff6ff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(232, 104, 8 + age / 30, 3 + age / 90, 0, 0, Math.PI * 2); ctx.stroke(); R(229, 98, 6, 6, '#c8fbff'); R(231, 92, 2, 18, '#c8fbff'); R(222, 100, 20, 2, '#c8fbff'); ctx.globalAlpha = 1; }
+      }
+      if (!s.noBoat) art('ferry', 30, 70 + Math.round(Math.sin(t / 420) * 1.5));
+    },
+    dock(t, s) {
+      if (!hasArt()) return LEGACY.dock(t, s);
+      skyDay(t, 56); seaStrip(56, 42, t);
+      if (s.def.island === 'ulleung') { hills(-30, 98, 160); hills(150, 98, 190); }
+      else { peaks(-10, 96, 150); peaks(200, 92, 90, [110, 185, 590, 575]); }
+      art('sand', 0, 96); art('deck', 0, 112);
+      for (let x = 20; x < SW; x += 90) art('bollard', x - 2, 100);
+    },
+    camp(t, s) {
+      if (!hasArt()) return LEGACY.camp(t, s);
+      skyDay(t, 60); seaStrip(60, 40, t); backdrop(s, 150, 100, 150);
+      art('sand', 0, 100); art('deck', 0, 116);
+      art('tent', 14, 52); art('antenna', 212, 76); art('crates', 178, 98);
+      art('signboard', 82, 84);
+      ctx.fillStyle = '#5a4030'; ctx.font = 'bold 6px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('우산몬 연구 기지', 114, 92); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      art('desk', 136, 90);
+      R(144, 93, 12, 8, s.cues.device ? (Math.sin(t / 160) > 0 ? '#7fe3ea' : '#3f8189') : '#3f8189'); R(145, 94, 4, 1, '#bff6f8');
+      const glow = s.cues.glow ? .6 + .4 * Math.sin(t / 180) : s.cues.device ? .35 : .15;
+      for (const x of [196, 244, 292]) {
+        art('pedestal', x - 20, 140);
+        ctx.globalAlpha = glow; R(x - 13, 143, 26, 2, '#7fe3ea'); R(x - 9, 142, 18, 1, '#d8fdff');
+        if (s.cues.glow) { ctx.globalAlpha = glow * .35; R(x - 12, 104, 24, 40, '#7fe3ea'); }
+        ctx.globalAlpha = 1;
+      }
+    },
+    field(t, s) {
+      if (!hasArt()) return LEGACY.field(t, s);
+      skyDay(t, 48, false); seaStrip(44, 10, t); backdrop(s, 180, 52, 120); art('meadow', 0, 54);
+      const shake = s.cues.rustle && !s.cues.pop ? Math.sin(t / 50) * 1.5 : s.cues.pop && t - s.cues.pop < 400 ? Math.sin(t / 30) * 2.5 : 0;
+      ctx.save(); ctx.translate(shake, 0); tiles('tall', 232, 108, 296, 146); ctx.restore();
     }
   };
 

@@ -2,6 +2,8 @@
 // Edit a bitmap below to change a prop. '.' is transparent.
 import { assetImage } from './assets.js';
 import { SCENERY_ATLAS } from './scenery-atlas.js';
+import { CUTSCENE_ATLAS } from './cutscene-atlas.js';
+import { islandFrame } from './island-pictures.js';
 
 const PALETTE = {
   o: '#232634', O: '#3a3f52',
@@ -172,6 +174,8 @@ function shadow(ctx, cx, bottom, w) { ctx.fillStyle = '#1d3a3a33'; ctx.fillRect(
 // Crops of the two-islands artwork, used for real-place landmarks.
 const PEAKS = { peaks: [110, 185, 1130, 575], peak: [110, 185, 590, 575] };
 function drawPeaks(ctx, kind, cx, bottom, width) {
+  const pics = assetImage(CUTSCENE_ATLAS.key), f = pics && islandFrame(kind === 'peak' ? 'seodo' : 'dokdo', kind === 'peak' ? 120 : 224);
+  if (f) { const h = Math.round(width * f[3] / f[2]); ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(pics, f[0], f[1], f[2], f[3], Math.round(cx - width / 2), Math.round(bottom - h), width, h); ctx.restore(); return; }
   const sheet = assetImage(SCENERY_ATLAS.monument.key), [sx, sy, sw, sh] = PEAKS[kind];
   const h = Math.round(width * sh / sw);
   if (!sheet) { blit(ctx, 'rock', cx, bottom, 4); return; }

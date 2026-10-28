@@ -1,4 +1,5 @@
 // 독도 탐험대 v0.36 — screens, movement between maps, story cutscenes and Dragon Quest–style quiz battles.
+import { CUTSCENE_ATLAS } from './cutscene-atlas.js';
 import { worldScale } from './layout.js';
 import { createJoystick } from './joystick.js';
 import { roomId, parseRoomId } from './interiors.js';
@@ -19,7 +20,7 @@ import { OPENING, STARTER_MEET, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.37';
+const VERSION = '0.38';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -203,7 +204,7 @@ function chooseAvatar(onChoose = null, canClose = true) {
 async function beginOpening(avatar) {
   resetTransient(); state = newState(); state.avatar = avatar; map = createMap('town0'); view = { x: state.x, y: state.y };
   $('#titleScreen').classList.add('hidden'); scene.classList.add('story');
-  preloadMonsters([...STARTERS, 34, 55, 9]); assetImage(PROFESSOR_PICTURE);
+  preloadMonsters([...STARTERS, 34, 55, 9]); assetImage(PROFESSOR_PICTURE); assetImage(CUTSCENE_ATLAS.key);
   await playStory(OPENING);
   await playStory(STARTER_MEET); // 김박사의 연구 기지에서 세 친구를 만나요
   chooseStarter(avatar);
@@ -655,7 +656,7 @@ function startBattle(kind, id, opts = {}) {
   $('#battleScreen').classList.remove('hidden'); scene.classList.add('battling');
   const foeTrainer = kind === 'enemy' ? VILLAIN_BY_ZONE[state.zone] : kind === 'trainer' ? opts.npc.actor : null;
   const foePortrait = villainPortrait(foeTrainer);
-  battleUI.mount({ backdrop: backdropKind(), sky: z().color, aura: berserk(battle), label: kind === 'tutorial' ? '연습 대결 · 김박사와 함께' : kind === 'wild' ? `사나워진 우산몬 · ${map.name}` : kind === 'legend' ? `전설의 우산몬 · ${map.name}` : kind === 'boss' || kind === 'rematch' ? `${opponentName(battle)} · 인증 결투` : opponentName(battle), foeTrainer, foePortrait });
+  battleUI.mount({ backdrop: backdropKind(), sky: z().color, aura: berserk(battle), island: map.def?.island || '', label: kind === 'tutorial' ? '연습 대결 · 김박사와 함께' : kind === 'wild' ? `사나워진 우산몬 · ${map.name}` : kind === 'legend' ? `전설의 우산몬 · ${map.name}` : kind === 'boss' || kind === 'rematch' ? `${opponentName(battle)} · 인증 결투` : opponentName(battle), foeTrainer, foePortrait });
   refreshBattle(); if (!(foePortrait && battleUI.portraitIn())) battleUI.enemyEnter(); beep(320, .12); setTimeout(() => beep(480, .12), 120); updateUI();
   runBattle(battle).catch(err => { console.error(err); if (battle) finishBattle(false, true); });
 }
