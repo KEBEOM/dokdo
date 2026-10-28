@@ -784,7 +784,7 @@ async function enemyFainted(b) {
   if (battle !== b) return false;
   if (b.index + 1 < b.enemies.length) {
     b.index++; b.turn++; refreshBattle();
-    if (b.kind === 'enemy' || b.kind === 'trainer') battleUI.portraitFlash(); else battleUI.enemyEnter();
+    battleUI.enemyEnter(); // 몽땅랜드 직원은 결투를 시작할 때 한 번만 나와요
     if (getSpecies(enemy().id).legendary) {
       await battleUI.say(`${josa(opponentName(b), '이/가')} 마지막으로 전설의 우산몬 ${josa(name(enemy()), '을/를')} 내보냈다!`); if (battle !== b) return false;
       await battleUI.say(`오랜 세월을 견딘 ${josa(name(enemy()), '이/가')} 검은 기운에 괴로워하고 있다. 정화해서 구해 주자!`, { tone: 'dark' }); return true;

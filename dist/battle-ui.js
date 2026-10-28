@@ -83,7 +83,8 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
   function setFoe(e, info, extra = '') {
     // 사나워진 우산몬: a purple 검은 기운 gauge; 관장 duels: a plain 기운 gauge
     const r = Math.max(0, e.hp / e.maxHp);
-    const gauge = info.dark ? `<div class="dq-gauge-label">${esc(info.gauge)} ${Math.ceil(r * 100)}%</div><div class="dq-bar dark"><i style="width:${r * 100}%"></i></div>` : `<div class="dq-gauge-label">${esc(info.gauge || '기운')}</div>${bar(e.hp, e.maxHp)}`;
+    const nums = `<b>${Math.ceil(Math.max(0, e.hp))}</b> / ${e.maxHp}`; // 퍼센트 대신 남은 수치 / 처음 수치
+    const gauge = info.dark ? `<div class="dq-gauge-label">${esc(info.gauge)} ${nums}</div><div class="dq-bar dark"><i style="width:${r * 100}%"></i></div>` : `<div class="dq-gauge-label">${esc(info.gauge || '기운')} ${nums}</div>${bar(e.hp, e.maxHp)}`;
     els.foe.innerHTML = `<strong>${info.dark && e.hp > 0 ? '<span class="dq-berserk">사나워짐</span> ' : ''}${esc(info.name)}</strong><span class="dq-lv">Lv ${e.level} · ${esc(info.type)}</span>${gauge}${extra ? `<small>${esc(extra)}</small>` : ''}`;
     battlePortrait(els.enemy, e.id); paintTrainer(); paintPortrait(); // the foe looks left
   }

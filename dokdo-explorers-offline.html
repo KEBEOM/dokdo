@@ -237,6 +237,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
 
 /* v0.24 · 광포화 진정 결투 */
 .dq-gauge-label{font-size:12px;color:#c9d3e0;margin-top:4px}
+.dq-gauge-label b{font-size:15px;color:#fff}
 .dq-bar.dark{background:#2a2040}.dq-bar.dark i{background:linear-gradient(90deg,#4a1f7a,#9b5de5)!important}
 .dq-berserk{display:inline-block;font-size:11px;font-weight:800;padding:1px 6px;border-radius:8px;background:#4a1f7a;color:#efe2ff;vertical-align:middle}
 .dq-enemy.aura::before{opacity:var(--aura,1)}
@@ -376,6 +377,37 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
 /* v0.36 — world map: 울릉도 inset and the ferry */
 .wm-island.small{font-size:11px;letter-spacing:1px}
 .wm-ferry{position:absolute;transform:translate(-50%,-50%);font-size:10px;font-weight:800;color:#fffbe8;background:#173c43c0;padding:1px 6px;border-radius:8px;white-space:nowrap;pointer-events:none;z-index:1}
+
+/* v0.37 결투 화면: 무대 크기(가로·세로) 둘 다에 맞춰 우산몬 크기를 정해요.
+   세로로 긴 휴대폰에서도 내 우산몬(뒷모습)이 상대나 몽땅랜드 직원을 덮지 않아요. */
+@supports (container-type:size){
+  .dq-stage{container-type:size}
+  .dq-mine{height:min(84cqh,50cqw);left:2%;bottom:-6%}
+  .dq-stage .dq-enemy{height:min(64cqh,44cqw);right:5%}
+  .dq-portrait{height:min(100cqh,62cqw);right:3%}
+  .battle-screen.dq.quiz-open .dq-mine{height:min(98cqh,40cqw);bottom:-10%}
+  .battle-screen.dq.quiz-open .dq-stage .dq-enemy{height:min(78cqh,34cqw)}
+  .battle-screen.dq.quiz-open .dq-portrait{height:min(100cqh,56cqw)}
+}
+@media (max-width:600px){
+  /* 상태 창: 작은 그림은 무대에 큰 그림이 있으니 숨기고, 이름·Lv·HP 막대를 창 안에 맞춰요 */
+  .dq-top{gap:8px}
+  .dq-status,.dq-foe{padding:7px 10px 8px;min-width:0;flex:1 1 0}
+  .dq-status .dq-ally{display:none}
+  .dq-status-row>div{flex:1;min-width:0}
+  .dq-status strong,.dq-foe strong{font-size:16px}
+  .dq-lv{margin-left:6px;font-size:12px;white-space:nowrap}
+  .dq-hp{font-size:13px}.dq-hp b{font-size:16px}
+  .dq-bar{width:100%}
+  .dq-foe .dq-berserk{font-size:10px;padding:1px 5px}
+  .dq-gauge-label{font-size:11px}
+  .dq-party{margin-top:5px}
+  /* 명령 창: 보조 설명은 이름 아래 작은 줄로 */
+  .dq-option{flex-wrap:wrap;gap:0 6px;font-size:16px;padding:6px 6px}
+  .dq-option small{flex-basis:100%;margin-left:20px;text-align:left;font-size:11px;line-height:1.3}
+  .dq-bottom{min-height:118px}
+  .dq-message{font-size:16px;padding:12px 16px 28px}
+}
 
 </style></head>
 <body><main id="gameApp" class="screen-frame" aria-label="독도 탐험대 게임">
@@ -6072,7 +6104,8 @@ function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
   function setFoe(e, info, extra = '') {
     // 사나워진 우산몬: a purple 검은 기운 gauge; 관장 duels: a plain 기운 gauge
     const r = Math.max(0, e.hp / e.maxHp);
-    const gauge = info.dark ? `<div class="dq-gauge-label">${esc(info.gauge)} ${Math.ceil(r * 100)}%</div><div class="dq-bar dark"><i style="width:${r * 100}%"></i></div>` : `<div class="dq-gauge-label">${esc(info.gauge || '기운')}</div>${bar(e.hp, e.maxHp)}`;
+    const nums = `<b>${Math.ceil(Math.max(0, e.hp))}</b> / ${e.maxHp}`; // 퍼센트 대신 남은 수치 / 처음 수치
+    const gauge = info.dark ? `<div class="dq-gauge-label">${esc(info.gauge)} ${nums}</div><div class="dq-bar dark"><i style="width:${r * 100}%"></i></div>` : `<div class="dq-gauge-label">${esc(info.gauge || '기운')} ${nums}</div>${bar(e.hp, e.maxHp)}`;
     els.foe.innerHTML = `<strong>${info.dark && e.hp > 0 ? '<span class="dq-berserk">사나워짐</span> ' : ''}${esc(info.name)}</strong><span class="dq-lv">Lv ${e.level} · ${esc(info.type)}</span>${gauge}${extra ? `<small>${esc(extra)}</small>` : ''}`;
     battlePortrait(els.enemy, e.id); paintTrainer(); paintPortrait(); // the foe looks left
   }
@@ -7028,7 +7061,7 @@ async function enemyFainted(b) {
   if (battle !== b) return false;
   if (b.index + 1 < b.enemies.length) {
     b.index++; b.turn++; refreshBattle();
-    if (b.kind === 'enemy' || b.kind === 'trainer') battleUI.portraitFlash(); else battleUI.enemyEnter();
+    battleUI.enemyEnter(); // 몽땅랜드 직원은 결투를 시작할 때 한 번만 나와요
     if (getSpecies(enemy().id).legendary) {
       await battleUI.say(`${josa(opponentName(b), '이/가')} 마지막으로 전설의 우산몬 ${josa(name(enemy()), '을/를')} 내보냈다!`); if (battle !== b) return false;
       await battleUI.say(`오랜 세월을 견딘 ${josa(name(enemy()), '이/가')} 검은 기운에 괴로워하고 있다. 정화해서 구해 주자!`, { tone: 'dark' }); return true;
