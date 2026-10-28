@@ -31,7 +31,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
         ${trainer ? '<canvas class="dq-trainer" width="144" height="144" aria-hidden="true"></canvas>' : ''}
         ${foePortrait ? '<div class="dq-portrait" aria-hidden="true"><canvas width="384" height="384"></canvas></div>' : ''}
         <div class="dq-enemy ${aura ? 'aura' : ''}"><canvas class="dq-pad" width="96" height="26" aria-hidden="true"></canvas><i class="dq-shadow" aria-hidden="true"></i><canvas id="enemySprite" class="battle-mon enemy" width="160" height="160" aria-label="상대 우산몬"></canvas><span class="dq-dmg" aria-hidden="true"></span></div>
-        <div class="dq-mine"><canvas class="dq-pad" width="96" height="26" aria-hidden="true"></canvas><i class="dq-shadow" aria-hidden="true"></i><canvas id="allySprite" class="dq-ally-mon" width="160" height="160" aria-label="내 우산몬 (뒷모습)"></canvas></div>
+        <div class="dq-mine"><canvas class="dq-pad" width="96" height="26" aria-hidden="true"></canvas><i class="dq-shadow" aria-hidden="true"></i><canvas id="allySprite" class="dq-ally-mon" width="160" height="160" aria-label="내 우산몬"></canvas></div>
         <span class="dq-label">${esc(label)}</span>
       </div>
       <div class="dq-coach" hidden><canvas width="64" height="64" aria-hidden="true"></canvas><p></p><button type="button" class="dq-coach-skip" hidden>연습 건너뛰기</button></div>
@@ -91,7 +91,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
       <div class="dq-hp">HP <b>${m.hp}</b> / ${m.maxHp}</div>${bar(m.hp, m.maxHp)}</div></div>
       <div class="dq-party" aria-label="동료 상태">${party.map(p => `<i class="${p.hp <= 0 ? 'down' : p.active ? 'on' : ''}" title="${esc(p.name)}"></i>`).join('')}</div>`;
     portrait(els.status.querySelector('.dq-ally'), m.id);
-    battlePortrait(els.ally, m.id, true); // my 우산몬 is seen from behind, looking right
+    battlePortrait(els.ally, m.id, true); // my 우산몬 looks right, toward the foe
     els.allyWrap.classList.toggle('tired', m.hp <= 0);
   }
   function setFoe(e, info, extra = '') {

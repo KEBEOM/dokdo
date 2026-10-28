@@ -20,7 +20,7 @@ export function drawAsset(ctx,key,x,y,width,height=width){
   ctx.save();ctx.imageSmoothingEnabled=false;
   ctx.drawImage(image,Math.round(x+(width-w)/2),Math.round(y+(height-h)/2),w,h);ctx.restore();return true;
 }
-export function monsterAssetKey(id,back=false){return `monsters/${back?'back/':''}${String(id).padStart(3,'0')}`;}
+export function monsterAssetKey(id){return `monsters/${String(id).padStart(3,'0')}`;} // v0.40: 뒷모습 그림 없이 앞모습만
 
 export function assetStatus(key){return cache.get(key)?.failed?'failed':cache.get(key)?.ready?'ready':'loading';}
-export function preloadMonsters(ids){for(const id of new Set(ids))for(const back of [false,true])assetImage(monsterAssetKey(id,back));}
+export function preloadMonsters(ids){for(const id of new Set(ids))assetImage(monsterAssetKey(id));}

@@ -61,7 +61,7 @@ function add(key) {
 const code = order.map(f => fs.readFileSync(path.join(dist, f), 'utf8')).join('\n');
 for (const m of code.matchAll(/["'`]((?:characters|scenery|npc|player|monsters)\/[A-Za-z0-9_./-]+?)(?:\.png)?["'`]/g)) add(m[1]);
 for (const m of code.matchAll(/"key"\s*:\s*"([^"]+)"/g)) add(m[1]);                       // atlas sheets
-for (let id = 1; id <= 100; id++) { const n = String(id).padStart(3, '0'); add(`monsters/${n}`); add(`monsters/back/${n}`); }
+for (let id = 1; id <= 100; id++) { const n = String(id).padStart(3, '0'); add(`monsters/${n}`); }
 for (const r of ['grunt', 'exec', 'boss']) add(`characters/baekmudan-${r}-portrait`);
 for (const sub of ['npc', 'player']) {
   const walk = d => fs.readdirSync(path.join(dist, 'assets', d), { withFileTypes: true }).forEach(e => e.isDirectory() ? walk(`${d}/${e.name}`) : /\.png$/.test(e.name) && add(`${d}/${e.name.replace(/\.png$/, '')}`));

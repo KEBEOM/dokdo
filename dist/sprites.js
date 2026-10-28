@@ -2,7 +2,7 @@ import {getSpecies} from './data.js';
 import {drawAsset,monsterAssetKey,assetStatus} from './assets.js';
 // Pending or failed assets never display the retired monster design.
 export function drawMonster(ctx,id,x,y,size=64,t=0,back=false){
- const key=monsterAssetKey(id,back);if(drawAsset(ctx,key,x,y,size))return true;
+ const key=monsterAssetKey(id);if(drawAsset(ctx,key,x,y,size))return true;
  ctx.save();ctx.fillStyle=assetStatus(key)==='failed'?'#ad8060':'#789b93';
  const dot=Math.max(2,Math.round(size/24));
  for(let i=0;i<3;i++)ctx.fillRect(Math.round(x+size/2+(i-1)*dot*3-dot/2),Math.round(y+size/2),dot,dot);
@@ -27,12 +27,15 @@ case 'starfish':{const points=[[14,2,5,25],[4,12,25,5],[7,8,5,16],[21,8,5,16],[4
 case 'coral':case 'anemone':{for(let i=0;i<5;i++){const a=4+i*5;box(a,5+(i%2)*4,4,20-(i%2)*4,body);if(m.shape==='coral'){r(a-2,11,3,3,body);r(a+3,15,3,3,body);}}box(8,19,19,9,body);eye(12,21);eye(21,21);r(9,27,19,2,outline);break;}
 case 'seal':{box(9,12,15,14,body);box(12,5,14,12,body);r(14,2,9,4,body);box(3,18,8,6,body);box(21,18,9,6,body);r(8,26,7,3,body);r(20,26,8,3,body);r(13,17,8,7,'#d1ded5');eye(15,8);eye(23,8);r(19,13,3,2,outline);r(12,14,5,1,light);r(24,14,6,1,light);r(11,16,5,1,light);r(24,16,6,1,light);r(14,0,3,3,gold);r(22,0,3,3,gold);r(17,1,5,2,gold);for(let i=0;i<3;i++){r(1+i*10,29,7,1,'#b6dfdc');}break;}}
 ctx.restore();}
-// 그림이 오른쪽을 보는 우산몬(초종용·술패랭이꽃·섬초롱꽃). 나머지는 왼쪽을 보거나 정면이에요.
-// 전투에서는 상대 우산몬이 왼쪽, 내 우산몬(뒷모습)이 오른쪽을 보도록 이 우산몬들만 좌우를 뒤집어 그려요.
-// 새 그림이 오른쪽을 보면 번호를 여기에 더하세요.
-export const FACES_RIGHT=new Set([4,10,11]);
+// v0.40 그림이 바라보는 쪽. 뒷모습 그림은 쓰지 않고, 앞모습 그림을 좌우로 뒤집어 방향을 맞춰요.
+//   결투에서 내 우산몬은 오른쪽(상대 쪽), 상대 우산몬은 왼쪽(내 쪽)을 봐요.
+//   FACES_RIGHT: 오른쪽을 보는 그림 · FACES_FRONT: 정면 그림(뒤집지 않아요) · 나머지: 왼쪽을 보는 그림
+//   그림을 새로 바꾸면 여기 번호를 맞춰 주세요.
+export const FACES_RIGHT=new Set([]);
+export const FACES_FRONT=new Set([1,2,4,5,6,7,9,10,12,13,14,15,19]);
+export const facing=id=>FACES_RIGHT.has(Number(id))?'right':FACES_FRONT.has(Number(id))?'front':'left';
 export function portrait(canvas,id,t=0,back=false,mirror=false){const ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);ctx.imageSmoothingEnabled=false;ctx.save();if(mirror){ctx.translate(canvas.width,0);ctx.scale(-1,1);}drawMonster(ctx,id,0,0,canvas.width,t,back);ctx.restore();}
-// Battle: the foe looks left (toward me), my 우산몬 is seen from behind looking right (toward the foe).
-export function battlePortrait(canvas,id,mine=false){portrait(canvas,id,0,mine,FACES_RIGHT.has(Number(id)));}
+// Battle: the foe looks left (toward me), my 우산몬 looks right (toward the foe). Both use the front picture.
+export function battlePortrait(canvas,id,mine=false){const f=facing(id);portrait(canvas,id,0,false,mine?f==='left':f==='right');}
 export function drawHuman(ctx,x,y,color='#3a7e89',dir='down',step=0,kind='normal',assetKey=null,size=32){if(!assetKey||!drawAsset(ctx,assetKey,x,y,size)){ctx.save();ctx.translate(Math.round(x),Math.round(y));ctx.scale(size/32,size/32);drawHumanDefault(ctx,0,0,color,dir,step,kind);ctx.restore();}}
 export function drawHumanDefault(ctx,x,y,color='#3a7e89',dir='down',step=0,kind='normal'){const r=(a,b,w,h,c)=>{ctx.fillStyle=c;ctx.fillRect(Math.round(x+a),Math.round(y+b),w,h)};r(5,28,22,4,'#243b3d30');r(9,22,6,8,'#3f5964');r(18,22,5,8,'#3f5964');r(7,29-(step%2),8,3,'#273e46');r(17,29+(step%2),8,3,'#273e46');r(7,14,18,12,color);r(4,16,4,8,'#e2b68a');r(25,16,4,8,'#e2b68a');r(9,4,15,13,'#e6c19a');r(7,1,19,7,'#374f4d');r(9,0,14,3,kind==='history'?'#46586b':'#ddbc73');r(6,5,21,3,kind==='history'?'#46586b':'#e5cf91');if(dir!=='up'){r(dir==='left'?10:dir==='right'?21:12,10,2,3,'#28444a');if(dir==='down')r(20,10,2,3,'#28444a');r(16,15,3,1,'#bd8b77');}else{r(9,7,15,5,'#374f4d');r(10,17,13,10,'#ba8b57');r(13,20,7,5,'#d4b477');}if(kind==='history'){r(11,17,3,9,'#ece7cb');r(21,17,3,9,'#ece7cb');r(9,0,15,3,'#354754');}if(kind==='enemy'){r(9,4,15,4,'#d9dfd7');r(11,17,11,2,'#d8ddd4');}}
