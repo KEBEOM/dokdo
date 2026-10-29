@@ -38,6 +38,7 @@ export function validateSave(value){
   for(const m of [...v.party,...v.storage]){
     if(!Number.isInteger(m.id)||m.id<1||m.id>100||!Number.isInteger(m.level)||m.level<1||m.level>100||!Number.isFinite(m.hp)||!Number.isFinite(m.xp)||m.xp<0||!Array.isArray(m.pp)||m.pp.length!==4||m.pp.some(p=>!Number.isInteger(p)||p<0))fail();
     if(legacy)m.id=LEGACY_SPECIES_MAP[m.id];
+    delete m.form;delete m.formBase; // 형태변환은 결투 안에서만 (저장 파일에는 노멀폼)
     Object.assign(m,stats(m.id,m.level));m.hp=Math.max(0,Math.min(m.hp,m.maxHp));m.pp=m.pp.map((p,i)=>Math.min(p,PP_MAX[i]));
   }
   for(const p of v.progress)if(!p||typeof p!=='object'||!Number.isFinite(p.studied)||['met','enemy','boss'].some(k=>typeof p[k]!=='boolean'))fail();

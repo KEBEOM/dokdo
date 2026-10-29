@@ -122,7 +122,7 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
       }
       if (c.aura && !c.calmAt) auraAround(c, size, t);
       ctx.globalAlpha = shown;
-      drawMonster(ctx, Number(c.who.slice(8)), c.x - size / 2, c.y - size - hop + bob - skip - (1 - shown) * 10, size, t / 1000);
+      drawMonster(ctx, c.who.slice(8), c.x - size / 2, c.y - size - hop + bob - skip - (1 - shown) * 10, size, t / 1000);
       ctx.globalAlpha = 1;
       if (c.calmAt && t - c.calmAt < 1300) { const a = (t - c.calmAt) / 1300; for (let i = 0; i < 12; i++) { ctx.globalAlpha = 1 - a; R(c.x + Math.cos(i * .52) * a * size * .9, c.y - size / 2 + Math.sin(i * .52) * a * size * .7, 3, 3, '#ffe9a6'); } ctx.globalAlpha = 1; }
     }
@@ -384,7 +384,7 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
         const age = t - s.cues.glint;
         if (age < 1800) { const a = Math.max(0, 1 - age / 1800); ctx.globalAlpha = a; ctx.strokeStyle = '#8ff6ff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(232, 104, 8 + age / 30, 3 + age / 90, 0, 0, Math.PI * 2); ctx.stroke(); R(229, 98, 6, 6, '#c8fbff'); R(231, 92, 2, 18, '#c8fbff'); R(222, 100, 20, 2, '#c8fbff'); ctx.globalAlpha = 1; }
       }
-      if (!s.noBoat) art('ferry', 30, 70 + Math.round(Math.sin(t / 420) * 1.5));
+      if (!s.noBoat && !s.def.noBoat) art('ferry', 30, 70 + Math.round(Math.sin(t / 420) * 1.5));
     },
     dock(t, s) {
       if (!hasArt()) return LEGACY.dock(t, s);
@@ -464,12 +464,13 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
     if (name === 'jump') { const p = s.cast.get('player'); if (p) p.hopAt = t; }
     if (name === 'pop') { const m = s.cast.get('mon'); if (m) { m.hidden = false; m.baseX = m.x; m.baseY = m.y; m.popAt = t; } const p = s.cast.get('player'); if (p) s.cues.surprise = t; }
     if (name === 'kim-turn') { const k = s.cast.get('kim'); if (k) k.dir = 'right'; }
-    // show:<id> appear in a column of light · hop:<id> a little jump · come:<id> walk to comeTo · calm:<id> the dark aura clears
+    // morph:<id> 전설의 우산몬이 morphTo 그림으로 바뀌어요 · show:<id> appear in a column of light · hop:<id> a little jump · come:<id> walk to comeTo · calm:<id> the dark aura clears
     const [verb, arg] = name.split(':'), who = arg && s.cast.get(arg);
     if (verb === 'show' && who) { who.hidden = false; who.showAt = t; }
     if (verb === 'hop' && who) who.hopAt = t;
     if (verb === 'come' && who?.comeTo) who.walk = { fx: who.x, fy: who.y, tx: who.comeTo[0], ty: who.comeTo[1], start: t, ms: who.walkMs || 900 };
     if (verb === 'calm' && who) who.calmAt = t;
+    if (verb === 'morph' && who?.morphTo) { who.who = who.morphTo; who.showAt = t; who.hidden = false; } // 전설의 우산몬 형태변환: 빛기둥 속에서 변환폼으로
     if (verb === 'picture' && PICTURES[arg]) { s.picture = { id: arg, at: t }; assetImage(PICTURES[arg].key); }
     if (name === 'picture-off' && s.picture) s.picture.offAt = t;
     if (name === 'machine-quiet') { s.cues.machine = t - 1e4; s.cues['machine-off'] = t - 1e4; } // already stopped, no sparks
@@ -490,7 +491,7 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
     titleEl.classList.toggle('show', !!def.title);
     for (const c of def.start || []) cue(c, t);
     for (const line of def.lines || []) { const m = /^picture:(\w+)/.exec(line.cue || ''); if (m && PICTURES[m[1]]) assetImage(PICTURES[m[1]].key); }
-    const ids = [...cast.values()].map(c => c.who).filter(w => w.startsWith('monster:')).map(w => Number(w.slice(8)));
+    const ids = [...cast.values()].map(c => c.who).filter(w => w.startsWith('monster:')).map(w => w.slice(8)); // '68-2' = 변환폼
     if (ids.length) preloadMonsters(ids);
   }
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

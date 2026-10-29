@@ -20,7 +20,10 @@ export function drawAsset(ctx,key,x,y,width,height=width){
   ctx.save();ctx.imageSmoothingEnabled=false;
   ctx.drawImage(image,Math.round(x+(width-w)/2),Math.round(y+(height-h)/2),w,h);ctx.restore();return true;
 }
-export function monsterAssetKey(id){return `monsters/${String(id).padStart(3,'0')}`;} // v0.40: 뒷모습 그림 없이 앞모습만
+// v0.41: 전설의 우산몬 변환폼은 '68-2'처럼 적어요 → monsters/068-2.png (노멀폼은 monsters/068.png)
+export function monsterAssetKey(id){const [n,f]=String(id).split('-');return `monsters/${n.padStart(3,'0')}${f&&f!=='1'?'-'+f:''}`;}
 
+// 그림 파일 주소 (한 파일 오프라인 판에서는 HTML 안에 넣은 그림)
+export function assetURL(key){return globalThis.DOKDOMON_EMBEDDED_ASSETS?.[key]||PLAYER_SHEETS[key]||`assets/${key}${/\.(png|jpe?g|webp)$/i.test(key)?'':'.png'}`;}
 export function assetStatus(key){return cache.get(key)?.failed?'failed':cache.get(key)?.ready?'ready':'loading';}
 export function preloadMonsters(ids){for(const id of new Set(ids))assetImage(monsterAssetKey(id));}

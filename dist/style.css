@@ -512,3 +512,34 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
 #gameApp .world-map canvas{image-rendering:pixelated}
 #gameApp .wm-town i{border:2px solid var(--px-line);box-shadow:0 2px 0 var(--px-shadow)}
 #gameApp .wm-route,#gameApp .wm-island,#gameApp .wm-ferry{border:2px solid var(--px-line);border-radius:7px;box-shadow:0 2px 0 var(--px-shadow)}
+
+/* v0.41 전설의 우산몬 형태변환: 하얀 빛에 감쌌다가 새 모습으로 */
+@keyframes dqMorph{0%{filter:brightness(1);transform:scale(1)}35%{filter:brightness(3) saturate(0);transform:scale(1.12)}60%{filter:brightness(3) saturate(0);transform:scale(.92)}100%{filter:brightness(1);transform:scale(1)}}
+.dq-stage .morph canvas:not(.dq-pad){animation:dqMorph 1s ease-out}
+.dq-stage .morph::after{content:'';position:absolute;left:50%;bottom:8%;width:70%;height:90%;transform:translateX(-50%);background:radial-gradient(closest-side,rgba(255,250,214,.85),rgba(255,233,160,0));pointer-events:none;animation:dqMorphGlow 1s ease-out forwards}
+@keyframes dqMorphGlow{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+
+/* v0.41 도감: 도트 ↔ 실제 사진 (사진은 자르지 않고 전체를 보여 줘요) · 변환폼 */
+.dex-view{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}
+.dex-view button{border:2px solid var(--px-line,#1f2a33);background:#fffaf0;color:#1f2a33;border-radius:8px;padding:6px 12px;font-weight:700;font-size:13px;cursor:pointer}
+.dex-view button.selected{background:#ffd86a}
+.monster-detail.with-photo{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}
+.dex-photo{margin:0;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+.dex-photo img{display:block;width:100%;max-width:320px;height:auto;max-height:240px;object-fit:contain;background:#f1efe6;border:2px solid var(--px-line,#1f2a33);border-radius:8px}
+.dex-photo figcaption{font-size:11px;line-height:1.4;color:#5d6f6c;text-align:center}
+@media(max-width:560px){.monster-detail.with-photo{grid-template-columns:1fr}.dex-photo img{max-height:200px}}
+/* 전설의 우산몬 합류 화면: 노멀폼 ⇄ 변환폼 */
+.form-pair{display:flex;align-items:center;justify-content:center;gap:10px;margin:4px 0 8px}
+.form-pair figure{margin:0;text-align:center}.form-pair canvas{width:112px;height:112px;image-rendering:pixelated}
+.form-pair figcaption{font-size:12px;font-weight:700;color:#5d6f6c}.form-pair span{font-size:22px;color:#c79a2c}
+/* 모험 수첩: 전설의 우산몬 목록 */
+.legend-panel{margin-top:14px}
+.legend-list{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px}
+.legend-list li{display:flex;align-items:center;gap:8px;padding:6px 8px;border:2px solid #d9d2bd;border-radius:8px;background:#fffdf6}
+.legend-list li.open{border-color:#e8bd64;background:#fff6d8}.legend-list li.done{border-color:#9cc79a;background:#f2faef}
+.legend-list canvas{width:40px;height:40px;flex:none;image-rendering:pixelated}
+.legend-list strong{display:block;font-size:13px}.legend-list small{display:block;font-size:11px;color:#5d6f6c;line-height:1.35}
+
+/* v0.41 상대 우산몬이 발밑 원(받침) 위에 서도록: 그림의 발(아래 끝)을 받침 가운데에 맞춰 올려요 */
+.dq-stage .dq-enemy canvas#enemySprite{top:-8%}
+.dq-stage .dq-enemy.aura::before{top:-2%;bottom:8%}

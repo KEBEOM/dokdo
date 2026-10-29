@@ -8,6 +8,7 @@ import { drawProp, drawGround, propArt } from './props.js';
 import { CUTSCENE_ATLAS } from './cutscene-atlas.js';
 import { assetImage } from './assets.js';
 import { drawInterior, drawFurniture, FURNITURE_DEPTH } from './interior-art.js';
+import { legendSpots } from './legends.js';
 
 export const TILE = 32, W = MAP_W, H = MAP_H;
 export const PROP_KINDS = ['sign', 'landmark', 'box', 'trash', 'observe', 'stone', 'legend'];
@@ -67,7 +68,8 @@ export function npcs(ref = 0, progress = {}, flags = {}) {
     // 풀숲 위에 서 있는 야생 우산몬은 두지 않아요. 사나워진 우산몬은 풀숲을 걸을 때 갑자기 나타나요.
     for (const r of villageResidents(zone)) { const p = parsed.residents[r.key]; if (p) list.push({ ...r, id: 'resident', kind: 'resident', x: p.x, y: p.y }); }
   }
-  for (const o of parsed.objects) {
+  // 전설의 우산몬(천연기념물): 조건을 채우면 정해진 칸에 금빛 기운이 나타나요 (legends.js)
+  for (const o of [...parsed.objects, ...legendSpots(map.id, flags)]) {
     const flag = `${map.id}:${o.key}`, used = !!flags[flag];
     if (o.type === 'trash' && used) continue;
     list.push({ ...o, id: o.type, kind: o.type, flag, used, objectKey: o.key });
@@ -178,6 +180,13 @@ function darkWisps(ctx, x, y, time) {
   for (let i = 0; i < 6; i++) { const age = (time / 30 + i * 23) % 60; ctx.globalAlpha = Math.max(0, .55 - age / 110); ctx.fillStyle = i % 2 ? '#4a1f7a' : '#1a0f2e'; ctx.fillRect(Math.round(cx - 14 + i * 5 + Math.sin(time / 400 + i) * 3), Math.round(cy + 8 - age * .7), 3, 3); }
   ctx.restore();
 }
+// 전설의 기운: 발밑의 금빛 원과 위로 떠오르는 반짝이
+function legendGlow(ctx, x, y, time) {
+  const cx = x * 32 + 16, cy = y * 32 + 26;
+  ctx.save(); ctx.globalAlpha = .35 + .15 * Math.sin(time / 260); ctx.fillStyle = '#ffe9a0'; ctx.beginPath(); ctx.ellipse(cx, cy, 18, 6, 0, 0, Math.PI * 2); ctx.fill();
+  for (let i = 0; i < 8; i++) { const age = (time / 14 + i * 47) % 100; ctx.globalAlpha = .8 * (1 - age / 100); rect(ctx, cx - 14 + (i * 37) % 28, cy - age * .5, 2, 2, i % 2 ? '#fff6c8' : '#ffd86a'); }
+  ctx.restore();
+}
 function marker(ctx, x, y, time, color = '#fbdf86') {
   const top = y * 32 + 28 - CHARACTER_SIZE - 22 + Math.sin(time / 250) * 2;
   rect(ctx, x * 32 + 8, top, 16, 18, color); rect(ctx, x * 32 + 14, top + 3, 3, 7, '#5f4a2e'); rect(ctx, x * 32 + 14, top + 12, 3, 2, '#5f4a2e');
@@ -194,7 +203,7 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
     if (n.furniture) drawFurniture(ctx, n.furniture, n.x, n.y, time, { open: n.used, glow: n.kind === 'rest' });
     else if (n.kind === 'board') drawIslandArt(ctx, 'record-board', n.x * 32 - 8, n.y * 32 - 16, 48, 54);
     else if (n.kind === 'wild') { darkWisps(ctx, n.x, n.y, time); drawMonster(ctx, n.species, n.x * 32 - 6, n.y * 32 - 12, 44, time / 1000); }
-    else if (n.kind === 'legend') { drawProp(ctx, 'observe', n.x, n.y, { time }); if (!n.used) marker(ctx, n.x, n.y, time, '#ffe9a0'); }
+    else if (n.kind === 'legend') { legendGlow(ctx, n.x, n.y, time); drawMonster(ctx, n.species, n.x * 32 - 10, n.y * 32 - 22 + Math.round(Math.sin(time / 300) * 2), 52, time / 1000); if (!n.used) marker(ctx, n.x, n.y, time, '#ffe9a0'); }
     else if (PROP_KINDS.includes(n.kind)) drawProp(ctx, n.kind, n.x, n.y, { open: n.used, art: n.art, time, water: map[n.y]?.[n.x] === 0 });
     else if (n.player) { if (!drawExplorer(ctx, state.avatar, fx, fy, CHARACTER_SIZE, state.dir, motion.walking, motion.distance || 0)) drawHuman(ctx, fx, fy, '#418e91', state.dir, 0, 'normal', null, CHARACTER_SIZE); }
     else if (n.actor && drawResident(ctx, n.actor, fx, fy, CHARACTER_SIZE, time, n.dir || 'down', n.walking || false, n.walkDistance || 0)) { /* drawn */ }

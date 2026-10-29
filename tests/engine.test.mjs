@@ -90,10 +90,11 @@ test('combat question selection spaces repeats and revisits missed concepts',()=
 test('requested starters, exact spreadsheet names and NO.100',()=>{
  assert.deepEqual(STARTERS.map(id=>getSpecies(id).name),['해국','괭이갈매기','독도새우']);
  assert.equal(getSpecies(3).name,'섬기린초');assert.equal(getSpecies(100).name,'강치');
- assert.deepEqual(MONSTERS.filter(m=>m.legendary).map(m=>m.name),['사철나무','강치'],'two legendary 우산몬');
+ assert.deepEqual(MONSTERS.filter(m=>m.legendary).map(m=>m.name),['사철나무','소쩍새','뿔쇠오리','매','황조롱이','고니','흑두루미','강치'],'천연기념물 7종 + 강치 are legendary');
+ assert.deepEqual(MONSTERS.filter(m=>m.forms===2).map(m=>m.id),[68,70,71,72,75,76],'six legendaries have a 변환폼');
  // legendary and starter 우산몬 exist once in the whole game: never in the grass, a 관장 team or a 백무단 team
- const reachable=new Set(ZONES.flatMap(z=>[...z.wild,...z.bossTeam]));assert.equal(new Set(ZONES.flatMap(z=>z.wild)).size,95);
- for(const id of [1,66,67,18,100])assert.ok(!reachable.has(id),`${id} is unique`);
+ const reachable=new Set(ZONES.flatMap(z=>[...z.wild,...z.bossTeam]));assert.equal(new Set(ZONES.flatMap(z=>z.wild)).size,89,"100 - 3 starters - 8 legendaries");
+ for(const id of [1,66,67,18,68,70,71,72,75,76,100])assert.ok(!reachable.has(id),`${id} is unique`);
 });
 test('v0.8 saves retain progress and migrate species once',()=>{
  const s=newState();delete s.rosterVersion;s.started=true;s.party=[createMonster(1,12),createMonster(69,16),createMonster(21,8)];s.storage=[createMonster(100,34)];s.seen=[1,2,3,67,69,100];s.caught=[1,3,69,100];s.badges=[0,1];s.progress[0].boss=true;

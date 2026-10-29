@@ -8,8 +8,10 @@ import { roomId, parseRoomId } from './interiors.js';
 import { MONSTERS, ZONES, TYPES, STARTERS, getSpecies, isUnique } from './data.js';
 import { CONCEPTS, QUESTIONS, SOURCES } from './learning.js';
 import { newState, validateSave, createMonster, damage, enemyHit, healAll, gainXP, captureChance, addMonster, recordAnswer, knownSkills, learnedBetween } from './engine.js';
-import { portrait } from './sprites.js';
-import { onAssetReady, preloadMonsters, assetImage } from './assets.js';
+import { portrait, look } from './sprites.js';
+import { LEGENDS, TREE_ENTRY, ALL_LEGEND_IDS, legendProgress, legendScene, openFlag, metFlag, ownsSpecies } from './legends.js';
+import { PHOTO_CREDITS, LICENSE_TEXT, photoKey } from './photo-credits.js';
+import { onAssetReady, preloadMonsters, assetImage, assetURL } from './assets.js';
 import { VILLAIN_ATLASES } from './villain-atlases.js';
 import { EXPLORERS, PROFESSOR_PICTURE, paintExplorerCard, paintExplorerPortrait, drawResident } from './characters.js';
 import { createNPCMotion } from './npc-motion.js';
@@ -22,7 +24,7 @@ import { OPENING, STARTER_MEET, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.40';
+const VERSION = '0.41';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -153,7 +155,7 @@ function closeModal() {
   if (modalReturn) { const fn = modalReturn; modalReturn = null; fn(); }
 }
 function head(title, kicker = '탐험 수첩', close = true) { return `<div class="modal-head"><div><span class="eyebrow">${kicker}</span><h2 id="modalTitle">${title}</h2></div>${close ? '<button class="modal-close" aria-label="닫기">✕</button>' : ''}</div>`; }
-function paintPortraits() { $$('canvas[data-portrait]').forEach(c => portrait(c, Number(c.dataset.portrait))); }
+function paintPortraits() { $$('canvas[data-portrait]').forEach(c => portrait(c, c.dataset.portrait)); } // '68-2' = 변환폼
 
 // ── map dialogue ───────────────────────────────────────────────────────────────
 function talk(speakerName, lines, done, note = '게임용 재구성 대화', actor = null) {
@@ -269,6 +271,7 @@ function updateUI() {
   $$('[data-party]').forEach(b => b.onclick = () => partyDetail(Number(b.dataset.party)));
   $('#quickQuestText').textContent = $('#questTitle').textContent; $('#dockPartyCount').textContent = `${state.party.length} / 6`;
   const buddy = state.party[state.active] || state.party[0];
+  paintLegendList(); preloadMonsters(LEGENDS.filter(q => q.map === map.id).map(q => q.id));
   if (buddy) { $('#buddyName').textContent = name(buddy); $('#buddyStatus').textContent = `Lv.${buddy.level} · ${buddy.hp}/${buddy.maxHp}`; $('#buddyImage').dataset.portrait = buddy.id; }
   paintPortraits();
 }
@@ -385,9 +388,12 @@ function interact(n) {
     case 'stone': return talk(n.name, n.lines, () => beginStudy('stone', null, { flag: n.flag, rewarded: n.used }), '기억 비석 · 복습');
     case 'legend': {
       // 전설의 우산몬은 게임 전체에 한 마리: 한 번 정화해 동료가 되면 다시 나오지 않아요.
-      const owned = [...state.party, ...state.storage].some(m => m.id === n.species);
-      if (n.used || owned) return talk(n.name, n.after || n.lines, () => { if (!n.used) setFlag(n.flag); }, '전설의 우산몬 · 실제 자연 정보');
-      return talk(n.name, n.lines, () => startBattle('legend', n.species, { npc: n }), '전설의 우산몬');
+      const q = LEGENDS.find(l => l.id === n.species);
+      if (n.used || ownsSpecies(state, n.species)) { setFlag(metFlag(n.species)); return talk(n.name, ['금빛 기운이 조용히 사라졌어요.'], null, '전설의 우산몬'); }
+      if (!q) return talk(n.name, n.lines, () => startBattle('legend', n.species, { npc: n }), '전설의 우산몬');
+      preloadMonsters([q.id, `${q.id}-2`]);
+      playStory(legendScene(q)).then(() => startBattle('legend', n.species, { npc: n }));
+      return;
     }
     case 'trainer':
       if (n.used) return talk(n.name, n.after || ['다음엔 지지 않을 거야!'], null, '몽땅랜드 · 창작 대화', n.actor);
@@ -527,6 +533,7 @@ function frame(now) {
     actorCtx.scale(sceneScale * actorPixelRatio, sceneScale * actorPixelRatio); actorCtx.translate(-camera.x, -camera.y);
     drawActors(actorCtx, state, view, now, { walking, distance: walkDistance }, people, map); actorCtx.restore(); paintWorldLabels(people);
   }
+  if (state.started && !document.hidden && now - (frame.legendAt || 0) > 700) { frame.legendAt = now; checkLegends(); }
   if (avatarChoice) $$('canvas[data-explorer-sprite]').forEach(c => paintExplorerCard(c, c.dataset.explorerSprite, now, avatarChoice.selected === c.dataset.explorerSprite));
   const door = !busy() && !facingNPC() && doorAhead(), n = !door && !busy() && nearestNPC(); $('#interactionPrompt').classList.toggle('hidden', !n && !door);
   if (door) $('#interactionPrompt').textContent = `${matchMedia('(pointer:coarse)').matches ? '대화' : 'E'} · ${door.name} 들어가기`;
@@ -699,6 +706,17 @@ async function attackWithQuiz(b, power, skillName) {
     await battleUI.explain(dark ? `아쉬워요! ${name(a)}의 마음이 닿지 않았다.` : `아쉬워요! ${name(a)}의 기술이 빗나갔다!`, explanationHTML(r.q), 'bad');
   }
 }
+// ── 전설의 우산몬 형태변환 (v0.41): 노멀폼(그림 068) ↔ 변환폼(그림 068-2) ──
+// 변환폼이면 정답의 힘 ×1.3, 튼튼함 ×1.2. 결투가 끝나면 노멀폼으로 돌아와요(저장 파일에는 노멀폼만).
+function setForm(m, form) {
+  if (form === 2 && m.form !== 2) { m.formBase = { attack: m.attack, defense: m.defense }; m.attack = Math.round(m.attack * 1.3); m.defense = Math.round(m.defense * 1.2); m.form = 2; }
+  else if (form !== 2 && m.form === 2) { if (m.formBase) { m.attack = m.formBase.attack; m.defense = m.formBase.defense; } delete m.form; delete m.formBase; }
+}
+async function morph(b, m, side) {
+  const to = m.form === 2 ? 1 : 2; setForm(m, to); battleUI.morph(side); beep(to === 2 ? 900 : 520, .2); refreshBattle(); updateUI();
+  if (side === 'ally') await battleUI.say(to === 2 ? `${name(m)}의 형태변환! 눈부신 빛에 휩싸여 모습이 바뀌었다! 정화의 힘이 강해졌다!` : `${josa(name(m), '이/가')} 원래 모습으로 돌아왔다.`, { tone: 'good' });
+  else await battleUI.say(`전설의 우산몬 ${josa(name(m), '이/가')} 형태를 바꿨다! 더 강한 모습이 되었다!`, { tone: 'dark' });
+}
 const SKILL_KIND = { attack: '정화', heal: '회복', guard: '보호' };
 // 정화하기: choose one of the skills this 우산몬 has learned (2 at first, more as it grows).
 async function purify(b) {
@@ -708,10 +726,12 @@ async function purify(b) {
   const items = list.map(s => ({ label: s.name, value: `skill-${s.index}`, sub: `${s.kind === 'attack' ? (s.index === 1 ? '강한 ' : '') + (dark ? '정화' : '겨루기') : SKILL_KIND[s.kind]} · ${a.pp[s.index]}/${s.max}`, disabled: a.pp[s.index] <= 0 || (first && s.index !== 0), hint: first && s.index === 0 }));
   if (first) tip(b, `‘${list[0].name}’${josa(list[0].name, '을/를').slice(list[0].name.length)} 골라요. 기술을 쓰면 독도 문제가 나와요!`);
   if (tired) items.push({ label: '있는 힘껏', value: 'skill-last', sub: '기술 횟수를 다 썼을 때' });
+  if (getSpecies(a.id).forms === 2 && !tut(b)) items.push({ label: a.form === 2 ? '원래 모습으로' : '형태변환', value: 'morph', sub: a.form === 2 ? '노멀폼으로 돌아가요' : '변환폼 · 정화의 힘 UP' });
   const pick = await battleUI.menu(items, { title: '정화하기', prompt: dark ? '어떤 기술로 정화할까? 문제를 맞혀야 마음이 닿아요.' : '어떤 기술로 겨룰까? 문제를 맞혀야 닿아요.', cancel: true });
   if (battle !== b) return 'end';
   if (pick === null) return 'free';
   if (pick === 'skill-last') { await attackWithQuiz(b, 1, '있는 힘껏'); return 'turn'; }
+  if (pick === 'morph') { await morph(b, a, 'ally'); return 'turn'; }
   const sk = list.find(s => `skill-${s.index}` === pick); a.pp[sk.index] = Math.max(0, a.pp[sk.index] - 1);
   if (sk.kind === 'attack') { await attackWithQuiz(b, sk.power, sk.name); return 'turn'; }
   if (sk.kind === 'heal') { const before = a.hp; a.hp = Math.min(a.maxHp, a.hp + Math.ceil(a.maxHp * .35)); refreshBattle(); updateUI(); await battleUI.say(`${name(a)}의 ${sk.name}! 체력이 ${a.hp - before} 회복됐다!`, { tone: 'good' }); return 'turn'; }
@@ -762,6 +782,7 @@ async function playerTurn(b) {
 }
 async function enemyTurn(b) {
   const a = active(), e = enemy(), dark = berserk(b);
+  if (b.kind === 'legend' && getSpecies(e.id).forms === 2 && e.form !== 2 && e.hp > 0 && e.hp <= e.maxHp / 2) { await morph(b, e, 'enemy'); if (battle !== b) return; }
   tip(b, '이번엔 사나워진 우산몬 차례예요! 문제를 맞히면 살짝만 아프게 막을 수 있어요.');
   const r = await askQuiz(b, 'defense', dark ? `사나워진 ${josa(name(e), '이/가')} 날뛴다!` : `${name(e)}의 문제 도전!`); if (!r) return;
   const d = enemyHit(e, a, { correct: r.correct, guard: b.guard });
@@ -841,7 +862,7 @@ async function runBattle(b) {
     b.turn++; b.guard = false;
   }
 }
-function closeBattle() { battle = null; battleUI.destroy(); $('#battleScreen').classList.add('hidden'); scene.classList.remove('battling'); lastEncounter = walks; }
+function closeBattle() { for (const m of [...state.party, ...state.storage]) setForm(m, 1); battle = null; battleUI.destroy(); $('#battleScreen').classList.add('hidden'); scene.classList.remove('battling'); lastEncounter = walks; }
 function returnToShelter() {
   if (map.kind !== 'town') { const def = getMapDef(townId(state.zone)); state.map = def.id; map = createMap(def.id); npcMotion.reset(); labelKey = ''; }
   const shop = map.parsed.roles.shop, people = npcs(map, progress(), state.flags);
@@ -859,6 +880,7 @@ function finishBattle(win, escaped = false, info = {}) {
       else talk(z().enemy, VILLAIN_TALES[state.zone].after, () => talk('서하', [z().story, '쉼터에서 동료를 회복하고 수호관으로 가 보세요.']), '몽땅랜드 · 창작 대화', VILLAIN_BY_ZONE[state.zone]);
     }
     else if (kind === 'tutorial') finishTutorialBattle();
+    else if (kind === 'legend') legendJoins(b);
     else if (kind === 'trainer') { setFlag(b.npc.flag); talk(b.npc.name, b.npc.after || ['다음엔 지지 않을 거야!'], null, '몽땅랜드 · 창작 대화', b.npc.actor); }
     else if (kind === 'boss') {
       progress().boss = true; if (!state.badges.includes(state.zone)) state.badges.push(state.zone);
@@ -893,6 +915,43 @@ async function legendEncounter() {
   openModal(head('기억의 강치', '전설의 우산몬 · NO.100') + '<div class="end-screen"><canvas data-portrait="100" width="160" height="160"></canvas><p>흩어진 강치의 기록이 하나로 이어졌어요.<br>강치는 당신과 함께 기억을 지키고 싶어 해요.</p><div class="fact-box">현실의 강치는 남획으로 멸종했어요. 게임 속 강치는 탐사 장치가 보여 주는 기억의 세계에서 만나는 창작 우산몬이며, 실제 생물이 되살아났다는 뜻은 아니에요.</div><div class="modal-actions"><button id="legendOK" class="primary">함께 기억할게 →</button></div></div>', () => { $('#legendOK').onclick = () => { closeModal(); updateUI(); save(); talk('서하', [z().story, '쉼터에서 동료를 회복하고 수호관으로 가 보세요.']); }; });
 }
 
+// ── 전설의 우산몬(천연기념물) 퀘스트 ─────────────────────────────────────────
+// 조건을 채우면 김박사가 무전으로 알려 주고(legend-open:번호), 지도 위에 금빛 기운이 생겨요.
+// 자동 검사(?test)에서는 다른 단계를 방해하지 않게, 검사가 window.__dokdo.legendRadio = true로 켤 때만 무전이 와요.
+const TEST_MODE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('test');
+function checkLegends() {
+  if (!state.started || busy() || !state.tutorial?.battle || (TEST_MODE && !window.__dokdo?.legendRadio)) return;
+  const q = LEGENDS.find(l => !state.flags[openFlag(l.id)] && !ownsSpecies(state, l.id) && legendProgress(l, state).done);
+  if (!q) return;
+  setFlag(openFlag(q.id)); save();
+  const intro = state.flags['legend-intro'] ? [] : ['탐험대, 들리나요? 김박사예요. 중요한 소식이 있어요!', '천연기념물은 나라가 법으로 정해 보호하는 자연유산이에요. 천연기념물 생물의 기록은 아주 오래되고 단단해서, 지우개 기계 속에서 ‘전설의 우산몬’이 되었대요.', '전설의 우산몬은 자연을 아끼는 탐험대 앞에만 나타나요. 모험 수첩에 조건을 적어 둘게요.'];
+  setFlag('legend-intro'); beep(980, .1); setTimeout(() => beep(1180, .1), 140);
+  talk('김박사(무전)', [...intro, ...q.radio, `전설의 우산몬 ‘${q.name}’ · ${q.place}`], () => { toast(`${q.place}에 전설의 기운이 나타났어요!`); labelKey = ''; updateUI(); }, '전설의 우산몬 소식', 'professor');
+}
+function legendJoins(b) {
+  const e = b.enemies[0], q = LEGENDS.find(l => l.id === e.id); if (!q) return;
+  setFlag(metFlag(q.id)); if (b.npc?.flag) setFlag(b.npc.flag);
+  addMonster(state, createMonster(e.id, e.level)); save(); updateUI();
+  openModal(head(q.name, `전설의 우산몬 · ${q.monument}`) + `<div class="end-screen"><div class="form-pair"><figure><canvas data-portrait="${q.id}" width="128" height="128"></canvas><figcaption>노멀폼</figcaption></figure><span aria-hidden="true">⇄</span><figure><canvas data-portrait="${q.id}-2" width="128" height="128"></canvas><figcaption>변환폼</figcaption></figure></div><p>검은 기운이 걷히자 ${josa(q.name, '이/가')} 고마운 듯 곁에 내려앉았어요.<br>이제 동료가 되어 함께해요!</p><div class="fact-box"><strong>${q.monument} · ${q.name}</strong><br>${esc(q.fact)}<br>결투에서 ‘정화하기 → 형태변환’을 고르면 변환폼으로 바뀌어요. 게임 속 모습은 창작이에요.</div><div class="modal-actions"><button id="legendJoinOK" class="primary">함께 가자 →</button></div></div>`, () => {
+    $('#legendJoinOK').onclick = () => { closeModal(); allLegendsCheck(); };
+  });
+}
+function allLegendsCheck() {
+  if (state.flags['legend-all'] || !ALL_LEGEND_IDS.every(id => ownsSpecies(state, id))) return;
+  setFlag('legend-all'); state.items.orb += 10; state.coins += 200; save(); updateUI();
+  talk('김박사(무전)', ['천연기념물 전설의 우산몬 일곱이 모두 당신과 함께하게 됐어요!', '오늘부터 당신은 ‘천연기념물 지킴이’예요. 친구 구슬 10개와 조사 코인 200개를 보낼게요.', '천연기념물은 우리가 아끼고 지켜야 다음 세대도 만날 수 있어요. 고마워요!'], null, '천연기념물 지킴이', 'professor');
+}
+function paintLegendList() {
+  const el = $('#legendList'); if (!el) return;
+  const rows = [TREE_ENTRY, ...LEGENDS].map(q => {
+    const owned = ownsSpecies(state, q.id), open = q.id !== 18 && state.flags[openFlag(q.id)], p = q.id === 18 ? null : legendProgress(q, state);
+    const status = owned ? '함께해요 ✓' : open ? `가 볼 곳: ${q.place}` : p ? `${q.need.label} (${p.cur}/${p.need})` : q.need.label;
+    return `<li class="${owned ? 'done' : open ? 'open' : ''}"><canvas data-portrait="${q.id}" width="40" height="40" style="${owned || open ? '' : 'filter:brightness(0) opacity(.35)'}"></canvas><div><strong>${owned || open ? q.name : '???'}</strong><small>${esc(q.title)}</small><small>${esc(status)}</small></div></li>`;
+  });
+  el.innerHTML = rows.join('');
+  $('#legendCount').textContent = `${ALL_LEGEND_IDS.filter(id => ownsSpecies(state, id)).length} / ${ALL_LEGEND_IDS.length}`;
+}
+
 // ── shop, party, dex, world map, notebook, menu ────────────────────────────────
 function showShop() {
   openModal(head('쉼터', '회복 · 준비 · 동료 관리') + `<p>잠깐 쉬어 가요. 동료 회복은 언제나 무료예요.</p><div class="fact-box">조사 코인 <strong>${state.coins}</strong> · 회복젤 ${state.items.heal} · 친구 구슬 ${state.items.orb}</div><div class="modal-actions"><button id="healAll" class="primary">모두 회복하기</button><button id="buyHeal" class="neutral" ${state.coins < 20 ? 'disabled' : ''}>회복젤 +3 · 20코인</button><button id="buyOrb" class="neutral" ${state.coins < 25 ? 'disabled' : ''}>친구 구슬 +5 · 25코인</button><button id="storageBtn" class="neutral">동료 보관함 (${state.storage.length})</button></div>`, () => {
@@ -920,9 +979,20 @@ function showDex(filter = 'all') {
     $$('[data-filter]').forEach(b => b.onclick = () => showDex(b.dataset.filter)); $$('[data-dex]').forEach(b => b.onclick = () => dexDetail(Number(b.dataset.dex), filter));
   });
 }
-function dexDetail(id, filter) {
-  const m = getSpecies(id), seen = state.seen.includes(id);
-  openModal(head(seen ? m.name : '아직 만나지 못한 친구', `NO.${String(id).padStart(3, '0')}`) + `<div class="monster-detail"><canvas data-portrait="${id}" width="160" height="160" style="${seen ? '' : 'filter:brightness(0) opacity(.2)'}"></canvas><div><span class="type-chip">${seen ? TYPES[m.type].name : '발견 전'}</span><p>${seen ? m.detail : `${ZONES[m.zone].name} 부근에서 단서를 찾아보세요.`}</p></div></div>${seen ? `<div class="fact-box"><strong>실제 생물 모티브 · ${m.motif}</strong><br>${esc(m.area)} · ${esc(m.group)}<br>기록 확인: ${esc(m.recordStatus)}<br>${esc(m.recordNote)}<br>모습과 능력은 게임용 창작이에요.${m.source ? `<br><a href="${m.source}" target="_blank" rel="noopener" class="source-link">관련 자료 살펴보기 ↗</a>` : ''}</div>` : ''}<div class="modal-actions"><button id="backDex" class="neutral">← 도감으로</button></div>`, () => $('#backDex').onclick = () => showDex(filter));
+// 도감: 도트 그림이 기본, ‘실제 사진 보기’를 누르면 실제 생물 사진으로 바뀌어요 (사진은 자르지 않고 전체를 보여 줘요).
+// 전설의 우산몬은 ‘노멀폼 / 변환폼’ 버튼으로 두 모습을 볼 수 있어요.
+function dexDetail(id, filter, view = 'dot') {
+  const m = getSpecies(id), seen = state.seen.includes(id), credit = PHOTO_CREDITS[id], hasForms = m.forms === 2;
+  const photo = seen && view === 'photo' && credit, dotId = view === 'form2' && hasForms ? `${id}-2` : String(id);
+  const picture = photo
+    ? `<figure class="dex-photo"><img src="${assetURL(photoKey(id))}" alt="${esc(credit.name)} 실제 사진" loading="lazy"><figcaption>사진: ${esc(credit.by)} · ${esc(LICENSE_TEXT[credit.license] || credit.license)}${credit.note ? `<br>${esc(credit.note)}` : ''}</figcaption></figure>`
+    : `<canvas data-portrait="${dotId}" width="160" height="160" style="${seen ? '' : 'filter:brightness(0) opacity(.2)'}"></canvas>`;
+  const toggles = seen ? `<div class="dex-view">${[['dot', '도트 그림'], ...(hasForms ? [['form2', '변환폼']] : []), ...(credit ? [['photo', '실제 사진 보기']] : [])].map(([v, label]) => `<button data-view="${v}" class="${view === v ? 'selected' : ''}" aria-pressed="${view === v}">${label}</button>`).join('')}</div>` : '';
+  const legendNote = m.legendary ? `<br><strong>전설의 우산몬</strong>${hasForms ? ' · 결투에서 형태변환을 쓸 수 있어요' : ''}` : '';
+  openModal(head(seen ? m.name : '아직 만나지 못한 친구', `NO.${String(id).padStart(3, '0')}${m.legendary ? ' · 전설' : ''}`) + `<div class="monster-detail${photo ? ' with-photo' : ''}">${picture}<div><span class="type-chip">${seen ? TYPES[m.type].name : '발견 전'}</span><p>${seen ? m.detail : `${ZONES[m.zone].name} 부근에서 단서를 찾아보세요.`}</p></div></div>${toggles}${seen ? `<div class="fact-box"><strong>실제 생물 모티브 · ${m.motif}</strong><br>${esc(m.area)} · ${esc(m.group)}<br>기록 확인: ${esc(m.recordStatus)}<br>${esc(m.recordNote)}${legendNote}<br>모습과 능력은 게임용 창작이에요.${m.source ? `<br><a href="${m.source}" target="_blank" rel="noopener" class="source-link">관련 자료 살펴보기 ↗</a>` : ''}</div>` : ''}<div class="modal-actions"><button id="backDex" class="neutral">← 도감으로</button></div>`, () => {
+    $('#backDex').onclick = () => showDex(filter);
+    $$('[data-view]').forEach(b => b.onclick = () => dexDetail(id, filter, b.dataset.view));
+  });
 }
 // ── 세계 지도: 두 섬을 그린 그림 지도. 가 본 마을을 누르면 바로 이동해요. ──
 // 자리(320×200 지도 칸)는 실제 지명의 대략적인 방향을 따랐어요. 섬 모양은 게임용 그림이에요.
@@ -1069,6 +1139,7 @@ if (typeof location !== 'undefined' && new URLSearchParams(location.search).has(
     screenOf(x, y) { const r = canvas.getBoundingClientRect(); return { x: r.left + (x * TILE + 16 - camera.x) * sceneScale, y: r.top + (y * TILE + 16 - camera.y) * sceneScale }; },
     standAtDoor(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b); settleMovement(); state.x = f.x; state.y = f.y; view = { x: f.x, y: f.y }; state.dir = 'up'; return f; },
     goInside(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b), p = pathfind(map, state.x, state.y, f.x, f.y, liveNPCs()); if (state.x === f.x && state.y === f.y) enterBuilding(b); else { path = p; pathAction = () => enterBuilding(b); } return p.length; },
+    legendRadio: false, dexDetail, showDex, showQuest, checkLegends, place(x, y, dir = 'right') { settleMovement(); path = []; state.x = x; state.y = y; view = { x, y }; state.dir = dir; },
     walkToTile(x, y) { const p = pathfind(map, moving?.toX ?? state.x, moving?.toY ?? state.y, x, y, liveNPCs()); path = p; pathAction = null; return p.length; }
   };
 }

@@ -22,11 +22,11 @@
 21,독도장님노린재,육지,곤충,,,5,개별 근거 미확인,앞선 99종 목록 수록; 독도 조사 종목록 대조 필요,,monsters/021.png
 22,애꽃노린재,육지,곤충,,,5,개별 근거 미확인,앞선 99종 목록 수록; 독도 조사 종목록 대조 필요,,monsters/022.png
 23,애긴노린재,육지,곤충,,,5,개별 근거 미확인,앞선 99종 목록 수록; 독도 조사 종목록 대조 필요,,monsters/023.png
-24,섬땅방아벌레,육지,곤충,,,5,개별 근거 미확인,앞선 99종 목록 수록; 독도 조사 종목록 대조 필요,,monsters/024.png
-25,긴뺨모래거저리,육지,곤충,,,5,개별 근거 미확인,앞선 99종 목록 수록; 독도 조사 종목록 대조 필요,,monsters/025.png
-26,모래섶벌레,육지,곤충,,,6,개별 근거 미확인,앞선 99종 목록 수록; 독도 조사 종목록 대조 필요,,monsters/026.png
+24,된장잠자리,하늘,곤충,,,5,추가 자료에 언급,국립생물자원관 「독도의 생물다양성」(2017) 62쪽에 수록. 섬땅방아벌레 대신 넣은 종이에요(v0.40).,https://www.nibr.go.kr/aiibook/access/ecatalogt.jsp?callmode=admin&catimage=&eclang=ko&Dir=78&um=s&start=164,monsters/024.png
+25,풀색노린재,육지,곤충,,,5,추가 자료에 언급,국립생물자원관 「독도의 생물다양성」(2017) 70쪽에 수록. 긴뺨모래거저리 대신 넣은 종이에요(v0.40).,https://www.nibr.go.kr/aiibook/access/ecatalogt.jsp?callmode=admin&catimage=&eclang=ko&Dir=78&um=s&start=164,monsters/025.png
+26,남생이잎벌레,육지,곤충,,,6,추가 자료에 언급,국립생물자원관 「독도의 생물다양성」(2017) 87쪽에 수록. 모래섶벌레 대신 넣은 종이에요(v0.40).,https://www.nibr.go.kr/aiibook/access/ecatalogt.jsp?callmode=admin&catimage=&eclang=ko&Dir=78&um=s&start=164,monsters/026.png
 27,칠성무당벌레,육지,곤충,,,6,개별 근거 미확인,앞선 99종 목록 수록; 독도 조사 종목록 대조 필요,,monsters/027.png
-28,무당벌레,육지,곤충,,,6,개별 근거 미확인,앞선 99종 목록 수록; 독도 조사 종목록 대조 필요,,monsters/028.png
+28,노랑나비,육지,곤충,,,6,추가 자료에 언급,국립생물자원관 「독도의 생물다양성」(2017) 108쪽에 수록. 무당벌레 대신 넣은 종이에요(v0.40).,https://www.nibr.go.kr/aiibook/access/ecatalogt.jsp?callmode=admin&catimage=&eclang=ko&Dir=78&um=s&start=164,monsters/028.png
 29,배검은꼬마개미,육지,곤충,,,6,개별 근거 미확인,앞선 99종 목록 수록; 독도 조사 종목록 대조 필요,,monsters/029.png
 30,쟈바꽃등에,육지,곤충,,,6,개별 근거 미확인,앞선 99종 목록 수록; 독도 조사 종목록 대조 필요,,monsters/030.png
 31,호리꽃등에,육지,곤충,,,7,개별 근거 미확인,앞선 99종 목록 수록; 독도 조사 종목록 대조 필요,,monsters/031.png
@@ -66,15 +66,15 @@
 65,대황,바다,해조류,,,7,개별 근거 미확인,앞선 99종 목록 수록; 독도 해역 조사 자료 대조 필요,,monsters/065.png
 66,독도새우,바다,갑각류,예,,1,사용자 지정 스타팅,첨부 명부의 청각 대신 편성한 게임 캐릭터 이름입니다. 실제 새우의 종명과 독도 해역 기록은 별도 확인이 필요해요.,,monsters/066.png
 67,괭이갈매기,하늘,조류,예,,1,공식 소개에 명시,독도 조류 목록에서 명칭 확인,https://dokdo.mofa.go.kr/kor/introduce/nature.jsp,monsters/067.png
-68,바다제비,하늘,조류,,,1,공식 소개에 명시,독도 조류 목록에서 명칭 확인,https://dokdo.mofa.go.kr/kor/introduce/nature.jsp,monsters/068.png
+68,소쩍새,하늘,조류,,예,도동항 뒷산 숲(한 번),추가 자료에 언급,국립생물자원관 「독도의 생물다양성」(2017) 134쪽에 수록. 바다제비 대신 넣은 종이에요(v0.40).,https://www.nibr.go.kr/aiibook/access/ecatalogt.jsp?callmode=admin&catimage=&eclang=ko&Dir=78&um=s&start=164,monsters/068.png
 69,슴새,하늘,조류,,,1,공식 소개에 명시,독도 조류 목록에서 명칭 확인,https://dokdo.mofa.go.kr/kor/introduce/nature.jsp,monsters/069.png
-70,뿔쇠오리,하늘,조류,,,1,추가 자료에 언급,독도 간헐 관찰 사례로 소개; 계절/연도 조사 대조 권장,https://webzine.ggc.go.kr/?amp=1&p=55884,monsters/070.png
-71,매,하늘,조류,,,1,추가 자료에 언급,독도 간헐 관찰 사례로 소개; 계절/연도 조사 대조 권장,https://webzine.ggc.go.kr/?amp=1&p=55884,monsters/071.png
-72,황조롱이,하늘,조류,,,2,공식 소개에 명시,독도 조류 목록에서 명칭 확인,https://dokdo.mofa.go.kr/kor/introduce/nature.jsp,monsters/072.png
+70,뿔쇠오리,하늘,조류,,예,보찰바위 갯바위(한 번),추가 자료에 언급,독도 간헐 관찰 사례로 소개; 계절/연도 조사 대조 권장,https://webzine.ggc.go.kr/?amp=1&p=55884,monsters/070.png
+71,매,하늘,조류,,예,탕건봉 절벽(한 번),추가 자료에 언급,독도 간헐 관찰 사례로 소개; 계절/연도 조사 대조 권장,https://webzine.ggc.go.kr/?amp=1&p=55884,monsters/071.png
+72,황조롱이,하늘,조류,,예,천장굴 길 언덕(한 번),공식 소개에 명시,독도 조류 목록에서 명칭 확인,https://dokdo.mofa.go.kr/kor/introduce/nature.jsp,monsters/072.png
 73,물수리,하늘,조류,,,2,공식 소개에 명시,독도 조류 목록에서 명칭 확인,https://dokdo.mofa.go.kr/kor/introduce/nature.jsp,monsters/073.png
 74,말똥가리,하늘,조류,,,2,개별 근거 미확인,앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요,,monsters/074.png
-75,고니,하늘,조류,,,2,추가 자료에 언급,독도 간헐 관찰 사례로 소개; 계절/연도 조사 대조 권장,https://webzine.ggc.go.kr/?amp=1&p=55884,monsters/075.png
-76,흑두루미,하늘,조류,,,2,추가 자료에 언급,독도 간헐 관찰 사례로 소개; 계절/연도 조사 대조 권장,https://webzine.ggc.go.kr/?amp=1&p=55884,monsters/076.png
+75,고니,하늘,조류,,예,물골 몽돌 해안(한 번),추가 자료에 언급,독도 간헐 관찰 사례로 소개; 계절/연도 조사 대조 권장,https://webzine.ggc.go.kr/?amp=1&p=55884,monsters/075.png
+76,흑두루미,하늘,조류,,예,상장군바위 오르막(한 번),추가 자료에 언급,독도 간헐 관찰 사례로 소개; 계절/연도 조사 대조 권장,https://webzine.ggc.go.kr/?amp=1&p=55884,monsters/076.png
 77,황로,하늘,조류,,,3,추가 자료에 언급,독도 간헐 관찰 사례로 소개; 계절/연도 조사 대조 권장,https://webzine.ggc.go.kr/?amp=1&p=55884,monsters/077.png
 78,검은댕기해오라기,하늘,조류,,,3,개별 근거 미확인,앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요,,monsters/078.png
 79,민물가마우지,하늘,조류,,,3,개별 근거 미확인,앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요,,monsters/079.png
@@ -92,7 +92,7 @@
 91,박새,하늘,조류,,,5,개별 근거 미확인,앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요,,monsters/091.png
 92,상모솔새,하늘,조류,,,6,개별 근거 미확인,앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요,,monsters/092.png
 93,섬개개비,하늘,조류,,,6,개별 근거 미확인,앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요,,monsters/093.png
-94,한국동박새,하늘,조류,,,6,개별 근거 미확인,앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요,,monsters/094.png
+94,칼새,하늘,조류,,,6,추가 자료에 언급,국립생물자원관 「독도의 생물다양성」(2017) 135쪽에 수록. 한국동박새 대신 넣은 종이에요(v0.40).,https://www.nibr.go.kr/aiibook/access/ecatalogt.jsp?callmode=admin&catimage=&eclang=ko&Dir=78&um=s&start=164,monsters/094.png
 95,귀제비,하늘,조류,,,6,개별 근거 미확인,앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요,,monsters/095.png
 96,딱새,하늘,조류,,,6,공식 소개에 명시,독도 조류 목록에서 명칭 확인,https://dokdo.mofa.go.kr/kor/introduce/nature.jsp,monsters/096.png
 97,호랑지빠귀,하늘,조류,,,7,개별 근거 미확인,앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요,,monsters/097.png

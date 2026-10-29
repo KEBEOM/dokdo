@@ -1,7 +1,7 @@
 // Dragon Quest–style battle screen: status window, framed backdrop, command window and a typed message window.
 // The game logic (game.js) drives it with await ui.say(...), await ui.menu(...), await ui.quiz(...).
 import { createTypewriter } from './typewriter.js';
-import { portrait, battlePortrait } from './sprites.js';
+import { portrait, battlePortrait, look } from './sprites.js';
 import { assetImage, drawAsset } from './assets.js';
 import { TERRAIN_ATLAS } from './terrain-atlas.js';
 import { SCENERY_ATLAS } from './scenery-atlas.js';
@@ -90,8 +90,8 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
     els.status.innerHTML = `<div class="dq-status-row"><canvas class="dq-ally" width="48" height="48" aria-hidden="true"></canvas><div><strong>${esc(info.name)}</strong><span class="dq-lv">Lv ${m.level}</span>
       <div class="dq-hp">HP <b>${m.hp}</b> / ${m.maxHp}</div>${bar(m.hp, m.maxHp)}</div></div>
       <div class="dq-party" aria-label="동료 상태">${party.map(p => `<i class="${p.hp <= 0 ? 'down' : p.active ? 'on' : ''}" title="${esc(p.name)}"></i>`).join('')}</div>`;
-    portrait(els.status.querySelector('.dq-ally'), m.id);
-    battlePortrait(els.ally, m.id, true); // my 우산몬 looks right, toward the foe
+    portrait(els.status.querySelector('.dq-ally'), look(m));
+    battlePortrait(els.ally, look(m), true); // my 우산몬 looks right, toward the foe
     els.allyWrap.classList.toggle('tired', m.hp <= 0);
   }
   function setFoe(e, info, extra = '') {
@@ -100,7 +100,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
     const nums = `<b>${Math.ceil(Math.max(0, e.hp))}</b> / ${e.maxHp}`; // 퍼센트 대신 남은 수치 / 처음 수치
     const gauge = info.dark ? `<div class="dq-gauge-label">${esc(info.gauge)} ${nums}</div><div class="dq-barrow"><b class="dq-tag dark">기운</b><div class="dq-bar dark"><i style="width:${r * 100}%"></i></div></div>` : `<div class="dq-gauge-label">${esc(info.gauge || '기운')} ${nums}</div>${bar(e.hp, e.maxHp, '기운')}`;
     els.foe.innerHTML = `<strong>${info.dark && e.hp > 0 ? '<span class="dq-berserk">사나워짐</span> ' : ''}${esc(info.name)}</strong><span class="dq-lv">Lv ${e.level} · ${esc(info.type)}</span>${gauge}${extra ? `<small>${esc(extra)}</small>` : ''}`;
-    battlePortrait(els.enemy, e.id); paintTrainer(); paintPortrait(); // the foe looks left
+    battlePortrait(els.enemy, look(e)); paintTrainer(); paintPortrait(); // the foe looks left
   }
   function paintPortrait() {
     const c = els.portrait?.querySelector('canvas'); if (!c || !portraitKey) return;
@@ -239,6 +239,8 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
   function enemyEnter() { els.enemyWrap.classList.remove('gone', 'hit', 'calm'); els.enemyWrap.classList.add('enter'); setTimeout(() => els.enemyWrap?.classList.remove('enter'), 600); }
   // Aura strength follows the remaining dark energy (0 = calm).
   function setAura(level) { const v = typeof level === 'number' ? level : level ? 1 : 0; els.enemyWrap.classList.toggle('aura', v > 0); els.enemyWrap.style.setProperty('--aura', String(v)); if (v > 0) els.enemyWrap.classList.remove('calm'); }
+  // 전설의 우산몬 형태변환: 빛에 감싸였다가 새 모습으로 (side: 'ally' | 'enemy')
+  function morph(side = 'ally') { const w = side === 'ally' ? els.allyWrap : els.enemyWrap; if (!w) return; w.classList.remove('morph'); void w.offsetWidth; w.classList.add('morph'); setTimeout(() => w.classList.remove('morph'), 1100); }
   function enemyCalmed() { setAura(0); els.enemyWrap.classList.remove('hit'); void els.enemyWrap.offsetWidth; els.enemyWrap.classList.add('calm'); }
 
   function handleKey(e) {
@@ -260,5 +262,5 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
     return false;
   }
   function destroy() { clearTimeout(portraitTimer); writer?.clear(); waiting = null; menuState = null; quizState = null; root.innerHTML = ''; root.classList.remove('dq', 'menu-open', 'quiz-open', 'shake', 'intro'); }
-  return { mount, setStatus, setFoe, say, menu, quiz, reveal, explain, confirm, damage, enemyDefeated, enemyCalmed, enemyEnter, setAura, allyAct, portraitIn, portraitOut, portraitFlash, coach, handleKey, destroy, get waiting() { return !!waiting; } };
+  return { morph, mount, setStatus, setFoe, say, menu, quiz, reveal, explain, confirm, damage, enemyDefeated, enemyCalmed, enemyEnter, setAura, allyAct, portraitIn, portraitOut, portraitFlash, coach, handleKey, destroy, get waiting() { return !!waiting; } };
 }

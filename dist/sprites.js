@@ -8,7 +8,7 @@ export function drawMonster(ctx,id,x,y,size=64,t=0,back=false){
  for(let i=0;i<3;i++)ctx.fillRect(Math.round(x+size/2+(i-1)*dot*3-dot/2),Math.round(y+size/2),dot,dot);
  ctx.restore();return false;
 }
-export function drawMonsterDefault(ctx,id,x,y,size=64,t=0,back=false){const m=getSpecies(id),u=size/32;ctx.save();ctx.translate(Math.round(x),Math.round(y));ctx.scale(u,u);if(back){ctx.translate(32,0);ctx.scale(-1,1);}const body=m.color,outline='#344d50',light='#f8f3d9',dark='#50737b',gold='#e5c87e';const r=(a,b,c,d,col)=>{ctx.fillStyle=col;ctx.fillRect(a,b,c,d)};const box=(a,b,c,d,col)=>{r(a,b,c,d,outline);r(a+1,b+1,c-2,d-2,col)};const eye=(a,b)=>{r(a,b,3,4,outline);r(a,b,1,1,'#fff9e2')};const bob=Math.sin(t*3+m.id)*.5;ctx.translate(0,Math.round(bob));const st=m.stage;r(8,28,18,2,'#315e4230');
+export function drawMonsterDefault(ctx,id,x,y,size=64,t=0,back=false){const m=getSpecies(parseInt(id,10)),u=size/32;ctx.save();ctx.translate(Math.round(x),Math.round(y));ctx.scale(u,u);if(back){ctx.translate(32,0);ctx.scale(-1,1);}const body=m.color,outline='#344d50',light='#f8f3d9',dark='#50737b',gold='#e5c87e';const r=(a,b,c,d,col)=>{ctx.fillStyle=col;ctx.fillRect(a,b,c,d)};const box=(a,b,c,d,col)=>{r(a,b,c,d,outline);r(a+1,b+1,c-2,d-2,col)};const eye=(a,b)=>{r(a,b,3,4,outline);r(a,b,1,1,'#fff9e2')};const bob=Math.sin(t*3+m.id)*.5;ctx.translate(0,Math.round(bob));const st=m.stage;r(8,28,18,2,'#315e4230');
 switch(m.shape){
 case 'bird':case 'raptor':{box(10,12,13,13,body);box(15,6,10,12,body);r(14,10,2,7,body);r(12,17,9,6,light);box(5,15,10,7,m.shape==='raptor'?'#7e6f60':'#a1b1b1');r(3,17,4,3,outline);r(23,13,6,3,gold);eye(20,10);r(12,25,3,3,gold);r(19,25,3,3,gold);r(11,28,5,1,outline);r(18,28,5,1,outline);if(st>1){r(5,13,3,3,light);r(2,11,3,5,outline);r(17,4,3,3,gold);}if(st>2){r(14,2,4,4,outline);r(15,2,2,3,gold);r(1,9,2,3,light);r(1,21,4,2,light);}if(m.name==='괭이갈매기'){r(5,19,5,2,'#57767b');r(25,14,2,1,'#c07868');}break;}
 case 'fish':case 'goby':{box(8,10,18,15,body);r(5,13,5,10,body);r(25,13,3,9,body);box(2,12,6,13,body);r(1,10,2,5,outline);r(1,23,2,4,outline);r(10,25,11,2,outline);r(12,7,9,3,outline);r(13,8,7,3,body);r(10,20,10,3,'#f0dcba');eye(22,13);r(25,20,3,1,outline);r(13,15,3,5,'#fff2c780');if(m.motif==='혹돔'){box(20,6,7,9,body);eye(23,14);}if(m.motif==='돌돔'){for(let i=10;i<22;i+=4)r(i,11,2,13,'#516d79');eye(23,13);}if(st>1){r(11,5,4,3,gold);r(15,4,4,4,gold);}if(st>2){r(8,3,3,4,outline);r(12,1,3,6,outline);r(16,2,3,5,outline);r(13,2,1,3,gold);}if(m.shape==='goby'){r(7,22,3,5,body);r(21,22,3,5,body);r(12,13,2,2,dark);r(16,19,2,2,dark);}break;}
@@ -27,13 +27,16 @@ case 'starfish':{const points=[[14,2,5,25],[4,12,25,5],[7,8,5,16],[21,8,5,16],[4
 case 'coral':case 'anemone':{for(let i=0;i<5;i++){const a=4+i*5;box(a,5+(i%2)*4,4,20-(i%2)*4,body);if(m.shape==='coral'){r(a-2,11,3,3,body);r(a+3,15,3,3,body);}}box(8,19,19,9,body);eye(12,21);eye(21,21);r(9,27,19,2,outline);break;}
 case 'seal':{box(9,12,15,14,body);box(12,5,14,12,body);r(14,2,9,4,body);box(3,18,8,6,body);box(21,18,9,6,body);r(8,26,7,3,body);r(20,26,8,3,body);r(13,17,8,7,'#d1ded5');eye(15,8);eye(23,8);r(19,13,3,2,outline);r(12,14,5,1,light);r(24,14,6,1,light);r(11,16,5,1,light);r(24,16,6,1,light);r(14,0,3,3,gold);r(22,0,3,3,gold);r(17,1,5,2,gold);for(let i=0;i<3;i++){r(1+i*10,29,7,1,'#b6dfdc');}break;}}
 ctx.restore();}
-// v0.40 그림이 바라보는 쪽. 뒷모습 그림은 쓰지 않고, 앞모습 그림을 좌우로 뒤집어 방향을 맞춰요.
+// 그림이 바라보는 쪽(v0.41, 사용자가 다시 찍은 도트 기준). 뒷모습 그림은 쓰지 않고, 앞모습 그림을 좌우로 뒤집어 방향을 맞춰요.
 //   결투에서 내 우산몬은 오른쪽(상대 쪽), 상대 우산몬은 왼쪽(내 쪽)을 봐요.
 //   FACES_RIGHT: 오른쪽을 보는 그림 · FACES_FRONT: 정면 그림(뒤집지 않아요) · 나머지: 왼쪽을 보는 그림
-//   그림을 새로 바꾸면 여기 번호를 맞춰 주세요.
-export const FACES_RIGHT=new Set([]);
-export const FACES_FRONT=new Set([1,2,4,5,6,7,9,10,12,13,14,15,19]);
-export const facing=id=>FACES_RIGHT.has(Number(id))?'right':FACES_FRONT.has(Number(id))?'front':'left';
+//   변환폼('68-2')은 FORM_FRONT에 있으면 정면이에요. 그림을 새로 바꾸면 여기 번호를 맞춰 주세요.
+export const FACES_RIGHT=new Set([21,22,23,31,32,33]);
+export const FACES_FRONT=new Set([1,4,5,6,7,13,14,15,17,18,19,52,53,55,56,58,59,60,61,62,63,64,65,68,73]);
+export const FORM_FRONT=new Set([]); // 변환폼 그림은 모두 왼쪽을 바라봐요 → 내 쪽에서는 뒤집어 오른쪽을 봐요
+export function facing(id){const s=String(id);if(s.includes('-')&&!s.endsWith('-1'))return FORM_FRONT.has(s)?'front':'left';const n=parseInt(s,10);return FACES_RIGHT.has(n)?'right':FACES_FRONT.has(n)?'front':'left';}
+// 그림 번호: 결투 중 형태변환한 전설의 우산몬은 '68-2', 나머지는 번호 그대로.
+export const look=m=>m&&m.form===2?`${m.id}-2`:m?.id;
 export function portrait(canvas,id,t=0,back=false,mirror=false){const ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);ctx.imageSmoothingEnabled=false;ctx.save();if(mirror){ctx.translate(canvas.width,0);ctx.scale(-1,1);}drawMonster(ctx,id,0,0,canvas.width,t,back);ctx.restore();}
 // Battle: the foe looks left (toward me), my 우산몬 looks right (toward the foe). Both use the front picture.
 export function battlePortrait(canvas,id,mine=false){const f=facing(id);portrait(canvas,id,0,false,mine?f==='left':f==='right');}

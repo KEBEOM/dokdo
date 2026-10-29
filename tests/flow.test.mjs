@@ -238,7 +238,7 @@ for (let zone = 0; zone < 8; zone++) {
     for (const id of ['sign', 'landmark', 'person', 'box', 'observe', 'trash']) { await npc(id); }
     const after = await G(() => ({ ...window.__dokdo.state.items, coins: window.__dokdo.state.coins }));
     assert.equal(after.heal, before.heal + 2, 'box gave two heals'); assert.ok(after.coins > before.coins, 'picking up rubbish rewards coins');
-    assert.ok(await G(() => window.__dokdo.state.seen.includes(68)), 'observation records the species');
+    assert.ok(await G(() => window.__dokdo.state.seen.includes(69)), 'observation records the species (슴새)');
     await npc('box'); assert.equal((await G(() => window.__dokdo.state.items.heal)), after.heal, 'a box opens once');
     await npc('stone'); await answerStudy(); assert.ok(await G(() => window.__dokdo.state.flags['route0:7']));
     await npc('trainer'); totalTurns += await fight(); assert.ok(await G(() => window.__dokdo.state.flags['route0:4']), 'trainer beaten once');
@@ -262,6 +262,28 @@ assert.equal(studyLog[0].correct, false); assert.equal(studyLog[1].correct, true
 await page.click('#notebookBtn'); assert.equal(await page.locator('[data-review]').count(), 12); await page.keyboard.press('Escape');
 await page.click('#dexBtn'); assert.equal(await page.locator('[data-dex]').count(), 100); await page.keyboard.press('Escape');
 
+// ── 6b. 전설의 우산몬(천연기념물): 조건을 채우면 김박사 무전 → 금빛 기운 → 만남 장면 → 정화 결투 → 동료 ──
+await G(() => { window.__dokdo.legendRadio = true; });
+await until(() => window.__dokdo.talk?.name === '김박사(무전)', 15000);
+for (let i = 0; i < 8; i++) { await dismiss(); await page.waitForTimeout(900); if (!(await G(() => !!window.__dokdo.talk))) break; }
+assert.ok(await G(() => window.__dokdo.state.flags['legend-open:68']), '소쩍새 quest opens after the 도동항 인증');
+await G(() => window.__dokdo.changeMap('town0', 'a')); await until(() => window.__dokdo.map.id === 'town0' && !window.__dokdo.transition, 15000); await dismiss();
+assert.ok(await G(() => window.__dokdo.npcs().some(n => n.kind === 'legend' && n.species === 68)), 'the golden spot is on the map');
+await G(() => { window.__dokdo.place(27, 6, 'right'); const n = window.__dokdo.npcs().find(n => n.kind === 'legend'); window.__dokdo.interact(n); });
+await until(() => window.__dokdo.cutscene() === 'legend-68', 10000); await skipCutscene();
+await until(() => window.__dokdo.battle?.kind === 'legend', 10000);
+await G(() => { window.__dokdo.battle.enemies[0].hp = Math.ceil(window.__dokdo.battle.enemies[0].maxHp * .4); });
+totalTurns += await fight();
+await until(() => !!document.querySelector('#legendJoinOK'), 10000);
+assert.ok(await page.$('.form-pair canvas[data-portrait="68-2"]'), 'the join screen shows the 변환폼');
+await page.click('#legendJoinOK'); await dismiss();
+st = await G(() => { const s = window.__dokdo.state; return { owned: [...s.party, ...s.storage].filter(m => m.id === 68).length, met: !!s.flags['legend:68'], spot: window.__dokdo.npcs().some(n => n.kind === 'legend' && n.species === 68), forms: [...s.party, ...s.storage].some(m => m.form) }; });
+assert.deepEqual(st, { owned: 1, met: true, spot: false, forms: false });
+await page.click('#dexBtn'); await page.click('[data-dex="68"]'); await page.click('[data-view="photo"]');
+await until(() => { const i = document.querySelector('.dex-photo img'); return i && i.complete && i.naturalWidth > 0; }, 10000);
+assert.match(await page.locator('.dex-photo figcaption').innerText(), /국립생물자원관.*공공누리/);
+await page.click('[data-view="form2"]'); assert.ok(await page.$('canvas[data-portrait="68-2"]'), 'dex shows the 변환폼'); await page.keyboard.press('Escape');
+
 // ── 7. Saves: reload and continue in the same place; a v0.21 save still loads ──
 await G(() => window.__dokdo.save()); const where = await G(() => ({ map: window.__dokdo.map.id, flags: Object.keys(window.__dokdo.state.flags).length }));
 await page.reload(); await page.click('#continueBtn');
@@ -273,4 +295,4 @@ assert.deepEqual(st, { map: 'town3', visited: 8, onSpawn: true });
 
 assert.deepEqual(errors, [], 'no browser errors');
 await browser.close(); server.close();
-console.log(`PASS: 백무 사장 reveal/fall/epilogue scenes, 사나워진 우산몬 duels with 검은 기운 gauges, 몽땅랜드 designs in battle, softened hits on correct defence, opening read line by line with the mission choice, starter + guide, key walking, closed bridge, guide, DQ commands (정화하기 with two starting skills, guard skill, item, orb, switch, run), my 우산몬 drawn from behind, 백무단 pictures fading out, explorer drawings in the character choice, 울릉도 도동항 and the ferry to 독도, buildings with floors (door, stairs, dex, books, review desk, rest), 김박사 picture and starter cutscene, 사철나무 purified from 백무 사장 and joining once, practice duel and walking tutorial, clickable picture map, easy words (사나워진 우산몬 · 검은 기운 · 몽땅랜드 컴퍼니), quiz rules (wrong attack = miss, correct defence = light hit), hints, KO recovery, route objects, trainer, memory stone, 8 chapters walked through 7 routes, first-arrival scenes, fast travel, legend, ending, saves and a v0.21 save; ${totalTurns} battle turns.`);
+console.log(`PASS: 전설의 우산몬 quest (radio, golden spot, meeting scene, duel, join with 변환폼, dex photo), 백무 사장 reveal/fall/epilogue scenes, 사나워진 우산몬 duels with 검은 기운 gauges, 몽땅랜드 designs in battle, softened hits on correct defence, opening read line by line with the mission choice, starter + guide, key walking, closed bridge, guide, DQ commands (정화하기 with two starting skills, guard skill, item, orb, switch, run), my 우산몬 drawn from behind, 백무단 pictures fading out, explorer drawings in the character choice, 울릉도 도동항 and the ferry to 독도, buildings with floors (door, stairs, dex, books, review desk, rest), 김박사 picture and starter cutscene, 사철나무 purified from 백무 사장 and joining once, practice duel and walking tutorial, clickable picture map, easy words (사나워진 우산몬 · 검은 기운 · 몽땅랜드 컴퍼니), quiz rules (wrong attack = miss, correct defence = light hit), hints, KO recovery, route objects, trainer, memory stone, 8 chapters walked through 7 routes, first-arrival scenes, fast travel, legend, ending, saves and a v0.21 save; ${totalTurns} battle turns.`);
