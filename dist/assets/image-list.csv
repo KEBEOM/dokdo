@@ -173,15 +173,8 @@ assets/npc/08/05.png,관장 가온,8지역 NPC,64,64,normal
 assets/npc/08/06.png,쉼터지기,8지역 NPC,64,64,normal
 assets/npc/08/07.png,모래 선장,8지역 NPC,64,64,normal
 assets/npc/08/08.png,연구 안내원,8지역 NPC,64,64,normal
-assets/scenery/lab.png,연구소,마을 건물,224,192,출입 위치와 충돌 범위는 기존 지도 유지
-assets/scenery/gym.png,수호관,마을 건물,256,224,출입 위치와 충돌 범위는 기존 지도 유지
-assets/scenery/shop.png,쉼터 · 상점,마을 건물,224,192,출입 위치와 충돌 범위는 기존 지도 유지
-assets/scenery/home.png,집,마을 건물,160,192,출입 위치와 충돌 범위는 기존 지도 유지
-assets/scenery/tree.png,나무,지도 장식,48,64,투명 배경
 assets/characters/girl-sheet.png,여학생 도트 시트,주인공 4×4 시트,1024,1024,첨부 원본. 한 칸은 게임에서 32×32로 표시
 assets/characters/boy-sheet.png,남학생 도트 시트,주인공 4×4 시트,1024,1024,첨부 원본. 왼쪽은 오른쪽 행의 좌우 반전
-assets/characters/girl-portrait.png,여학생 전신,캐릭터 선택창,1024,1024,첨부 원본
-assets/characters/boy-portrait.png,남학생 전신,캐릭터 선택창,512,512,첨부 원본
 assets/characters/child-boy-sheet.png,남자아이 준,주민 4×4 원본 시트,1024,1024,교체 후 node build.mjs 실행
 assets/characters/child-girl-sheet.png,여자아이 솔 · 양갈래,주민 4×4 원본 시트,1024,1024,교체 후 node build.mjs 실행
 assets/characters/child-girl-ribbon-sheet.png,여자아이 봄 · 리본,주민 4×4 원본 시트,1024,1024,교체 후 node build.mjs 실행
@@ -206,4 +199,3 @@ assets/characters/professor-atlas-v19.png,한여울 박사,현재 애니메이�
 assets/scenery/village-pixels-v21.png,한국풍 마을,현재 지형 소품 시트,1254,1254,9종 좌표는 scenery-atlas.js
 assets/scenery/two-islands-monument-v19.png,두 섬 조형물,창작 마을 장식,1346,1168,실제 지형 재현 자료 아님
 
-assets/scenery/terrain-pixels-v21.png,지형 6종,바다·잔디·풀숲·흙길·모래·부두,1024,1536,새 지형 시트

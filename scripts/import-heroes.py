@@ -13,7 +13,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def load(name):
     spec = importlib.util.spec_from_file_location(name.replace('-', '_'), os.path.join(ROOT, 'scripts', name + '.py'))
     mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod); return mod
-im = load('import-monsters')
+im = load('image-cleanup')
 from PIL import Image
 import numpy as np
 

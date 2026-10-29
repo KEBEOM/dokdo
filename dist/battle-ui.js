@@ -151,12 +151,12 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
   }
 
   // A DQ command window. items: [{label, value, sub, disabled}]. Resolves to value, or null on cancel.
-  function menu(items, { title = '', prompt = '', cancel = false } = {}) {
+  function menu(items, { title = '', prompt = '', cancel = false, layout = '' } = {}) {
     quizState = null; root.classList.remove('quiz-open'); root.classList.add('menu-open');
     els.message.className = 'dq-window dq-message'; els.extra.innerHTML = ''; els.next.hidden = true;
     if (prompt) writer.type(prompt); else writer.clear();
     const all = cancel ? [...items, { label: '돌아가기', value: null, back: true }] : items;
-    els.command.hidden = false;
+    els.command.hidden = false; els.command.classList.toggle('cards', layout === 'cards'); // 버튼이 많을 때: 긴 이름은 줄바꿈, 마지막 버튼도 한 칸만
     els.command.innerHTML = `${title ? `<div class="dq-command-title">${esc(title)}</div>` : ''}<div class="dq-options">${all.map((it, i) => `<button type="button" class="dq-option ${it.back ? 'back' : ''}" data-index="${i}" ${it.value ? `data-cmd="${esc(it.value)}"` : ''} ${it.disabled ? 'disabled' : ''}><span class="dq-cursor">▶</span><span>${esc(it.label)}</span>${it.sub ? `<small>${esc(it.sub)}</small>` : ''}</button>`).join('')}</div>`;
     all.forEach((it, i) => { if (it.hint) els.command.querySelectorAll('.dq-option')[i].classList.add('coach-pick'); });
     return new Promise(resolve => {

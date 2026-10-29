@@ -41,11 +41,9 @@ async function answerStudy(makeMistake = false) {
 async function battleState() { return G(() => { const b = window.__dokdo.battle; if (!b) return 'none'; if (document.querySelector('#dqCommand:not([hidden]) .dq-option')) return 'cmd'; if (document.querySelector('.dq-answer:not(.locked)')) return 'quiz'; return 'msg'; }); }
 async function toMenu() { for (let i = 0; i < 40; i++) { const s = await battleState(); if (s === 'cmd' || s === 'quiz' || s === 'none') return s; await page.click('#dqMessage'); } throw new Error('no menu'); }
 async function answer(correct) { const a = await G(() => window.__dokdo.battle.quiz.q.answer); await page.click(`[data-battle-answer="${correct ? a : (a + 1) % 4}"]`); await until(() => !!document.querySelector('.dq-result')); }
-// 정화하기 → the first attack skill that still has uses (or '있는 힘껏').
+// 문제 풀기 → the question appears right away.
 async function purifyAttack() {
-  await page.click('[data-cmd="purify"]');
-  const pick = await G(() => ['skill-0', 'skill-1', 'skill-last'].find(c => { const b = document.querySelector(`#dqCommand [data-cmd="${c}"]`); return b && !b.disabled; }));
-  await page.click(`#dqCommand [data-cmd="${pick}"]`);
+  await page.click('[data-cmd="quiz"]');
 }
 async function fight() {
   let turns = 0;
@@ -116,9 +114,9 @@ assert.equal(await page.textContent('#locationName'), '도동항', 'chapter 1 is
 
 // ── 1b. Tutorial: a practice duel with 김박사's tips, then the walking guide ──
 await until(() => window.__dokdo.battle?.kind === 'tutorial', 10000);
-assert.equal(await toMenu(), 'cmd'); assert.ok(await page.isVisible('.dq-coach')); assert.match(await page.textContent('.dq-coach p'), /정화하기/);
-assert.deepEqual(await page.$$eval('#dqCommand .dq-option:not([disabled])', b => b.map(x => x.dataset.cmd)), ['purify'], 'only 정화하기 on the first turn');
-assert.ok(await page.$('#dqCommand .coach-pick[data-cmd="purify"]'), '정화하기 is highlighted');
+assert.equal(await toMenu(), 'cmd'); assert.ok(await page.isVisible('.dq-coach')); assert.match(await page.textContent('.dq-coach p'), /문제 풀기/);
+assert.deepEqual(await page.$$eval('#dqCommand .dq-option:not([disabled])', b => b.map(x => x.dataset.cmd)), ['quiz'], 'only 문제 풀기 on the first turn');
+assert.ok(await page.$('#dqCommand .coach-pick[data-cmd="quiz"]'), '문제 풀기 is highlighted');
 await fight(); assert.equal(await G(() => window.__dokdo.state.tutorial.battle), true, 'practice duel done');
 await until(() => !!document.querySelector('#coachPanel'), 5000); assert.match(await page.textContent('#coachPanel'), /1 \/ 4/);
 for (const k of ['ArrowUp', 'ArrowDown', 'ArrowUp']) { await page.keyboard.down(k); await page.waitForTimeout(120); await page.keyboard.up(k); await page.waitForTimeout(380); }
@@ -145,16 +143,14 @@ await G(() => { const d = window.__dokdo, s = d.map.spawns.a; d.state.x = s.x; d
 await G(() => { Math.random = () => .5; window.__dokdo.startBattle('wild', 21); });
 assert.equal(await page.$('.dq-trainer'), null, 'wild battles show no 백무단 member');
 await page.click('#dqMessage'); assert.match(await page.textContent('.dq-text'), /나타났다/);
-assert.equal(await toMenu(), 'cmd'); assert.deepEqual(await page.$$eval('#dqCommand .dq-option', b => b.map(x => x.dataset.cmd)), ['purify', 'item', 'party', 'run'], '정화하기 replaces the plain attack');
+assert.equal(await toMenu(), 'cmd'); assert.deepEqual(await page.$$eval('#dqCommand .dq-option', b => b.map(x => x.dataset.cmd)), ['quiz', 'befriend', 'item', 'party', 'run'], '문제 풀기 · 동료 만들기 · 도구 · 동료 · 물러나기');
 assert.ok(await G(() => { const c = document.querySelector('#allySprite'); return !!c && c.getContext('2d').getImageData(0, 0, c.width, c.height).data.some((v, i) => i % 4 === 3 && v > 0); }), 'my 우산몬 is drawn (from behind)');
-await page.click('[data-cmd="purify"]'); assert.deepEqual(await page.$$eval('#dqCommand .dq-option[data-cmd]', b => b.map(x => x.dataset.cmd)), ['skill-0', 'skill-3'], 'two skills at first');
-await page.click('#dqCommand .dq-option.back');
 const hp = () => G(() => ({ me: window.__dokdo.state.party[window.__dokdo.state.active].hp, foe: window.__dokdo.battle?.enemies[window.__dokdo.battle.index].hp, log: window.__dokdo.state.answerLog.length, pp: window.__dokdo.state.party[0].pp.slice() }));
 let h = await hp();
 await purifyAttack(); assert.equal(await G(() => window.__dokdo.battle.quiz.phase), 'attack');
 const right = await G(() => window.__dokdo.battle.quiz.q.answer);
 await page.click(`[data-battle-answer="${right}"]`); await page.click(`[data-battle-answer="${right}"]`, { force: true }).catch(() => { });
-let h2 = await hp(); assert.ok(h2.foe < h.foe, 'correct attack answer hurts the foe'); assert.equal(h2.me, h.me); assert.equal(h2.log, h.log + 1, 'answered once'); assert.equal(h2.pp[0], h.pp[0] - 1, 'the skill used one of its uses');
+let h2 = await hp(); assert.ok(h2.foe < h.foe, 'correct attack answer hurts the foe'); assert.equal(h2.me, h.me); assert.equal(h2.log, h.log + 1, 'answered once');
 await toMenu(); assert.equal(await G(() => window.__dokdo.battle.quiz.phase), 'defense', 'the foe asks next'); await answer(true); const softHit = h.me - (await hp()).me; assert.ok(softHit >= 1, 'a correct defence still takes a light hit');
 await toMenu(); await purifyAttack(); h = await hp(); await answer(false); h2 = await hp(); assert.equal(h2.me, h.me, 'a wrong attack answer just misses'); assert.equal(h2.foe, h.foe);
 await toMenu(); h = await hp(); await answer(false); assert.ok(h.me - (await hp()).me > softHit, 'a wrong defence hurts more than a correct one');
@@ -163,13 +159,14 @@ await toMenu(); await G(() => { const b = window.__dokdo.battle; b.enemies[0].hp
 await purifyAttack(); await page.click('#battleHint'); assert.ok(await page.isVisible('.dq-hint')); await answer(true);
 assert.equal(await G(() => window.__dokdo.state.answerLog.at(-1).assisted), true);
 await toMenu(); await answer(true);
-// a guard skill uses PP and asks no question; the item menu heals
-await toMenu(); h = await hp(); await page.click('[data-cmd="purify"]'); await page.click('#dqCommand [data-cmd="skill-3"]');
-assert.equal((await hp()).pp[3], h.pp[3] - 1); await page.click('#dqMessage').catch(() => { }); assert.match(await page.textContent('.dq-text'), /절반/); await toMenu(); await answer(true);
+// type advantage: against a weak foe (잎 → 빛) a wrong answer still reaches with half power
+await toMenu(); await G(() => { const e = window.__dokdo.battle.enemies[0]; e.id = 28; e.hp = e.maxHp; });
+await purifyAttack(); h = await hp(); await answer(false); h2 = await hp(); assert.ok(h2.foe < h.foe, 'advantage: even a wrong answer reaches with half power');
+await toMenu(); await answer(true); await G(() => { window.__dokdo.battle.enemies[0].id = 21; });
 await toMenu(); await G(() => { window.__dokdo.state.party[0].hp = 5; }); await page.click('[data-cmd="item"]'); await page.click('[data-cmd="heal"]');
 await page.click('#dqMessage'); assert.ok((await hp()).me > 5); await toMenu(); await answer(true);
-// the orb befriends (first friends are guaranteed)
-await toMenu(); await page.click('[data-cmd="item"]'); await page.click('[data-cmd="orb"]');
+// 동료 만들기 needs no orb (first friends are guaranteed)
+await toMenu(); await page.click('[data-cmd="befriend"]');
 for (let i = 0; i < 10 && await G(() => !!window.__dokdo.battle); i++) await page.click('#dqMessage');
 assert.equal(await G(() => window.__dokdo.state.party.length), 2); assert.ok(await page.isHidden('#battleScreen'));
 // switching and running away
@@ -183,6 +180,31 @@ await toMenu(); await purifyAttack(); await answer(false); await toMenu(); await
 for (let i = 0; i < 12 && await G(() => !!window.__dokdo.battle); i++) await page.click('#dqMessage');
 assert.equal(await G(() => window.__dokdo.battle), null); assert.equal(await G(() => window.__dokdo.talk?.name), '쉼터지기');
 await dismiss(); assert.ok(await G(() => window.__dokdo.state.party.every(m => m.hp === m.maxHp)));
+// 동료 주머니: with six friends, swap with one who is resting — no machine needed
+await G(() => { const s = window.__dokdo.state, base = s.party[0]; while (s.party.length < 6) s.party.push({ ...base, uid: 'p' + s.party.length, id: 40 + s.party.length }); s.storage.push({ ...base, uid: 'rest1', id: 44 }); });
+await page.click('#partyBtn'); await page.click('#pocketBtn'); await page.click('[data-rest-slot="0"]'); assert.ok(await page.isVisible('.swap-note'), 'asks who to swap with');
+await page.click('[data-party-slot="5"]');
+assert.deepEqual(await G(() => ({ p5: window.__dokdo.state.party[5].id, rest: window.__dokdo.state.storage.map(m => m.id), size: window.__dokdo.state.party.length })), { p5: 44, rest: [45], size: 6 });
+await G(() => { const s = window.__dokdo.state; s.party = s.party.slice(0, 2); s.storage = []; window.__dokdo.closeModal(); });
+
+// ── 5b. 길 위를 걸어 다니는 야생 우산몬: 마을엔 없고, 길에는 보이게 걸어 다녀요. 부딪히면 결투, 끝나면 사라져요 ──
+assert.equal(await G(() => window.__dokdo.people().filter(n => n.kind === 'wild').length), 0, 'no wild 우산몬 in town');
+await G(() => window.__dokdo.changeMap('route0', 'a')); await until(() => window.__dokdo.map.id === 'route0' && !window.__dokdo.transition, 15000); await dismiss();
+await until(() => window.__dokdo.people().filter(n => n.kind === 'wild').length === 4, 5000);
+let bumped = false;
+for (let i = 0; i < 12 && !bumped; i++) {
+  const ok = await G(() => { const d = window.__dokdo, r = d.people().find(n => n.kind === 'wild' && !n.walking && !d.people().some(p => p.x === n.x - 1 && p.y === n.y) && [1, 2, 3, 4].includes(d.map[n.y][n.x - 1])); if (!r) return null; d.place(r.x - 1, r.y, 'right'); return r.uid; });
+  if (ok) { await page.keyboard.down('ArrowRight'); await page.waitForTimeout(200); await page.keyboard.up('ArrowRight'); bumped = await page.waitForFunction(uid => window.__dokdo.battle?.roamer === uid, ok, { timeout: 1500, polling: 50 }).then(() => true, () => false); if (!bumped && await G(() => !!window.__dokdo.battle)) { await G(() => window.__dokdo.closeBattleForTest()); } }
+  if (!bumped) await page.waitForTimeout(400);
+}
+assert.ok(bumped, 'bumping into a walking 우산몬 starts a battle with it');
+const metUid = await G(() => window.__dokdo.battle.roamer);
+await toMenu(); await G(() => { Math.random = () => .1; }); await page.click('[data-cmd="run"]');
+for (let i = 0; i < 6 && await G(() => !!window.__dokdo.battle); i++) await page.click('#dqMessage');
+await until(() => !window.__dokdo.battle); await G(() => { Math.random = () => .5; });
+assert.ok(await G(uid => !window.__dokdo.people().some(n => n.uid === uid), metUid), 'the one you met disappears (it comes back somewhere else later)');
+await G(() => window.__dokdo.changeMap('town0', 'a')); await until(() => window.__dokdo.map.id === 'town0' && !window.__dokdo.transition, 15000); await dismiss();
+assert.equal(await G(() => window.__dokdo.people().filter(n => n.kind === 'wild').length), 0, 'back in town: none');
 
 // ── 6. All eight chapters, walking every route ──
 let totalTurns = 0;
@@ -205,8 +227,7 @@ for (let zone = 0; zone < 8; zone++) {
     // 사철나무 was in 백무 사장's team: purified, it joins (one in the whole game), then 강치
     assert.equal(await G(() => window.__dokdo.cutscene()), 'boss-fall'); await skipCutscene();
     assert.equal(await G(() => window.__dokdo.cutscene()), 'tree-joins'); await skipCutscene();
-    await until(() => !!document.querySelector('#legendTreeOK'), 10000); await page.click('#legendTreeOK');
-    assert.equal(await G(() => [...window.__dokdo.state.party, ...window.__dokdo.state.storage].filter(m => m.id === 18).length), 1, 'one 사철나무 joined');
+    assert.equal(await G(() => [...window.__dokdo.state.party, ...window.__dokdo.state.storage].filter(m => m.id === 18).length), 0, '사철나무 is freed and goes back to 천장굴 (caught later at 10%)');
     await skipCutscene(); await page.click('#legendOK'); await dismiss(); assert.ok(await G(() => window.__dokdo.state.legend));
   }
   await npc('shop'); await page.click('#healAll');
@@ -267,13 +288,23 @@ await G(() => { window.__dokdo.legendRadio = true; });
 await until(() => window.__dokdo.talk?.name === '김박사(무전)', 15000);
 for (let i = 0; i < 8; i++) { await dismiss(); await page.waitForTimeout(900); if (!(await G(() => !!window.__dokdo.talk))) break; }
 assert.ok(await G(() => window.__dokdo.state.flags['legend-open:68']), '소쩍새 quest opens after the 도동항 인증');
+assert.ok(await G(() => window.__dokdo.state.flags['legend-open:18']), '사철나무 quest opens after 백무 사장 is stopped');
 await G(() => window.__dokdo.changeMap('town0', 'a')); await until(() => window.__dokdo.map.id === 'town0' && !window.__dokdo.transition, 15000); await dismiss();
 assert.ok(await G(() => window.__dokdo.npcs().some(n => n.kind === 'legend' && n.species === 68)), 'the golden spot is on the map');
 await G(() => { window.__dokdo.place(27, 6, 'right'); const n = window.__dokdo.npcs().find(n => n.kind === 'legend'); window.__dokdo.interact(n); });
 await until(() => window.__dokdo.cutscene() === 'legend-68', 10000); await skipCutscene();
 await until(() => window.__dokdo.battle?.kind === 'legend', 10000);
-await G(() => { window.__dokdo.battle.enemies[0].hp = Math.ceil(window.__dokdo.battle.enemies[0].maxHp * .4); });
+// purified but not befriended: it goes back and the spot stays
+await G(() => { window.__dokdo.battle.enemies[0].hp = 1; });
 totalTurns += await fight();
+assert.ok(await G(() => window.__dokdo.npcs().some(n => n.kind === 'legend' && n.species === 68)), 'still there after a plain win');
+// 동료 만들기 at a fixed 10%: here the dice say yes
+await G(() => { window.__dokdo.place(27, 6, 'right'); window.__dokdo.interact(window.__dokdo.npcs().find(n => n.kind === 'legend')); });
+await until(() => window.__dokdo.cutscene() === 'legend-68', 10000); await skipCutscene(); await until(() => window.__dokdo.battle?.kind === 'legend', 10000);
+assert.equal(await toMenu(), 'cmd'); assert.match(await page.textContent('#dqCommand [data-cmd="befriend"]'), /10%/);
+await G(() => { Math.random = () => .05; }); await page.click('[data-cmd="befriend"]');
+for (let i = 0; i < 10 && await G(() => !!window.__dokdo.battle); i++) await page.click('#dqMessage');
+await G(() => { Math.random = () => .5; });
 await until(() => !!document.querySelector('#legendJoinOK'), 10000);
 assert.ok(await page.$('.form-pair canvas[data-portrait="68-2"]'), 'the join screen shows the 변환폼');
 await page.click('#legendJoinOK'); await dismiss();
@@ -295,4 +326,4 @@ assert.deepEqual(st, { map: 'town3', visited: 8, onSpawn: true });
 
 assert.deepEqual(errors, [], 'no browser errors');
 await browser.close(); server.close();
-console.log(`PASS: 전설의 우산몬 quest (radio, golden spot, meeting scene, duel, join with 변환폼, dex photo), 백무 사장 reveal/fall/epilogue scenes, 사나워진 우산몬 duels with 검은 기운 gauges, 몽땅랜드 designs in battle, softened hits on correct defence, opening read line by line with the mission choice, starter + guide, key walking, closed bridge, guide, DQ commands (정화하기 with two starting skills, guard skill, item, orb, switch, run), my 우산몬 drawn from behind, 백무단 pictures fading out, explorer drawings in the character choice, 울릉도 도동항 and the ferry to 독도, buildings with floors (door, stairs, dex, books, review desk, rest), 김박사 picture and starter cutscene, 사철나무 purified from 백무 사장 and joining once, practice duel and walking tutorial, clickable picture map, easy words (사나워진 우산몬 · 검은 기운 · 몽땅랜드 컴퍼니), quiz rules (wrong attack = miss, correct defence = light hit), hints, KO recovery, route objects, trainer, memory stone, 8 chapters walked through 7 routes, first-arrival scenes, fast travel, legend, ending, saves and a v0.21 save; ${totalTurns} battle turns.`);
+console.log(`PASS: wild 우산몬 walk on routes (none in towns, bump to battle, gone afterwards), 문제 풀기 asks right away, type advantage, 형태변환 in the menu for legends, 동료 만들기 button, 동료 주머니 swap, 전설의 우산몬 quest (radio, golden spot, meeting scene, plain win keeps the spot, 10% 동료 만들기, join with 변환폼, dex photo), 백무 사장 reveal/fall/epilogue scenes, 사나워진 우산몬 duels with 검은 기운 gauges, 몽땅랜드 designs in battle, softened hits on correct defence, opening read line by line with the mission choice, starter + guide, key walking, closed bridge, guide, DQ commands (정화하기 with two starting skills, guard skill, item, orb, switch, run), my 우산몬 drawn from behind, 백무단 pictures fading out, explorer drawings in the character choice, 울릉도 도동항 and the ferry to 독도, buildings with floors (door, stairs, dex, books, review desk, rest), 김박사 picture and starter cutscene, 사철나무 purified from 백무 사장 and joining once, practice duel and walking tutorial, clickable picture map, easy words (사나워진 우산몬 · 검은 기운 · 몽땅랜드 컴퍼니), quiz rules (wrong attack = miss, correct defence = light hit), hints, KO recovery, route objects, trainer, memory stone, 8 chapters walked through 7 routes, first-arrival scenes, fast travel, legend, ending, saves and a v0.21 save; ${totalTurns} battle turns.`);

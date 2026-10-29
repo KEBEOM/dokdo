@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {MONSTERS,STARTERS,ZONES,getSpecies} from '../dist/data.js';
 import {CONCEPTS,QUESTIONS} from '../dist/learning.js';
-import {newState,createMonster,addMonster,healAll,gainXP,damage,enemyHit,SOFTEN_RATE,captureChance,recordAnswer,validateSave,advantage,PP_MAX,skills,knownSkills,learnedBetween} from '../dist/engine.js';
+import {newState,createMonster,addMonster,healAll,gainXP,damage,enemyHit,attackHit,SOFTEN_RATE,PIERCE_CHANCE,LEGEND_CAPTURE,captureChance,recordAnswer,validateSave,advantage,PP_MAX,skills,knownSkills,learnedBetween} from '../dist/engine.js';
 import {createMap,npcs,pathfind,blocked,cameraFor,TILE,W,H} from '../dist/world.js';
 import {MAPS} from '../dist/maps.js';
 import {selectBattleQuestion,shuffledChoices} from '../dist/battle-quiz.js';
@@ -41,11 +41,15 @@ test('a correct answer to the opponent question still hurts, but much less',()=>
   const me=createMonster(1,8),foe=createMonster(34,9),rng=()=>.5;
   const full=enemyHit(foe,me,{correct:false},rng),soft=enemyHit(foe,me,{correct:true},rng);
   assert.equal(full,damage(foe,me,1,rng).amount);assert.ok(soft>=1&&soft<full,'correct answers soften the blow');assert.equal(soft,Math.max(1,Math.round(full*SOFTEN_RATE)));
-  assert.ok(enemyHit(foe,me,{correct:true,guard:true},rng)<=soft,'the guard skill softens it further');
+  assert.equal(SOFTEN_RATE,.6,'a correct answer takes 40% off');assert.equal(enemyHit(foe,me,{correct:true,pierce:true},rng),full,'boss pierce: full damage even when correct');assert.ok(PIERCE_CHANCE>0&&PIERCE_CHANCE<1);
+  // my attack: type advantage x1.5 when correct, half of the plain hit when wrong; neutral/weak wrong answers miss
+  const leaf=createMonster(1,10),light=createMonster(28,10),rock=createMonster(55,10);const fixed=()=>.5;
+  const good=attackHit(leaf,light,true,1.3,fixed),plain=attackHit(leaf,rock,true,1.3,fixed),miss=attackHit(leaf,rock,false,1.3,fixed),half=attackHit(leaf,light,false,1.3,fixed);
+  assert.equal(good.mult,1.5);assert.equal(miss.amount,0);assert.ok(half.amount>0&&half.amount<good.amount);assert.equal(half.amount,Math.max(1,Math.round(good.amount/1.5*.5)));
 });
 test('damage, type advantage, capture and recovery remain finite',()=>{
   const s=newState();addMonster(s,createMonster(21,5));const foe=createMonster(47,5);assert.equal(advantage('wave','rock'),1.5);assert.equal(advantage('rock','wave'),.75);assert.ok(damage(s.party[0],foe,1,()=>.5).amount>0);
-  const full=captureChance(foe);foe.hp=1;assert.ok(captureChance(foe)>full);assert.equal(captureChance(createMonster(100)),0);
+  const full=captureChance(foe);foe.hp=1;assert.ok(captureChance(foe)>full);assert.equal(captureChance(createMonster(100)),.1,'legendaries: fixed 10%');assert.equal(captureChance({...createMonster(68),hp:1}),LEGEND_CAPTURE);
   s.party[0].hp=0;s.party[0].pp=[0,0,0,0];healAll(s);assert.equal(s.party[0].hp,s.party[0].maxHp);assert.deepEqual(s.party[0].pp,PP_MAX);
 });
 test('starter keeps its biological name as it levels and party overflows to storage',()=>{
@@ -127,4 +131,15 @@ test('no wild 우산몬 stand on the grass; the legendary tree is only seen on �
   assert.deepEqual(legends, [], 'no legend waits on the map: 사철나무 is in 백무 사장\'s team');
   const tree = MAPS.flatMap(def => npcs(createMap(def.id), p, {}).filter(n => n.kind === 'observe' && n.species === 18).map(() => def.id));
   assert.deepEqual(tree, ['route1'], 'the real tree can be observed from afar on 천장굴 길');
+});
+test('v0.42: every 우산몬 has its own 체력·공격·방어·스피드, legends are stronger, faster friends run away more easily',async()=>{
+  const {MONSTERS}=await import('../dist/data.js');const {stats,runChance}=await import('../dist/engine.js');
+  const total=m=>m.base.hp+m.base.attack+m.base.defense+m.base.speed;
+  for(const m of MONSTERS){assert.deepEqual(Object.keys(m.base),['hp','attack','defense','speed'],m.name);for(const v of Object.values(m.base))assert.ok(v>=30&&v<=140,m.name);}
+  const normal=MONSTERS.filter(m=>!m.legendary).map(total),legend=MONSTERS.filter(m=>m.legendary).map(total);
+  assert.ok(Math.min(...legend)>Math.max(...normal),'legends beat every normal 우산몬 in total');
+  assert.ok(new Set(MONSTERS.map(m=>JSON.stringify(m.base))).size>=40,'stats really differ');
+  assert.ok(stats(56,10).defense>stats(94,10).defense&&stats(94,10).speed>stats(56,10).speed,'거북손 is tough, 칼새 is fast');
+  const a=stats(10,20);assert.ok(a.maxHp>stats(10,5).maxHp&&a.attack>stats(10,5).attack,'stats grow with level');
+  assert.ok(runChance({speed:30},{speed:10})>runChance({speed:10},{speed:30}));
 });

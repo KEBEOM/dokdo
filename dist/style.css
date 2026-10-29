@@ -543,3 +543,22 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
 /* v0.41 상대 우산몬이 발밑 원(받침) 위에 서도록: 그림의 발(아래 끝)을 받침 가운데에 맞춰 올려요 */
 .dq-stage .dq-enemy canvas#enemySprite{top:-8%}
 .dq-stage .dq-enemy.aura::before{top:-2%;bottom:8%}
+
+/* v0.42 도감 기본 능력치 막대 */
+.base-stats{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;margin:8px 0 10px}
+.base-stats div{display:grid;grid-template-columns:44px 1fr 28px;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#3d5550}
+.base-stats i{display:block;height:8px;border-radius:4px;background:#e2e6dc;border:1px solid #c9cfc2;overflow:hidden}
+.base-stats b{display:block;height:100%;background:linear-gradient(90deg,#7cc4a0,#4c9a7a)}
+.base-stats em{font-style:normal;text-align:right}
+.swap-note{background:#fff6d8;border:2px solid #e8bd64;border-radius:8px;padding:8px 10px}
+.dex-card.swap-target{outline:3px dashed #e8bd64;outline-offset:-3px}
+.dex-card.selected{outline:3px solid #4c9a7a;outline-offset:-3px}
+.pocket-btn{margin-top:8px}
+
+/* v0.42 결투 메뉴: 두 칸이 패널을 넘지 않게. .cards = 버튼이 많을 때(전설의 형태변환) 돌아가기·물러나기도 한 칸만 */
+.dq-command .dq-options{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.dq-command .dq-option{min-width:0}
+.dq-command.cards .dq-option:not(.back){font-size:min(1em,17px);line-height:1.2;white-space:normal;overflow-wrap:anywhere;word-break:keep-all}
+.dq-command.cards .dq-option small{white-space:normal}
+.dq-command.cards .dq-option.back{grid-column:auto!important;align-self:stretch}
+@media (max-height:560px){.dq-command.cards .dq-option:not(.back){font-size:14px}.dq-command.cards .dq-option small{font-size:10px}}

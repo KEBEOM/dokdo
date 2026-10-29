@@ -1,5 +1,5 @@
 import { ZONES, EXTRA_NPCS, getSpecies } from './data.js';
-import { drawHuman, drawMonster } from './sprites.js';
+import { drawHuman, drawMonster, facing } from './sprites.js';
 import { drawScenery, drawIslandArt } from './scenery.js';
 import { drawTerrain } from './terrain.js';
 import { drawExplorer, drawResident, CHARACTER_SIZE } from './characters.js';
@@ -202,7 +202,12 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
     const fx = n.x * 32 + (32 - CHARACTER_SIZE) / 2, fy = n.y * 32 + 28 - CHARACTER_SIZE;
     if (n.furniture) drawFurniture(ctx, n.furniture, n.x, n.y, time, { open: n.used, glow: n.kind === 'rest' });
     else if (n.kind === 'board') drawIslandArt(ctx, 'record-board', n.x * 32 - 8, n.y * 32 - 16, 48, 54);
-    else if (n.kind === 'wild') { darkWisps(ctx, n.x, n.y, time); drawMonster(ctx, n.species, n.x * 32 - 6, n.y * 32 - 12, 44, time / 1000); }
+    else if (n.kind === 'wild') { // 걸어 다니는 사나워진 우산몬: 가는 쪽을 보고, 걸을 때 통통 튀어요
+      darkWisps(ctx, n.x, n.y, time);
+      const f = facing(n.species), flip = (n.dir === 'right' && f === 'left') || (n.dir === 'left' && f === 'right'), hop = n.walking ? Math.abs(Math.sin(time / 70)) * 3 : 0;
+      ctx.save(); if (flip) { ctx.translate(n.x * 32 * 2 + 32, 0); ctx.scale(-1, 1); }
+      drawMonster(ctx, n.species, n.x * 32 - 6, n.y * 32 - 12 - hop, 44, time / 1000); ctx.restore();
+    }
     else if (n.kind === 'legend') { legendGlow(ctx, n.x, n.y, time); drawMonster(ctx, n.species, n.x * 32 - 10, n.y * 32 - 22 + Math.round(Math.sin(time / 300) * 2), 52, time / 1000); if (!n.used) marker(ctx, n.x, n.y, time, '#ffe9a0'); }
     else if (PROP_KINDS.includes(n.kind)) drawProp(ctx, n.kind, n.x, n.y, { open: n.used, art: n.art, time, water: map[n.y]?.[n.x] === 0 });
     else if (n.player) { if (!drawExplorer(ctx, state.avatar, fx, fy, CHARACTER_SIZE, state.dir, motion.walking, motion.distance || 0)) drawHuman(ctx, fx, fy, '#418e91', state.dir, 0, 'normal', null, CHARACTER_SIZE); }

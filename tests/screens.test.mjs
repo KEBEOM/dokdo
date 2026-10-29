@@ -99,21 +99,21 @@ async function runDevice(d) {
   const state = () => G(() => document.querySelector('.dq-answer:not(.locked)') ? 'quiz' : document.querySelector('#dqCommand:not([hidden]) .dq-option') ? 'cmd' : 'msg');
   for (let i = 0; i < 30 && await state() !== 'cmd'; i++) { await tap('#dqMessage'); await page.waitForTimeout(80); }
   await check('06-battle-command');
-  await tap('[data-cmd="purify"]'); await check('07-battle-skills', 300);
-  await tap('#dqCommand [data-cmd="skill-0"]'); await until(() => !!document.querySelector('.dq-answer:not(.locked)')); await check('08-battle-quiz', 500, '.dq-answer'); // all four answers without scrolling
+  await tap('[data-cmd="quiz"]'); await until(() => !!document.querySelector('.dq-answer:not(.locked)')); await check('08-battle-quiz', 500, '.dq-answer'); // all four answers without scrolling
   const a = await G(() => window.__dokdo.battle.quiz.q.answer); await tap(`[data-battle-answer="${(a + 1) % 4}"]`);
   await until(() => !!document.querySelector('.dq-result')); await page.waitForTimeout(2200); await check('09-battle-result', 0);
   await G(() => document.querySelector('.dq-coach-skip')?.click()); await until(() => !window.__dokdo.battle);
   for (let i = 0; i < 10 && await page.$('#dialogue:not(.hidden) #nextTalk'); i++) await tap('#nextTalk');
-  // a longer quiz: the question with the longest choices
-  await G(() => window.__dokdo.startBattle('wild', 39)); await until(() => !!window.__dokdo.battle);
+  // a longer quiz: the question with the longest choices — with a legendary out, the menu also shows 형태변환
+  await G(() => { const s = window.__dokdo.state; s.party[0].keepId = s.party[0].id; s.party[0].id = 70; window.__dokdo.startBattle('wild', 39); }); await until(() => !!window.__dokdo.battle);
   for (let i = 0; i < 30 && await state() !== 'cmd'; i++) { await tap('#dqMessage'); await page.waitForTimeout(80); }
+  await check('07-battle-menu-morph', 300);
   await G(() => { const longest = window.__dokdo.longestQuestion; if (longest) window.__dokdo.forceQuestion = longest; });
-  await tap('[data-cmd="purify"]'); await tap('#dqCommand [data-cmd="skill-0"]'); await until(() => !!document.querySelector('.dq-answer:not(.locked)'));
+  await tap('[data-cmd="quiz"]'); await until(() => !!document.querySelector('.dq-answer:not(.locked)'));
   await tap('#battleHint'); await check('10-battle-quiz-hint', 500);
   const b2 = await G(() => window.__dokdo.battle.quiz.q.answer); await tap(`[data-battle-answer="${b2}"]`);
   await until(() => !!document.querySelector('.dq-result')); await page.waitForTimeout(3500); await check('11-battle-result-long', 0);
-  await G(() => { window.__dokdo.forceQuestion = null; window.__dokdo.closeBattleForTest?.(); });
+  await G(() => { window.__dokdo.forceQuestion = null; window.__dokdo.closeBattleForTest?.(); const m = window.__dokdo.state.party[0]; m.id = m.keepId; delete m.keepId; });
   await until(() => !window.__dokdo.battle);
   for (let i = 0; i < 10 && await page.$('#dialogue:not(.hidden) #nextTalk'); i++) await tap('#nextTalk');
   // walking screen, a conversation, the study quiz, the map, the dex

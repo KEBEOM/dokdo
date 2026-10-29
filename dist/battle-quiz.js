@@ -1,7 +1,7 @@
 import {QUESTIONS} from './learning.js';
 
 // Avoid immediate repeats; revisit a missed concept after other questions.
-export function selectBattleQuestion(state,rng=Math.random){
+export function rankBattleQuestions(state,rng=Math.random){
   const log=state.answerLog, recent=new Set(log.slice(-3).map(a=>a.q));
   const due=new Set();
   for(let i=Math.max(0,log.length-16);i<log.length-2;i++){
@@ -14,8 +14,9 @@ export function selectBattleQuestion(state,rng=Math.random){
     (counts.get(q.id)||0)*1.2+(state.learning[q.concept]?.independent||0)*.3-
     (q.zone===state.zone?1:0)+rng()
   }));
-  pool.sort((a,b)=>a.score-b.score);return pool[0].q;
+  pool.sort((a,b)=>a.score-b.score);return pool.map(p=>p.q);
 }
+export function selectBattleQuestion(state,rng=Math.random){return rankBattleQuestions(state,rng)[0];}
 
 export function shuffledChoices(q,rng=Math.random){
   const order=q.options.map((_,i)=>i);

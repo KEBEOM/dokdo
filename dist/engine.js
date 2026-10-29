@@ -1,13 +1,25 @@
 import {getSpecies,TYPES,ROSTER_VERSION,LEGACY_SPECIES_MAP} from './data.js';
 import {MAP_BY_ID,parseMap,MAP_W,MAP_H} from './maps.js';
 const START=parseMap('town0').spawns.a;
-export function stats(id,level){const s=getSpecies(id);const st=s.stage;return {maxHp:24+level*5+st*5,attack:8+level*2+st*3,defense:5+level+st*3,speed:8+level+(s.type==='wind'?6:0)};}
+// v0.42 우산몬마다 다른 기본 능력치(data.js의 base: 체력·공격·방어·스피드, 보통 75). 레벨이 오르면 같이 커져요.
+//   기본값 차이의 절반만 반영해요(차이는 살리되 너무 벌어지지 않게): 배율 = (기본값+75)/150
+const DEFAULT_BASE={hp:75,attack:75,defense:75,speed:75};
+export function stats(id,level){const b=getSpecies(id).base||DEFAULT_BASE,k=v=>(v+75)/150;return {maxHp:Math.round((29+level*5)*k(b.hp)),attack:Math.max(1,Math.round((11+level*2)*k(b.attack))),defense:Math.max(1,Math.round((8+level)*k(b.defense))),speed:Math.max(1,Math.round((8+level)*k(b.speed)))};}
+// 물러나기: 내 우산몬이 빠를수록 잘 돼요(30%~95%).
+export const runChance=(me,foe)=>Math.min(.95,Math.max(.3,.6+(me.speed-foe.speed)/(me.speed+foe.speed)));
 export function createMonster(id,level=4){const s=stats(id,level);return {uid:`m${Date.now().toString(36)}${Math.random().toString(36).slice(2,7)}`,id,level,xp:0,hp:s.maxHp,...s,pp:PP_MAX.slice()};}
 export function advantage(a,b){const ring={wave:'rock',rock:'wind',wind:'wave',leaf:'light',light:'echo',echo:'leaf'};return ring[a]===b?1.5:ring[b]===a?.75:1;}
 export function damage(attacker,defender,power=1,rng=Math.random){const mult=advantage(getSpecies(attacker.id).type,getSpecies(defender.id).type);return {amount:Math.max(3,Math.round((attacker.attack*power-defender.defense*.45)*mult*(.9+rng()*.2))),mult};}
-// v0.23: the opponent's question attack always lands, but a correct answer softens the blow.
-export const SOFTEN_RATE=.25;
-export function enemyHit(attacker,defender,{correct=false,guard=false}={},rng=Math.random){let d=damage(attacker,defender,1,rng).amount;if(correct)d=Math.max(1,Math.round(d*SOFTEN_RATE));if(guard)d=Math.max(1,Math.ceil(d/2));return d;}
+// v0.42 결투 규칙
+//  막기: 상대의 문제 공격은 늘 들어오지만, 정답을 맞히면 충격이 40% 줄어요(60%만 받아요).
+//        관장 결투와 마지막 백무 사장 결투(보스)는 PIERCE_CHANCE 확률로 정답을 맞혀도 그대로 들어와요(관통).
+//  공격: 문제 카드를 골라 풀어요. 맞히면 정화(상성이 좋으면 1.5배, 나쁘면 0.75배).
+//        틀리면 빗나가지만, 상성이 좋은 상대에게는 틀려도 보통 위력의 절반이 닿아요.
+export const SOFTEN_RATE=.6, PIERCE_CHANCE=.3, QUESTION_POWER=1.3, WRONG_ADVANTAGE_RATE=.5;
+export const BOSS_KINDS=['boss','rematch']; // + 마지막 백무 사장 결투(game.js isBoss)
+export function enemyHit(attacker,defender,{correct=false,guard=false,pierce=false}={},rng=Math.random){let d=damage(attacker,defender,1,rng).amount;if(correct&&!pierce)d=Math.max(1,Math.round(d*SOFTEN_RATE));if(guard)d=Math.max(1,Math.ceil(d/2));return d;}
+// 내 공격: {amount, mult}. 틀렸을 때 상성이 좋으면 보통 위력(상성 1배)의 절반, 아니면 0.
+export function attackHit(attacker,defender,correct,power=QUESTION_POWER,rng=Math.random){const d=damage(attacker,defender,power,rng);if(correct)return d;if(d.mult>1)return {amount:Math.max(1,Math.round(d.amount/d.mult*WRONG_ADVANTAGE_RATE)),mult:d.mult};return {amount:0,mult:d.mult};}
 // 기술: 처음(Lv1)에는 손길(정화)과 보호 두 가지, Lv8에 숨 고르기(회복), Lv12에 파동(강한 정화)을 배웁니다.
 // 배열 순서(0 손길, 1 파동, 2 숨 고르기, 3 보호)는 저장 파일의 기술 횟수(pp) 순서와 같습니다.
 export const PP_MAX=[25,8,8,10];
@@ -20,7 +32,9 @@ export function knownSkills(m){return skills(m).filter(s=>m.level>=s.learn).sort
 export function learnedBetween(m,from,to){return skills(m).filter(s=>s.learn>from&&s.learn<=to);}
 export function healAll(state){for(const m of state.party){const st=stats(m.id,m.level);Object.assign(m,st);m.hp=m.maxHp;m.pp=PP_MAX.slice();}return state;}
 export function gainXP(m,amount){m.xp+=amount;const changes=[];while(m.xp>=m.level*13){m.xp-=m.level*13;m.level++;changes.push(`${getSpecies(m.id).name} Lv.${m.level}`);const sp=getSpecies(m.id);if(sp.evolvesTo&&m.level>=sp.evolveLevel){m.id=sp.evolvesTo;changes.push(`${sp.name} → ${getSpecies(m.id).name}`);}Object.assign(m,stats(m.id,m.level));m.hp=m.maxHp;m.pp=PP_MAX.slice();}return changes;}
-export function captureChance(enemy){if(getSpecies(enemy.id).legendary)return 0;return Math.min(.93,.45+(1-enemy.hp/enemy.maxHp)*.43);}
+// 동료 만들기: 검은 기운이 적을수록 잘 돼요. 전설의 우산몬은 언제나 10%.
+export const LEGEND_CAPTURE=.1;
+export function captureChance(enemy){if(getSpecies(enemy.id).legendary)return LEGEND_CAPTURE;return Math.min(.93,.45+(1-enemy.hp/enemy.maxHp)*.43);}
 export function addMonster(state,mon){if(state.party.length<6)state.party.push(mon);else state.storage.push(mon);if(!state.caught.includes(mon.id))state.caught.push(mon.id);if(!state.seen.includes(mon.id))state.seen.push(mon.id);}
 export function recordAnswer(state,q,correct,assisted=false,context={}){const r=state.learning[q.concept]||{attempts:0,correct:0,independent:0,seen:[],sessions:[],last:0};r.attempts++;if(correct){r.correct++;if(!assisted)r.independent++;}if(!r.seen.includes(q.id))r.seen.push(q.id);if(!r.sessions.includes(state.sessionId))r.sessions.push(state.sessionId);r.last=Date.now();state.learning[q.concept]=r;state.answerLog.push({q:q.id,concept:q.concept,correct,assisted,time:Date.now(),session:state.sessionId,mode:context.mode||'study',phase:context.phase||'',opponent:context.opponent||null,zone:state.zone});if(state.answerLog.length>2000)state.answerLog.shift();return r;}
 export function newState(){return {schema:1,rosterVersion:ROSTER_VERSION,started:false,zone:0,map:'town0',visited:[0],flags:{},x:START.x,y:START.y,dir:'up',avatar:null,party:[],storage:[],active:0,caught:[],seen:[],badges:[],progress:Array.from({length:8},()=>({met:false,studied:0,enemy:false,boss:false})),learning:{},answerLog:[],items:{heal:8,orb:15},coins:120,playMs:0,ended:false,legend:false,sound:false,tutorial:{battle:true,walk:4},sessionId:Date.now().toString(36),savedAt:0};}

@@ -8,7 +8,8 @@
 //
 //   need.type  badge: 그 장 관장 인증 · observe/trainer/trash/stone: 지도 위에서 해낸 일의 수 · seen: 도감 발견 수
 //   x, y       전설의 기운이 나타나는 칸 (걸어서 닿을 수 있는 빈칸, tests/legends.test.mjs가 확인해요)
-// 사철나무(18)는 대한봉에서 백무 사장이 내보내는 마지막 우산몬이라 지도 위 자리가 없어요.
+// 사철나무(18)는 대한봉에서 백무 사장을 막으면 풀려나 천장굴 길로 돌아가요(need.type story).
+// 전설의 우산몬은 정화해도 저절로 동료가 되지 않아요. 결투에서 ‘동료 만들기’를 눌러 10% 확률로 동료가 돼요.
 // 실제 생물 정보는 국립생물자원관 「독도의 생물다양성」(2017)과 국가유산청 자료를 바탕으로 짧게 줄였어요.
 // 지정 번호는 2021년부터 공식적으로 쓰지 않지만 흔히 함께 적어요.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -67,15 +68,21 @@ export const LEGENDS = [
     scene: { bg: 'field', caption: '상장군바위 · 오르막 꼭대기' },
     meet: ['바람이 멎은 언덕 꼭대기에 키 큰 새 한 마리가 조용히 서 있다.', '하얀 목과 검은 몸의 두루미가 긴 날개를 펼치며 이쪽을 돌아본다!'],
     fact: '흑두루미는 몸이 검은 잿빛이고 목이 하얀 두루미예요. 겨울을 나러 먼 북쪽에서 날아오는 철새로, 순천만이 대표적인 쉼터예요. 독도를 지나가며 기록되기도 했어요.'
+  },
+  {
+    id: 18, name: '사철나무', noun: '나무', monument: '천연기념물 제538호', map: 'route1', x: 10, y: 24, place: '천장굴 길 아래쪽 비탈',
+    title: '천장굴 위의 오래된 나무', need: { type: 'story', n: 1, label: '대한봉에서 백무 사장의 계획 막기' },
+    radio: ['백무 사장에게서 풀려난 사철나무가 천장굴 쪽으로 돌아갔어요.', '천장굴 길 아래쪽 비탈에 금빛 기운이 보인대요. 다시 만나서 동료가 되어 달라고 해 봐요!'],
+    scene: { bg: 'field', caption: '천장굴 길 · 비탈' },
+    meet: ['바람이 멎은 비탈에서 오래된 나무 한 그루가 잎을 사르르 흔든다.', '사철나무가 아직 남은 검은 기운을 털어 내려 애쓰고 있다!'],
+    fact: '독도의 사철나무는 동도 천장굴 위쪽 비탈에서 100년 넘게 자란, 독도에서 가장 오래된 나무예요. 2012년 천연기념물 제538호로 지정되었어요.'
   }
 ];
-// 사철나무는 이야기 속 마지막 만남(대한봉 · 백무 사장). 수첩 목록에만 함께 보여요.
-export const TREE_ENTRY = { id: 18, name: '사철나무', monument: '천연기념물 제538호', title: '천장굴 위의 오래된 나무', need: { label: '대한봉에서 백무 사장의 계획 막기' } };
-export const ALL_LEGEND_IDS = [18, ...LEGENDS.map(q => q.id)];
+export const ALL_LEGEND_IDS = LEGENDS.map(q => q.id);
 
 export function legendProgress(q, state) {
   const n = q.need;
-  const cur = n.type === 'badge' ? (state.badges?.includes(n.zone) ? 1 : 0) : n.type === 'seen' ? (state.seen?.length || 0) : countDone(state, n.type);
+  const cur = n.type === 'badge' ? (state.badges?.includes(n.zone) ? 1 : 0) : n.type === 'seen' ? (state.seen?.length || 0) : n.type === 'story' ? (state.progress?.[7]?.enemy ? 1 : 0) : countDone(state, n.type);
   return { cur: Math.min(cur, n.n), need: n.n, done: cur >= n.n };
 }
 export const openFlag = id => `legend-open:${id}`;
@@ -104,7 +111,7 @@ export function legendScene(q) {
       lines: [
         { who: null, text: q.meet[0], cue: 'glint' },
         { who: null, text: q.meet[1], cue: 'show:leg' },
-        { who: '김박사(무전)', text: `전설의 우산몬 ${josa(q.name, '이에요/예요')}! ${josa(q.monument, '으로/로')} 지정된 새예요.` },
+        { who: '김박사(무전)', text: `전설의 우산몬 ${josa(q.name, '이에요/예요')}! ${josa(q.monument, '으로/로')} 지정된 ${q.noun || '새'}예요.` },
         { who: '김박사(무전)', text: '그런데 몸에 검은 기운이 감겨 있어요. 기계에서 새어 나온 기운에 괴로워하나 봐요. 정화해서 구해 줘요!', cue: 'jump' }
       ]
     }]

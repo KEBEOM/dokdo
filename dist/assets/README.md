@@ -1,75 +1,27 @@
-# 0.21 통일된 마을·지형 도트
+# 독도 탐험대 그림 파일 (v0.41)
 
-바다·잔디·풀숲·흙길·모래·부두는 `scenery/terrain-pixels-v21.png`를 사용합니다. 건물·나무·돌담·배·팻말은 `scenery/village-pixels-v21.png`입니다. `docs/art-v21.md`에 교체 방법이 있습니다.
+그림을 바꾼 뒤에는 `node scripts/build-offline.mjs`로 한 파일짜리 게임을 다시 만드세요(오프라인 판에는 그림이 들어 있어요).
 
-# 0.19 한국풍 마을과 박사님
+## 우산몬
+- `monsters/001.png`~`100.png`: 우산몬 그림(512×512 투명 PNG, 발끝은 아래에서 12칸 위). 도감·결투·지도에 모두 이 한 장을 써요.
+- `monsters/068-2.png` 등: 전설의 우산몬 변환폼(68 소쩍새, 70 뿔쇠오리, 71 매, 72 황조롱이, 75 고니, 76 흑두루미).
+- 새로 찍은 도트는 `python scripts/import-dots.py <폴더>`로 넣어요(한 도트 10×10 원본, 이름 `NNN.png` · `NNN-1.png` · `NNN-2.png`). 원본은 `monsters-original/`에 보관해요.
+- 결투에서 바라보는 쪽은 `dist/sprites.js`의 `FACES_RIGHT`(오른쪽) · `FACES_FRONT`(정면)에 적어요. 나머지는 왼쪽을 보는 그림이에요.
+- `monster-contact-sheet.png`: 100종과 변환폼 미리보기(게임 실행에는 쓰지 않아요).
+- `monster-list.csv`: 100종의 번호·이름·기록 확인 · `image-list.csv`, `image-catalog.html`: 그림 파일 목록.
 
-현재 맵은 `scenery/village-pixels-v21.png`와 `scenery/two-islands-monument-v19.png`, 박사님은 `characters/professor-atlas-v19.png`를 사용합니다. 잘라내기 좌표와 교체 방법은 `docs/art-v19.md`를 참고하세요. 아래의 과거 버전 파일은 이전 디자인 보관용입니다.
+## 실제 사진 (도감 ‘실제 사진 보기’)
+- `photos/001.jpg`~`100.jpg`: 실제 생물 사진. 원본을 자르거나 고치지 않고 크기만 줄였어요(긴 변 640px).
+- 출처와 이용 조건은 `dist/photo-credits.js`에 있고, 도감에서 사진 아래에 보여요. 공공누리 제3·4유형 사진은 고치면 안 돼요(변경금지).
 
-# 독도 탐험대 이미지 · 0.18
+## 사람
+- 주인공: `characters/explorers-atlas-v17.png`(걷기 시트), 캐릭터 선택 그림 `characters/explorer-{girl,boy}-portrait-v33.png`.
+- 김박사: `characters/professor-atlas-v33.png`, 큰 그림 `characters/professor-portrait-v33.png`.
+- 마을 사람: `characters/{child-boy,child-girl,child-girl-ribbon,man,woman}-atlas-v18.png` (좌표: `dist/npc-atlases.js`).
+- 몽땅랜드: `characters/villain-*-v25.png` (좌표: `dist/villain-atlases.js`), 결투 등장 그림 `characters/baekmudan-{grunt,exec,boss}-portrait.png`.
+- `characters/*-sheet.png`, `*-original.jpg`, `*-game.png`: `scripts/bake-characters.mjs`가 쓰는 원본과 결과물이에요.
+- `npc/`, `player/`: 새 그림을 불러오지 못했을 때만 쓰는 예비 그림이에요.
 
-`image-catalog.html`을 열면 그림과 교체 경로를 볼 수 있습니다. `image-list.csv`는 전체 목록입니다. 이미지 팩만으로는 게임이 실행되지 않습니다.
-
-## 주인공 시트 교체 (현재 0.17)
-
-- 남녀 공통: `characters/explorers-atlas-v17.png`, 투명 PNG 1024×1536, 5열×6행.
-- 1~3행 남학생 정면/오른쪽/뒤, 4~6행 여학생 정면/오른쪽/뒤.
-- 각 행 1열은 정지, 2~5열은 걷기. 왼쪽은 오른쪽 전체 반전입니다.
-- 정확한 자르기 영역과 기준점은 `explorer-atlas.js`에 있습니다. 같은 위치에 그려 PNG를 교체하거나, 위치가 바뀌면 해당 좌표도 수정하세요.
-- 프레임 전체를 재생하며 팔·다리를 따로 늘이거나 회전하지 않습니다.
-- 선택창과 지도 모두 이 PNG를 사용합니다. 단일 HTML은 그림이 포함되어 있으므로 교체 후 다시 빌드해야 합니다.
-- `boy-original.jpg`, `girl-original.jpg`, 기존 `*-game.png`, `*-portrait.png`, `*-sheet.png`는 참고용으로 보존합니다. 주인공 렌더러에서는 사용하지 않습니다.
-- 자세한 구조와 생성 프롬프트: `docs/explorer-sheet-v17.md`.
-
-## 전체 NPC 교체 (현재 0.18)
-
-`characters/child-boy-atlas-v18.png`, `child-girl-atlas-v18.png`, `child-girl-ribbon-atlas-v18.png`, `man-atlas-v18.png`, `woman-atlas-v18.png`입니다.
-
-- 투명 PNG 1536×1024, 5열×3행. 각 15프레임, 전체 75프레임입니다.
-- 행: 정면 / 오른쪽 / 뒤. 열: 정지 / 걷기 1~4. 왼쪽은 전체 반전입니다.
-- 자르기 좌표·기준점·고정 배율은 `npc-atlases.js`입니다. 파일 위치와 배치를 유지하면 교체할 수 있습니다.
-- 주민·위인·관장·악당·상점·선장·연구 안내원 등 모든 사람 NPC가 이 다섯 디자인을 사용합니다.
-- 이전 `*-game.png`와 `npc/01~08/` 이미지는 참고용입니다. 현재 사람 NPC 렌더러에서는 사용하지 않습니다.
-- 자동으로 원래 자리 주변 한 칸 이내만 움직이며 대화 중에는 멈춥니다. 설정은 `npc-motion.js`입니다.
-- 교체 후 단일 HTML을 다시 빌드해야 합니다. 자세한 안내: `docs/npc-sheets-v18.md`.
-
-## 다른 이미지
-
-- `monsters/001.png`~`100.png`: 도감·상대·지도 그림. 128×128 투명 PNG 권장.
-- `monsters/back/001.png`~`100.png`: 전투 중 내 동료. 기본 파일은 정면 좌우 반전입니다.
-- `npc/01/`~`npc/08/`: 이전 지역 인물 그림 보존용. 현재는 새 NPC 시트를 사용합니다.
-- `player/`: 새 주인공 이미지 로딩 실패 시 표시하는 이전 그림.
-- `scenery/`: 건물·나무. 이동 가능 범위는 그림을 바꾸어도 유지됩니다.
-- `monster-contact-sheet.png`: 100종 번호별 미리보기. 실행에는 사용하지 않습니다.
-
-현재 주인공 PNG와 참고용 원본 JPG 두 장이 포함됩니다. `image-list.csv`에서 파일 경로를 확인하세요.
-
-## v0.9 우산몬 이름·그림
-001 해국, 066 독도새우, 067 괭이갈매기가 스타팅입니다. 괭이갈매기는 2026-10-20 10:02에 첨부한 새 도안입니다. 스타팅 PNG는 흰 배경을 투명 처리한 그림이며 정면 그림을 양쪽 전투 표시에도 사용합니다. 나머지는 생물 분류에 맞춘 코드 기반 도트입니다. 정밀한 실제 생물 도해는 아닙니다.
-
-monster-list.csv에 100종의 이름과 번호가 있습니다. 엑셀 66번 청각 대신 요청한 독도새우를 편성했고, 100번은 강치입니다. 원본 엑셀의 출현 기록 미확인 표시는 게임 도감에도 유지했습니다.
-
-## 이전 버전 변경 이력
-
-아래 설명은 0.17 이전 구현입니다. 현재는 위의 새 PNG 시트를 사용합니다.
-
-## 0.12 좌우 걷기
-원본 JPG 파일은 0.11과 같습니다. 첨부 시트의 측면 네 장은 모두 같은 발을 앞에 두고 있어, `characters.js`의 `sideWalkPose`와 `sideWalkFrame`이 첫 측면 프레임의 바지·신발 픽셀로 양발 교대 보행을 구성합니다. 머리와 상체는 첫 측면 프레임 그대로입니다. 움직일 때 8포즈를 재생하고 멈추면 발을 모읍니다. 좌우용 원본 시트를 교체하면서 다리 위치·비율이 달라지면 해당 함수의 원본 좌표도 맞춰 주세요.
-
-## 0.13 달리기 수정
-0.12의 가로 조각 변형을 제거했습니다. `sideWalkPose`가 고정 길이의 허벅지·종아리와 무릎 각도를 계산하고 `sideWalkFrame`이 완성된 자세를 캐시합니다. 신발은 원본의 한 조각으로 회전하며, 머리·얼굴·상체는 원본을 유지합니다. 원본 JPG 두 장은 그대로입니다.
-
-
-## 0.14 다리 두께 수정
-
-측면 달리기의 허벅지·무릎·발목 반지름을 16·14·12로 넓히고, 신발은 고정 1.5배로 표시합니다. 원본 이미지 파일은 그대로 유지하며 이동 자세와 속도는 0.13과 같습니다.
-
-
-## 0.15 팔 교대와 곧은 정지 자세
-
-원본의 고정 팔 부분을 분리해 두 팔을 반대 위상으로 그립니다. 얼굴·머리카락 원본 픽셀을 보존하며, 이동이 끝나면 팔과 다리를 수직으로 펴서 정지합니다.
-
-
-## 0.16 팔 두께와 정지 머리 위치
-
-소매·팔뚝을 더 굵게 그리고, 정지 시 머리 원본을 뒤로 24픽셀 옮깁니다. 원본 파일을 변경하거나 머리 픽셀을 늘리지 않으며 머리카락이 잘리지 않도록 확인했습니다.
+## 배경
+- `scenery/terrain-bw-v39.png`(지형 타일), `scenery/props-bw-v39.png`(지도 소품), `scenery/island-art-v36.png`(건물·나무), `scenery/cutscene-art-v38.png`(컷신 배경) 등.
+- 각 그림은 `scripts/draw-*.py`로 다시 만들 수 있고, 자리 좌표는 `dist/*-atlas.js`에 있어요.

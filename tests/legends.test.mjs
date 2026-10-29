@@ -9,11 +9,12 @@ import { newState } from '../dist/engine.js';
 import { monsterAssetKey } from '../dist/assets.js';
 import { facing, look } from '../dist/sprites.js';
 import { PHOTO_CREDITS } from '../dist/photo-credits.js';
+const await_maps = await import('../dist/maps.js');
 
 test('legend spots are free, reachable tiles that appear only after the quest opens', () => {
   for (const q of LEGENDS) {
     const map = createMap(q.map), sp = getSpecies(q.id);
-    assert.ok(sp.legendary && sp.forms === 2, `${q.name} is a legendary with two forms`);
+    assert.ok(sp.legendary && (sp.forms === 2 || q.id === 18), `${q.name} is a legendary (two forms except 사철나무)`);
     assert.ok([1, 2, 3, 4].includes(map[q.y][q.x]), `${q.name} stands on land (${q.map} ${q.x},${q.y})`);
     assert.ok(!map.keepClear.has(`${q.x},${q.y}`) && !map.solid.has(`${q.x},${q.y}`), `${q.name} spot is not a door, exit or wall`);
     const closed = npcs(map, {}, {}); assert.ok(!closed.some(n => n.kind === 'legend'), 'hidden before the quest opens');
@@ -42,7 +43,9 @@ test('quest conditions count real progress and open in story order', () => {
     const upTo = order.slice(0, order.indexOf(q.map) + 1), avail = MAPS.filter(m => upTo.includes(m.id)).flatMap(m => Object.values(m.objects || {})).filter(o => o.type === q.need.type).length;
     assert.ok(avail >= q.need.n, `${q.name}: ${avail} ${q.need.type} objects before ${q.map} (needs ${q.need.n})`);
   }
-  assert.deepEqual(ALL_LEGEND_IDS, [18, 68, 72, 71, 70, 75, 76]);
+  const tree = LEGENDS.find(q => q.id === 18); assert.equal(legendProgress(tree, s).done, false);
+  s.progress[7].enemy = true; assert.ok(legendProgress(tree, s).done, '사철나무 returns to 천장굴 길 after 백무 사장 is stopped');
+  assert.deepEqual(ALL_LEGEND_IDS, [68, 72, 71, 70, 75, 76, 18]);
 });
 
 test('legendaries never show up in grass, gym or 몽땅랜드 teams', () => {
@@ -56,6 +59,7 @@ test('meeting scenes, 변환폼 pictures, facing and real photos', () => {
     const sc = legendScene(q).scenes[0];
     assert.ok(sc.cast.some(c => c.who === `monster:${q.id}`) && sc.lines.some(l => l.cue === `show:${'leg'}`), `${q.name} scene`);
     assert.ok(!/이이에요|예요예요|undefined/.test(sc.lines.map(l => l.text).join(' ')), `${q.name} scene text`);
+    if (q.id === 18) { assert.ok(sc.lines.some(l => l.text.includes('지정된 나무')), '사철나무 is a tree'); continue; }
     assert.equal(monsterAssetKey(`${q.id}-2`), `monsters/${String(q.id).padStart(3, '0')}-2`);
     assert.ok(fs.existsSync(`dist/assets/${monsterAssetKey(`${q.id}-2`)}.png`), `${q.name} 변환폼 picture`);
     assert.equal(facing(`${q.id}-2`), 'left', '변환폼 looks left, so my side flips it to look right');
@@ -68,5 +72,4 @@ test('meeting scenes, 변환폼 pictures, facing and real photos', () => {
     assert.ok(fs.existsSync(`dist/assets/photos/${String(id).padStart(3, '0')}.jpg`), `photo ${id}`);
   }
 });
-const await_maps = await import('../dist/maps.js');
-console.log('PASS: 6 legend spots (free, reachable, hidden until unlocked), conditions in story order, no legendaries in teams, scenes, 변환폼 pictures, facing and 100 credited photos.');
+console.log('PASS: 7 legend spots (free, reachable, hidden until unlocked), conditions in story order, no legendaries in teams, scenes, 변환폼 pictures, facing and 100 credited photos.');

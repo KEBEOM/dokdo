@@ -7,14 +7,15 @@ import { createJoystick } from './joystick.js';
 import { roomId, parseRoomId } from './interiors.js';
 import { MONSTERS, ZONES, TYPES, STARTERS, getSpecies, isUnique } from './data.js';
 import { CONCEPTS, QUESTIONS, SOURCES } from './learning.js';
-import { newState, validateSave, createMonster, damage, enemyHit, healAll, gainXP, captureChance, addMonster, recordAnswer, knownSkills, learnedBetween } from './engine.js';
+import { newState, validateSave, createMonster, damage, enemyHit, attackHit, advantage, healAll, gainXP, captureChance, runChance, addMonster, recordAnswer, BOSS_KINDS, PIERCE_CHANCE, QUESTION_POWER } from './engine.js';
 import { portrait, look } from './sprites.js';
-import { LEGENDS, TREE_ENTRY, ALL_LEGEND_IDS, legendProgress, legendScene, openFlag, metFlag, ownsSpecies } from './legends.js';
+import { LEGENDS, ALL_LEGEND_IDS, legendProgress, legendScene, openFlag, metFlag, ownsSpecies } from './legends.js';
 import { PHOTO_CREDITS, LICENSE_TEXT, photoKey } from './photo-credits.js';
 import { onAssetReady, preloadMonsters, assetImage, assetURL } from './assets.js';
 import { VILLAIN_ATLASES } from './villain-atlases.js';
 import { EXPLORERS, PROFESSOR_PICTURE, paintExplorerCard, paintExplorerPortrait, drawResident } from './characters.js';
 import { createNPCMotion } from './npc-motion.js';
+import { createRoamers } from './roamers.js';
 import { MOVE_DURATION, moveView } from './movement.js';
 import { selectBattleQuestion, shuffledChoices } from './battle-quiz.js';
 import { createMap, npcs, blocked, pathfind, drawWorld, drawActors, TILE, W, H, wantedRole, VILLAIN_BY_ZONE } from './world.js';
@@ -24,7 +25,7 @@ import { OPENING, STARTER_MEET, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.41';
+const VERSION = '0.43';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -35,6 +36,7 @@ let camera = { x: 0, y: 0 }, view = { x: state.x, y: state.y }, moving = null, p
 let walks = 0, lastEncounter = 0, walkDistance = 0, battle = null, dialogueState = null, modalReturn = null, avatarChoice = null;
 let lastTick = performance.now(), audioCtx = null, transition = false;
 const npcMotion = createNPCMotion(); let npcFocus = null;
+const roamers = createRoamers(); // 길 위를 걸어 다니는 야생 우산몬 (roamers.js)
 const keys = new Set();
 
 const canvas = $('#world'), ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
@@ -50,7 +52,7 @@ const z = () => ZONES[state.zone];
 const progress = () => state.progress[state.zone];
 const name = m => getSpecies(m.id).name;
 const busy = () => !state.started || !$('#modal').classList.contains('hidden') || !!dialogueState || !!battle || cutscenes.active() || transition;
-function liveNPCs() { const base = npcs(map, progress(), state.flags); npcMotion.sync(map.id, base); return npcMotion.snapshot(base); }
+function liveNPCs() { const base = npcs(map, progress(), state.flags); npcMotion.sync(map.id, base); return [...npcMotion.snapshot(base), ...roamers.snapshot(performance.now())]; }
 
 // The visible height of the browser window (iPad/iPhone Safari toolbars excluded), also for browsers without 100dvh.
 function setAppHeight() { document.documentElement.style.setProperty('--app-h', `${Math.round(window.innerHeight)}px`); }
@@ -128,7 +130,7 @@ function beep(freq = 440, length = .06) {
 }
 function settleMovement() { if (moving) { state.x = moving.toX; state.y = moving.toY; view = { x: state.x, y: state.y }; moving = null; } }
 function resetTransient() {
-  npcMotion.reset(); npcFocus = null; walkDistance = 0; avatarChoice = null; moving = null; path = []; pathAction = null; keys.clear();
+  npcMotion.reset(); roamers.reset(); npcFocus = null; walkDistance = 0; avatarChoice = null; moving = null; path = []; pathAction = null; keys.clear();
   dialogueState = null; if (battle) battleUI.destroy(); battle = null; modalReturn = null; walks = 0; lastEncounter = 0; transition = false;
   $('#dialogue').classList.add('hidden'); $('#battleScreen').classList.add('hidden'); scene.classList.remove('battling', 'talking', 'map-fading');
   $('#coachPanel')?.remove(); tutorialSteps = 0;
@@ -332,8 +334,9 @@ function moveToNPC(n) {
 // ── talking to people and objects ──────────────────────────────────────────────
 function giveItems(give = {}) {
   const parts = [];
-  if (give.heal) { state.items.heal += give.heal; parts.push(`회복젤 ${give.heal}개`); }
-  if (give.orb) { state.items.orb += give.orb; parts.push(`친구 구슬 ${give.orb}개`); }
+  // v0.42: 친구 구슬이 없어져서, 예전 구슬 선물은 회복젤로 받아요.
+  const heal = (give.heal || 0) + (give.orb || 0);
+  if (heal) { state.items.heal += heal; parts.push(`회복젤 ${heal}개`); }
   if (give.coins) { state.coins += give.coins; parts.push(`조사 코인 ${give.coins}개`); }
   if (parts.length) { toast(`${parts.join(', ')}를 받았어요!`); beep(860, .15); }
 }
@@ -366,14 +369,14 @@ function interact(n) {
       return talk(`관장 ${z().boss}`, ['잘 왔어요. 먼저 여행에서 배운 사실을 하나 확인해 볼까요?', '그다음에는 우산몬과 호흡을 맞춰 봐요. 준비된 동료와 함께 도전하세요!'], () => beginStudy('boss'));
     case 'shop': return showShop();
     case 'shopkeeper': return talk(n.name, n.lines, () => showShop(), '쉼터 · 회복과 준비', n.actor);
-    case 'storage': return showStorage();
+    case 'storage': return showStorage(); // (예전 저장 지도 호환) 지금은 동료 메뉴에서 열어요
     case 'dex': return showDex();
     case 'rest': return talk(n.name, ['포근한 자리에서 잠깐 쉬었어요.', '동료들이 모두 기운을 되찾았어요!'], () => { healAll(state); beep(660, .15); updateUI(); save(); }, '쉬어 가기');
     case 'badges': {
       const got = state.badges.slice().sort((a, b) => a - b).map(i => `${ZONES[i].badge}(${ZONES[i].name})`);
       return talk(n.name, got.length ? [`지금까지 받은 인증 ${got.length}개: ${got.join(', ')}`, '인증을 받을 때마다 진열장에 이름이 새겨져요.'] : ['아직 받은 인증이 없어요.', `관장 ${z().boss}의 시험을 통과하면 여기에 ‘${z().badge}’ 인증이 새겨져요.`], null, '수호관 · 인증 진열장');
     }
-    case 'wild': return startBattle('wild', n.species);
+    case 'wild': return startBattle('wild', n.species, { roamer: n.uid });
     case 'sign': return talk(n.name, n.lines, () => setFlag(n.flag), '안내판 · 실제 지명 정보');
     case 'landmark': return talk(n.name, n.lines, () => setFlag(n.flag), '실제 지명 · 지도 위 그림은 게임용');
     case 'person':
@@ -428,6 +431,7 @@ function move(dx, dy, now) {
   const nx = state.x + dx, ny = state.y + dy; state.dir = dx < 0 ? 'left' : dx > 0 ? 'right' : dy < 0 ? 'up' : 'down';
   if (exitLocked(nx, ny)) { if (!move.warned || now - move.warned > 1500) { toast(lockedMessage()); move.warned = now; } return false; }
   if (dy === -1) { const b = buildingDoorAt(nx, ny); if (b) { enterBuilding(b); return true; } } // walking up into a door
+  const wild = roamers.at(nx, ny); if (wild) { path = []; pathAction = null; startBattle('wild', wild.species, { roamer: wild.uid }); return false; } // 걸어 다니는 우산몬과 부딪히면 결투
   if (blocked(map, nx, ny, liveNPCs())) return false;
   moving = { fromX: state.x, fromY: state.y, toX: nx, toY: ny, start: now }; return true;
 }
@@ -441,12 +445,7 @@ function arrive() {
     if (map.doors.some(d => d.x === state.x && d.y === state.y)) { leaveBuilding(); return; }
     const s = map.stairs.find(s => s.x === state.x && s.y === state.y); if (s) { useStairs(s); return; }
   }
-  if (map[state.y][state.x] === 3 && walks - lastEncounter > 8 && Math.random() < .18 && !pathAction) {
-    lastEncounter = walks; path = [];
-    const lo = map.kind === 'route' ? state.zone : Math.max(0, state.zone - 2), hi = map.kind === 'route' ? Math.min(6, state.zone + 1) : state.zone;
-    const pool = MONSTERS.filter(m => m.stage === 1 && !isUnique(m) && m.zone <= hi && m.zone >= lo); // 전설·스타팅 우산몬은 나오지 않아요
-    startBattle('wild', pool[Math.floor(Math.random() * pool.length)].id);
-  }
+  // v0.43: 풀숲을 걸어도 갑자기 나타나지 않아요. 야생 우산몬은 길 위에서 걸어 다녀요(roamers.js).
 }
 async function changeMap(id, spawnKey = 'a', { heal = false, instant = false, dir = null } = {}) {
   if (!id || transition) return;
@@ -513,6 +512,7 @@ function frame(now) {
   if (!pathAction && !dialogueState && !busy()) npcFocus = null;
   const baseNPCs = npcs(map, progress(), state.flags); npcMotion.sync(map.id, baseNPCs);
   npcMotion.update(baseNPCs, map, { dt, player: { x: state.x, y: state.y, toX: moving?.toX, toY: moving?.toY }, paused: busy() || document.hidden, holdKey: npcFocus, route: path });
+  if (state.started) { const people = npcMotion.snapshot(baseNPCs), me = { x: state.x, y: state.y, toX: moving?.toX, toY: moving?.toY }; roamers.sync(map, people, me, now); roamers.update(map, people, me, now, busy() || document.hidden); }
   let nextStart = now;
   if (moving) { const result = moveView(view, moving, now); walkDistance += result.distance; if (result.complete) { nextStart = Math.max(moving.start + MOVE_DURATION, now - MOVE_DURATION); arrive(); } }
   if (!moving && !busy()) {
@@ -652,16 +652,16 @@ function startBattle(kind, id, opts = {}) {
   else if (kind === 'tutorial') {
     // a gentle practice foe: two right answers calm it, and it only taps lightly
     const foe = createMonster(id, 3), mine = state.party[state.active] || state.party[0];
-    foe.maxHp = foe.hp = damage(mine, foe, 1.2, () => .5).amount * 2 - 1; foe.attack = 3; enemies = [foe];
+    foe.maxHp = foe.hp = damage(mine, foe, QUESTION_POWER, () => .5).amount * 2 - 1; foe.attack = 3; enemies = [foe];
   }
-  else if (kind === 'enemy') { const pool = z().wild.filter(i => !STARTERS.includes(i)); enemies = (state.zone === 7 ? bossTeam() : [pool[2] || pool[0] || 21]).map(i => createMonster(i, base + (i === TREE ? 2 : 0))); }
+  else if (kind === 'enemy') { const pool = z().wild.filter(i => !STARTERS.includes(i)); enemies = (state.zone === 7 ? bossTeam() : [pool[2] || pool[0] || 21]).map(i => createMonster(i, base)); }
   else if (kind === 'trainer') enemies = (opts.npc.team?.length ? opts.npc.team : [z().wild.filter(i => !STARTERS.includes(i))[3]]).map(i => createMonster(i, base));
   else enemies = z().bossTeam.slice(0, kind === 'rematch' ? 3 : 2).map(i => createMonster(i, base + 1 + (kind === 'rematch' ? 2 : 0)));
   for (const m of enemies) if (!state.seen.includes(m.id)) state.seen.push(m.id);
   preloadMonsters(enemies.map(m => m.id));
   for (const r of ['grunt', 'exec', 'boss']) assetImage(`characters/baekmudan-${r}-portrait`);
   $('#toast').classList.add('hidden');
-  battle = { kind, enemies, index: 0, turn: 1, npc: opts.npc || null, captureTried: false, guard: false, quiz: null };
+  battle = { kind, enemies, index: 0, turn: 1, npc: opts.npc || null, roamer: opts.roamer || null, captureTried: false, guard: false, quiz: null };
   $('#battleScreen').classList.remove('hidden'); scene.classList.add('battling');
   const foeTrainer = kind === 'enemy' ? VILLAIN_BY_ZONE[state.zone] : kind === 'trainer' ? opts.npc.actor : null;
   const foePortrait = villainPortrait(foeTrainer);
@@ -677,13 +677,23 @@ function refreshBattle() {
   if (dark) battleUI.setAura(e.hp > 0 ? Math.max(.25, e.hp / e.maxHp) : 0);
 }
 function explanationHTML(q) { return `<p class="dq-explain">${esc(q.explanation)}</p><a class="source-link" href="${q.source}" target="_blank" rel="noopener">자료 확인 ↗</a>`; }
-async function askQuiz(b, phase, header) {
-  const q = testQuestion || selectBattleQuestion(state), order = shuffledChoices(q);
+// ── 문제 결투 (v0.42) ───────────────────────────────────────────────────────────
+// 내 차례: ‘문제 풀기’를 누르면 바로 독도 문제가 나와요. 상성은 내 우산몬과 상대 우산몬의 속성으로 정해요.
+const conceptTitle = q => CONCEPTS.find(c => c.id === q.concept)?.title || '기억 확인';
+const matchup = (a, e) => advantage(getSpecies(a.id).type, getSpecies(e.id).type);
+const isBoss = b => BOSS_KINDS.includes(b.kind) || (b.kind === 'enemy' && state.zone === 7); // 관장 · 백무 사장
+function attackRule(b, mult) {
+  if (mult > 1) return '상성이 좋아요! 맞히면 1.5배로 걷어 내고, 틀려도 절반은 닿아요.';
+  if (mult < 1) return '상성이 나빠요. 맞혀도 0.75배만 닿고, 틀리면 빗나가요.';
+  return berserk(b) ? '맞히면 검은 기운을 걷어 내요. 틀리면 마음이 닿지 않아요.' : '맞히면 상대의 기운이 줄어요. 틀리면 빗나가요.';
+}
+async function askQuiz(b, phase, header, chosen = null) {
+  const q = chosen || testQuestion || selectBattleQuestion(state), order = shuffledChoices(q);
   b.quiz = { q, phase, order, answered: false, assisted: false };
-  const rule = phase === 'attack'
-    ? (berserk(b) ? '맞히면 검은 기운을 걷어 내요. 틀리면 마음이 닿지 않아요.' : '맞히면 상대의 기운이 줄어요. 틀리면 빗나가요.')
-    : '맞히면 잘 막아서 조금만 아파요. 틀리면 그대로 충격을 받아요.';
-  const res = await battleUI.quiz({ q, order, phase, header, rule, concept: CONCEPTS.find(c => c.id === q.concept)?.title || '기억 확인' });
+  const pierce = phase === 'defense' && isBoss(b);
+  const rule = phase === 'attack' ? attackRule(b, matchup(active(), enemy()))
+    : `맞히면 충격이 40% 줄어요. 틀리면 그대로 받아요.${pierce ? ' 이 상대는 가끔 정답도 뚫고 들어와요(관통)!' : ''}`;
+  const res = await battleUI.quiz({ q, order, phase, header, rule, concept: conceptTitle(q) });
   if (battle !== b) return null;
   const correct = res.choice === q.answer;
   Object.assign(b.quiz, { answered: true, assisted: res.assisted, correct, choice: res.choice });
@@ -691,19 +701,21 @@ async function askQuiz(b, phase, header) {
   battleUI.reveal(q, res.choice); beep(correct ? 720 : 200, .12); save();
   return { q, correct };
 }
-async function attackWithQuiz(b, power, skillName) {
+async function attackWithQuiz(b, q = null) {
   const a = active(), e = enemy(), dark = berserk(b);
   battleUI.allyAct?.('lunge');
   tip(b, '알맞은 답을 눌러요. 맞히면 검은 기운이 줄어요. 모르겠으면 ‘기록 힌트 보기’를 눌러도 돼요.');
-  const r = await askQuiz(b, 'attack', `${name(a)}의 ${skillName}!`); if (!r) return;
+  const r = await askQuiz(b, 'attack', `${name(a)}의 문제 풀기!`, q); if (!r) return;
   tip(b, r.correct ? '잘했어요! 오른쪽 위 보라색 막대가 줄어든 게 보이죠?' : '괜찮아요! 틀려도 내 우산몬은 다치지 않아요. 다시 해 봐요.');
+  const d = attackHit(a, e, r.correct);
+  if (d.amount > 0) { e.hp = Math.max(0, e.hp - d.amount); battleUI.damage(d.amount, 'enemy'); refreshBattle(); }
   if (r.correct) {
-    const d = damage(a, e, power); e.hp = Math.max(0, e.hp - d.amount); battleUI.damage(d.amount, 'enemy'); refreshBattle();
-    const eff = d.mult > 1 ? ' 마음이 크게 닿았다!' : d.mult < 1 ? ' 잘 닿지 않은 것 같다…' : '';
+    const eff = d.mult > 1 ? ' 상성이 좋아 마음이 크게 닿았다!' : d.mult < 1 ? ' 상성이 나빠 잘 닿지 않은 것 같다…' : '';
     await battleUI.explain(dark ? `정답! ${name(e)}의 검은 기운을 ${d.amount}만큼 걷어 냈다!${eff}` : `정답! ${name(e)}의 기운이 ${d.amount} 줄었다!${eff}`, explanationHTML(r.q), 'good');
+  } else if (d.amount > 0) {
+    await battleUI.explain(`아쉬워요! 그래도 상성이 좋아서 ${dark ? `검은 기운을 ${d.amount}만큼 걷어 냈다` : `기운이 ${d.amount} 줄었다`}.`, explanationHTML(r.q), 'bad');
   } else {
-    // a wrong answer on my turn just misses (no damage to either side)
-    await battleUI.explain(dark ? `아쉬워요! ${name(a)}의 마음이 닿지 않았다.` : `아쉬워요! ${name(a)}의 기술이 빗나갔다!`, explanationHTML(r.q), 'bad');
+    await battleUI.explain(dark ? `아쉬워요! ${name(a)}의 마음이 닿지 않았다.` : `아쉬워요! ${name(a)}의 도전이 빗나갔다!`, explanationHTML(r.q), 'bad');
   }
 }
 // ── 전설의 우산몬 형태변환 (v0.41): 노멀폼(그림 068) ↔ 변환폼(그림 068-2) ──
@@ -717,80 +729,68 @@ async function morph(b, m, side) {
   if (side === 'ally') await battleUI.say(to === 2 ? `${name(m)}의 형태변환! 눈부신 빛에 휩싸여 모습이 바뀌었다! 정화의 힘이 강해졌다!` : `${josa(name(m), '이/가')} 원래 모습으로 돌아왔다.`, { tone: 'good' });
   else await battleUI.say(`전설의 우산몬 ${josa(name(m), '이/가')} 형태를 바꿨다! 더 강한 모습이 되었다!`, { tone: 'dark' });
 }
-const SKILL_KIND = { attack: '정화', heal: '회복', guard: '보호' };
-// 정화하기: choose one of the skills this 우산몬 has learned (2 at first, more as it grows).
-async function purify(b) {
-  const a = active(), list = knownSkills(a), dark = berserk(b);
-  const tired = list.every(s => s.kind !== 'attack' || a.pp[s.index] <= 0);
-  const first = tut(b) && b.turn === 1;
-  const items = list.map(s => ({ label: s.name, value: `skill-${s.index}`, sub: `${s.kind === 'attack' ? (s.index === 1 ? '강한 ' : '') + (dark ? '정화' : '겨루기') : SKILL_KIND[s.kind]} · ${a.pp[s.index]}/${s.max}`, disabled: a.pp[s.index] <= 0 || (first && s.index !== 0), hint: first && s.index === 0 }));
-  if (first) tip(b, `‘${list[0].name}’${josa(list[0].name, '을/를').slice(list[0].name.length)} 골라요. 기술을 쓰면 독도 문제가 나와요!`);
-  if (tired) items.push({ label: '있는 힘껏', value: 'skill-last', sub: '기술 횟수를 다 썼을 때' });
-  if (getSpecies(a.id).forms === 2 && !tut(b)) items.push({ label: a.form === 2 ? '원래 모습으로' : '형태변환', value: 'morph', sub: a.form === 2 ? '노멀폼으로 돌아가요' : '변환폼 · 정화의 힘 UP' });
-  const pick = await battleUI.menu(items, { title: '정화하기', prompt: dark ? '어떤 기술로 정화할까? 문제를 맞혀야 마음이 닿아요.' : '어떤 기술로 겨룰까? 문제를 맞혀야 닿아요.', cancel: true });
+// 동료 만들기: 버튼을 누르면 확률로 동료가 돼요(구슬 필요 없음). 시도하면 그 차례에는 공격하지 못해요.
+async function befriend(b) {
+  const e = enemy(), sp = getSpecies(e.id), chance = captureChance(e);
+  await battleUI.say(`${name(e)}에게 손을 내밀었다… 마음이 닿을까?`);
   if (battle !== b) return 'end';
-  if (pick === null) return 'free';
-  if (pick === 'skill-last') { await attackWithQuiz(b, 1, '있는 힘껏'); return 'turn'; }
-  if (pick === 'morph') { await morph(b, a, 'ally'); return 'turn'; }
-  const sk = list.find(s => `skill-${s.index}` === pick); a.pp[sk.index] = Math.max(0, a.pp[sk.index] - 1);
-  if (sk.kind === 'attack') { await attackWithQuiz(b, sk.power, sk.name); return 'turn'; }
-  if (sk.kind === 'heal') { const before = a.hp; a.hp = Math.min(a.maxHp, a.hp + Math.ceil(a.maxHp * .35)); refreshBattle(); updateUI(); await battleUI.say(`${name(a)}의 ${sk.name}! 체력이 ${a.hp - before} 회복됐다!`, { tone: 'good' }); return 'turn'; }
-  b.guard = true; await battleUI.say(`${name(a)}의 ${sk.name}! 이번 차례에 받는 충격이 절반으로 줄어든다.`); return 'turn';
+  const sure = !sp.legendary && state.caught.length < 2; // 첫 동료 한 마리는 꼭 함께해요
+  if (sure || Math.random() < chance) {
+    addMonster(state, createMonster(e.id, e.level)); beep(850, .2);
+    await battleUI.say(`검은 기운이 걷히고, ${josa(name(e), '이/가')} 마음을 열어 동료가 되었다!`, { tone: 'good' });
+    finishBattle(false, false, { captured: e, legend: b.kind === 'legend' ? b : null }); return 'end';
+  }
+  await battleUI.say(sp.legendary ? `${josa(name(e), '은/는')} 아직 마음을 열지 않았다. (전설의 우산몬은 10%의 확률로만 동료가 돼요)` : '아직 마음을 열지 않았다. 검은 기운을 더 걷어 내면 잘 돼요.'); return 'turn';
 }
 async function playerTurn(b) {
-  const a = active(), dark = berserk(b), first = tut(b) && b.turn === 1;
-  tip(b, first ? '‘정화하기’를 눌러 보세요. 우산몬이 쓸 수 있는 기술이 나와요.' : '이번엔 마음대로 골라 봐요! ‘보호’를 쓰면 다음에 받는 충격이 절반이 돼요.');
+  const a = active(), e = enemy(), first = tut(b) && b.turn === 1, wild = b.kind === 'wild' || b.kind === 'legend', mult = matchup(a, e);
+  const forms = getSpecies(a.id).forms === 2 && !tut(b);
+  tip(b, first ? '‘문제 풀기’를 눌러 보세요. 독도 문제가 나와요!' : '이번엔 마음대로 골라 봐요! 상성이 좋은 동료로 바꾸면 더 크게 걷어 낼 수 있어요.');
+  const chance = wild ? Math.round(captureChance(e) * 100) : 0;
   const cmd = await battleUI.menu([
-    { label: '정화하기', value: 'purify', sub: `기술 ${knownSkills(a).length}가지`, hint: first },
-    { label: '도구', value: 'item', sub: `회복젤 ${state.items.heal} · 친구 구슬 ${state.items.orb}`, disabled: first },
+    { label: '문제 풀기', value: 'quiz', sub: `${TYPES[getSpecies(a.id).type].name} → ${TYPES[getSpecies(e.id).type].name}${mult > 1 ? ' · 상성 좋음' : mult < 1 ? ' · 상성 나쁨' : ''}`, hint: first },
+    { label: '동료 만들기', value: 'befriend', sub: wild ? `성공률 약 ${chance}% · 차례를 써요` : '야생 우산몬에게만', disabled: first || !wild },
+    { label: '도구', value: 'item', sub: `회복젤 ${state.items.heal}`, disabled: first },
     { label: '동료', value: 'party', sub: '교체', disabled: first || state.party.filter(m => m.hp > 0).length < 2 },
-    { label: '물러나기', value: 'run', sub: b.kind === 'wild' ? '' : '결투 중', disabled: first }
-  ], { prompt: `${josa(name(a), '은/는')} 무엇을 할까?` });
+    ...(forms ? [{ label: a.form === 2 ? '원래 모습으로' : '형태변환', value: 'morph', sub: a.form === 2 ? '노멀폼으로 돌아가요' : '변환폼 · 정화의 힘 UP' }] : []),
+    { label: '물러나기', value: 'run', sub: wild ? `성공률 약 ${Math.round(runChance(a, enemy()) * 100)}%` : '결투 중', disabled: first, back: true }
+  ], { prompt: `${josa(name(a), '은/는')} 무엇을 할까?`, layout: forms ? 'cards' : '' });
   if (battle !== b) return 'end';
-  if (cmd === 'purify') return purify(b);
+  if (cmd === 'quiz') { await attackWithQuiz(b); return 'turn'; }
+  if (cmd === 'morph') { await morph(b, a, 'ally'); return 'turn'; }
+  if (cmd === 'befriend') return befriend(b);
   if (cmd === 'item') {
-    const orbNote = b.kind !== 'wild' ? '야생 우산몬에게만' : b.captureTried ? '이번 만남에 이미 사용' : '검은 기운이 적을수록 잘 통해요';
     const pick = await battleUI.menu([
-      { label: `회복젤 ×${state.items.heal}`, value: 'heal', sub: '체력 45% 회복', disabled: state.items.heal <= 0 || a.hp === a.maxHp },
-      { label: `친구 구슬 ×${state.items.orb}`, value: 'orb', sub: orbNote, disabled: b.kind !== 'wild' || state.items.orb <= 0 || b.captureTried }
+      { label: `회복젤 ×${state.items.heal}`, value: 'heal', sub: '체력 45% 회복', disabled: state.items.heal <= 0 || a.hp === a.maxHp }
     ], { title: '도구', prompt: '어떤 도구를 쓸까?', cancel: true });
     if (pick === null) return 'free';
-    if (pick === 'heal') {
-      state.items.heal--; const before = a.hp; a.hp = Math.min(a.maxHp, a.hp + Math.ceil(a.maxHp * .45)); refreshBattle(); updateUI(); save();
-      await battleUI.say(`회복젤을 썼다! ${name(a)}의 체력이 ${a.hp - before} 회복됐다!`); return 'turn';
-    }
-    state.items.orb--; b.captureTried = true; const e = enemy();
-    await battleUI.say(`친구 구슬을 건넸다… ${name(e)}에게 마음이 닿을까?`);
-    if (battle !== b) return 'end';
-    if (state.caught.length < 2 || Math.random() < captureChance(e)) {
-      addMonster(state, createMonster(e.id, e.level)); beep(850, .2);
-      await battleUI.say(`검은 기운이 걷히고, ${josa(name(e), '이/가')} 마음을 열어 동료가 되었다!`, { tone: 'good' });
-      finishBattle(false, false, { captured: e }); return 'end';
-    }
-    await battleUI.say('아직 마음을 열지 않았다. 검은 기운을 더 걷어 내 보자.'); return 'turn';
+    state.items.heal--; const before = a.hp; a.hp = Math.min(a.maxHp, a.hp + Math.ceil(a.maxHp * .45)); refreshBattle(); updateUI(); save();
+    await battleUI.say(`회복젤을 썼다! ${name(a)}의 체력이 ${a.hp - before} 회복됐다!`); return 'turn';
   }
   if (cmd === 'party') {
-    const pick = await battleUI.menu(state.party.map((m, i) => ({ label: name(m), value: String(i), sub: `Lv ${m.level} · HP ${m.hp}/${m.maxHp}`, disabled: m.hp <= 0 || i === state.active })), { title: '동료', prompt: '누구와 교체할까?', cancel: true });
+    const e = enemy();
+    const pick = await battleUI.menu(state.party.map((m, i) => { const mu = matchup(m, e); return { label: name(m), value: String(i), sub: `Lv ${m.level} · HP ${m.hp}/${m.maxHp}${mu > 1 ? ' · 상성 좋음' : mu < 1 ? ' · 상성 나쁨' : ''}`, disabled: m.hp <= 0 || i === state.active }; }), { title: '동료', prompt: '누구와 교체할까?', cancel: true });
     if (pick === null) return 'free';
     state.active = Number(pick); refreshBattle(); battleUI.allyAct?.('enter'); updateUI(); save();
     await battleUI.say(`${name(active())}, 부탁해!`); return 'turn';
   }
   if (tut(b)) { await battleUI.say('연습 대결은 끝까지 해 봐요! 그만하려면 위쪽 ‘연습 건너뛰기’를 눌러요.'); return 'free'; }
-  if (b.kind !== 'wild' && b.kind !== 'legend') { await battleUI.say('이 결투에서는 물러날 수 없다!'); return 'free'; }
-  if (Math.random() < .8) { await battleUI.say('무사히 물러났다!'); finishBattle(false, true); return 'end'; }
+  if (!wild) { await battleUI.say('이 결투에서는 물러날 수 없다!'); return 'free'; }
+  if (Math.random() < runChance(a, enemy())) { await battleUI.say('무사히 물러났다!'); finishBattle(false, true); return 'end'; }
   await battleUI.say('물러나지 못했다!'); return 'turn';
 }
 async function enemyTurn(b) {
   const a = active(), e = enemy(), dark = berserk(b);
   if (b.kind === 'legend' && getSpecies(e.id).forms === 2 && e.form !== 2 && e.hp > 0 && e.hp <= e.maxHp / 2) { await morph(b, e, 'enemy'); if (battle !== b) return; }
-  tip(b, '이번엔 사나워진 우산몬 차례예요! 문제를 맞히면 살짝만 아프게 막을 수 있어요.');
+  tip(b, '이번엔 사나워진 우산몬 차례예요! 문제를 맞히면 충격이 40% 줄어요.');
   const r = await askQuiz(b, 'defense', dark ? `사나워진 ${josa(name(e), '이/가')} 날뛴다!` : `${name(e)}의 문제 도전!`); if (!r) return;
-  const d = enemyHit(e, a, { correct: r.correct, guard: b.guard });
+  const pierce = r.correct && isBoss(b) && Math.random() < PIERCE_CHANCE;
+  const d = enemyHit(e, a, { correct: r.correct, pierce });
   a.hp = Math.max(tut(b) ? 1 : 0, a.hp - d);
   tip(b, '내 체력(HP)은 왼쪽 위에서 볼 수 있어요. 줄어들면 쉼터나 회복젤로 채워요.'); battleUI.damage(d, 'player'); refreshBattle(); updateUI();
-  const guarded = b.guard ? ' (보호 기술로 충격이 더 줄었다)' : '';
-  if (r.correct) await battleUI.explain(`정답! ${josa(name(a), '이/가')} 잘 막아 내서 ${d}의 충격만 받았다!${guarded}`, explanationHTML(r.q), 'good');
-  else await battleUI.explain(`${dark ? `${josa(name(e), '이/가')} 날뛰었다!` : `${name(e)}의 도전!`} ${josa(name(a), '은/는')} ${d}의 충격을 받았다!${guarded}`, explanationHTML(r.q), 'bad');
+  if (pierce) await battleUI.explain(`정답! 그런데 ${name(e)}의 힘이 너무 세서 그대로 뚫고 들어왔다! (관통) ${josa(name(a), '은/는')} ${d}의 충격을 받았다!`, explanationHTML(r.q), 'bad');
+  else if (r.correct) await battleUI.explain(`정답! ${josa(name(a), '이/가')} 잘 막아 내서 충격이 40% 줄었다. ${d}의 충격만 받았다!`, explanationHTML(r.q), 'good');
+  else await battleUI.explain(`${dark ? `${josa(name(e), '이/가')} 날뛰었다!` : `${name(e)}의 도전!`} ${josa(name(a), '은/는')} ${d}의 충격을 받았다!`, explanationHTML(r.q), 'bad');
 }
 async function allyFainted(b) {
   battleUI.allyAct?.('tired');
@@ -824,7 +824,6 @@ async function victory(b) {
   for (const m of state.party) {
     const before = m.level; gainXP(m, xp);
     if (m.level > before) ups.push(`${name(m)}의 레벨이 올라 Lv.${josa(String(m.level), '이/가')} 되었다!`);
-    for (const sk of learnedBetween(m, before, m.level)) ups.push(`${josa(name(m), '은/는')} 새 기술 ‘${sk.name}’${josa(sk.name, '을/를').slice(sk.name.length)} 배웠다!`);
     if (!state.caught.includes(m.id)) state.caught.push(m.id); if (!state.seen.includes(m.id)) state.seen.push(m.id);
   }
   refreshBattle(); updateUI(); save();
@@ -862,7 +861,7 @@ async function runBattle(b) {
     b.turn++; b.guard = false;
   }
 }
-function closeBattle() { for (const m of [...state.party, ...state.storage]) setForm(m, 1); battle = null; battleUI.destroy(); $('#battleScreen').classList.add('hidden'); scene.classList.remove('battling'); lastEncounter = walks; }
+function closeBattle() { for (const m of [...state.party, ...state.storage]) setForm(m, 1); if (battle?.roamer) roamers.remove(battle.roamer, performance.now()); battle = null; battleUI.destroy(); $('#battleScreen').classList.add('hidden'); scene.classList.remove('battling'); lastEncounter = walks; }
 function returnToShelter() {
   if (map.kind !== 'town') { const def = getMapDef(townId(state.zone)); state.map = def.id; map = createMap(def.id); npcMotion.reset(); labelKey = ''; }
   const shop = map.parsed.roles.shop, people = npcs(map, progress(), state.flags);
@@ -872,7 +871,8 @@ function returnToShelter() {
 function finishBattle(win, escaped = false, info = {}) {
   if (!battle) return;
   const b = battle, kind = b.kind; closeBattle();
-  if (info.captured) toast(`${josa(getSpecies(info.captured.id).name, '이/가')} 동료가 되었어요!`);
+  if (info.captured && info.legend) legendJoins(info.legend);
+  else if (info.captured) toast(`${josa(getSpecies(info.captured.id).name, '이/가')} 동료가 되었어요!`);
   else if (win) {
     if (kind === 'enemy') {
       progress().enemy = true; state.items.heal += 2;
@@ -880,34 +880,26 @@ function finishBattle(win, escaped = false, info = {}) {
       else talk(z().enemy, VILLAIN_TALES[state.zone].after, () => talk('서하', [z().story, '쉼터에서 동료를 회복하고 수호관으로 가 보세요.']), '몽땅랜드 · 창작 대화', VILLAIN_BY_ZONE[state.zone]);
     }
     else if (kind === 'tutorial') finishTutorialBattle();
-    else if (kind === 'legend') legendJoins(b);
+    else if (kind === 'legend') { const sp = getSpecies(b.enemies[0].id); talk('김박사(무전)', [`검은 기운은 걷혔지만, ${josa(sp.name, '은/는')} 아직 마음을 열지 않고 제자리로 돌아갔어요.`, '전설의 우산몬은 결투 중에 ‘동료 만들기’를 눌러야 해요(10%). 다시 찾아가 도전해 봐요!'], null, '전설의 우산몬', 'professor'); }
     else if (kind === 'trainer') { setFlag(b.npc.flag); talk(b.npc.name, b.npc.after || ['다음엔 지지 않을 거야!'], null, '몽땅랜드 · 창작 대화', b.npc.actor); }
     else if (kind === 'boss') {
       progress().boss = true; if (!state.badges.includes(state.zone)) state.badges.push(state.zone);
-      const learned = [];
-      for (const m of state.party) { const goal = 8 + state.zone * 4, before = m.level; while (m.level < goal) gainXP(m, m.level * 13); for (const sk of learnedBetween(m, before, m.level)) learned.push(`${name(m)} ‘${sk.name}’`); if (!state.caught.includes(m.id)) state.caught.push(m.id); if (!state.seen.includes(m.id)) state.seen.push(m.id); }
-      if (learned.length) setTimeout(() => toast(`새 기술을 배웠어요: ${learned.slice(0, 3).join(', ')}`), 400);
-      healAll(state); state.items.orb += 5; state.items.heal += 2; labelKey = '';
+      for (const m of state.party) { const goal = 8 + state.zone * 4; while (m.level < goal) gainXP(m, m.level * 13); if (!state.caught.includes(m.id)) state.caught.push(m.id); if (!state.seen.includes(m.id)) state.seen.push(m.id); }
+      healAll(state); state.items.heal += 4; labelKey = '';
       talk(`관장 ${z().boss}`, [`훌륭해요! ${z().badge} 인증을 드릴게요. 우산몬과 함께 한 걸음 더 성장했어요.`, state.zone === 7 ? '울릉도와 독도, 두 섬의 기억을 되찾은 당신은 이제 두 섬의 수호사예요!' : `이제 마을 오른쪽 다리가 열렸어요. ‘${getMapDef(nextMapId(map.id)).name}’을 따라 다음 지역으로 가 보세요!`], () => { if (state.zone === 7) { state.ended = true; save(); playStory(EPILOGUE).then(showEnding); } });
     }
   } else if (!escaped) {
     healAll(state); returnToShelter();
-    talk('쉼터지기', ['동료들이 푹 쉬고 기운을 되찾았어요. 잃어버린 기록이나 동료는 없으니 걱정하지 마세요.', '회복젤과 동료 교체, 보호 기술을 활용해 다시 결투해 보세요.']);
+    talk('쉼터지기', ['동료들이 푹 쉬고 기운을 되찾았어요. 잃어버린 기록이나 동료는 없으니 걱정하지 마세요.', '회복젤과 동료 교체를 활용하고, 상성이 좋은 동료로 다시 결투해 보세요.']);
   } else toast('사나워진 우산몬에게서 잠시 물러났어요.');
   updateUI(); save();
 }
 async function bossFall(b) {
   await playStory(BOSS_FALL);
-  const tree = b?.enemies.find(m => m.id === TREE);
-  if (tree && !ownsTree()) await treeJoins(tree);
+  // 사철나무는 풀려나 천장굴 길로 돌아가요. 그곳에서 다시 만나 ‘동료 만들기’(10%)로 함께할 수 있어요.
+  if (b?.enemies.some(m => m.id === TREE) && !ownsTree()) await playStory(TREE_JOINS);
   if (!state.legend) await legendEncounter();
   else talk('서하', [z().story, '쉼터에서 동료를 회복하고 수호관으로 가 보세요.']);
-}
-// 사철나무: 백무 사장에게서 정화하면 동료가 되어 함께해요 (게임 전체에 한 마리).
-async function treeJoins(e) {
-  addMonster(state, createMonster(e.id, e.level)); if (!state.caught.includes(e.id)) state.caught.push(e.id); save();
-  await playStory(TREE_JOINS);
-  await new Promise(done => openModal(head('오래된 사철나무', `전설의 우산몬 · NO.${String(e.id).padStart(3, '0')}`) + `<div class="end-screen"><canvas data-portrait="${e.id}" width="160" height="160"></canvas><p>검은 기운이 걷히자 사철나무가 잎을 흔들며 인사했어요.<br>이제 당신과 함께 독도를 지키고 싶어 해요.</p><div class="fact-box">독도의 사철나무는 동도 천장굴 위쪽 비탈에서 100년 넘게 자란, 독도에서 가장 오래된 나무예요. 2012년 천연기념물 제538호로 지정되었어요. 게임 속 모습은 창작이에요.</div><div class="modal-actions"><button id="legendTreeOK" class="primary">함께 가자 →</button></div></div>`, () => { paintPortraits(); $('#legendTreeOK').onclick = () => { closeModal(); updateUI(); save(); done(); }; }));
 }
 async function legendEncounter() {
   state.legend = true; addMonster(state, createMonster(100, 34)); save();
@@ -928,23 +920,27 @@ function checkLegends() {
   setFlag('legend-intro'); beep(980, .1); setTimeout(() => beep(1180, .1), 140);
   talk('김박사(무전)', [...intro, ...q.radio, `전설의 우산몬 ‘${q.name}’ · ${q.place}`], () => { toast(`${q.place}에 전설의 기운이 나타났어요!`); labelKey = ''; updateUI(); }, '전설의 우산몬 소식', 'professor');
 }
+// 전설의 우산몬이 ‘동료 만들기’(10%)로 동료가 됐을 때 (동료로 넣는 일은 befriend가 이미 했어요)
 function legendJoins(b) {
   const e = b.enemies[0], q = LEGENDS.find(l => l.id === e.id); if (!q) return;
   setFlag(metFlag(q.id)); if (b.npc?.flag) setFlag(b.npc.flag);
-  addMonster(state, createMonster(e.id, e.level)); save(); updateUI();
-  openModal(head(q.name, `전설의 우산몬 · ${q.monument}`) + `<div class="end-screen"><div class="form-pair"><figure><canvas data-portrait="${q.id}" width="128" height="128"></canvas><figcaption>노멀폼</figcaption></figure><span aria-hidden="true">⇄</span><figure><canvas data-portrait="${q.id}-2" width="128" height="128"></canvas><figcaption>변환폼</figcaption></figure></div><p>검은 기운이 걷히자 ${josa(q.name, '이/가')} 고마운 듯 곁에 내려앉았어요.<br>이제 동료가 되어 함께해요!</p><div class="fact-box"><strong>${q.monument} · ${q.name}</strong><br>${esc(q.fact)}<br>결투에서 ‘정화하기 → 형태변환’을 고르면 변환폼으로 바뀌어요. 게임 속 모습은 창작이에요.</div><div class="modal-actions"><button id="legendJoinOK" class="primary">함께 가자 →</button></div></div>`, () => {
+  if (!ownsSpecies(state, e.id)) addMonster(state, createMonster(e.id, e.level));
+  save(); updateUI();
+  const forms = getSpecies(q.id).forms === 2;
+  const pics = forms ? `<div class="form-pair"><figure><canvas data-portrait="${q.id}" width="128" height="128"></canvas><figcaption>노멀폼</figcaption></figure><span aria-hidden="true">⇄</span><figure><canvas data-portrait="${q.id}-2" width="128" height="128"></canvas><figcaption>변환폼</figcaption></figure></div>` : `<canvas data-portrait="${q.id}" width="160" height="160"></canvas>`;
+  openModal(head(q.name, `전설의 우산몬 · ${q.monument}`) + `<div class="end-screen">${pics}<p>${josa(q.name, '이/가')} 마음을 열고 곁에 다가왔어요.<br>이제 동료가 되어 함께해요!</p><div class="fact-box"><strong>${q.monument} · ${q.name}</strong><br>${esc(q.fact)}<br>${forms ? '결투 메뉴의 ‘형태변환’을 누르면 변환폼으로 바뀌어요. ' : ''}게임 속 모습은 창작이에요.</div><div class="modal-actions"><button id="legendJoinOK" class="primary">함께 가자 →</button></div></div>`, () => {
     $('#legendJoinOK').onclick = () => { closeModal(); allLegendsCheck(); };
   });
 }
 function allLegendsCheck() {
   if (state.flags['legend-all'] || !ALL_LEGEND_IDS.every(id => ownsSpecies(state, id))) return;
-  setFlag('legend-all'); state.items.orb += 10; state.coins += 200; save(); updateUI();
-  talk('김박사(무전)', ['천연기념물 전설의 우산몬 일곱이 모두 당신과 함께하게 됐어요!', '오늘부터 당신은 ‘천연기념물 지킴이’예요. 친구 구슬 10개와 조사 코인 200개를 보낼게요.', '천연기념물은 우리가 아끼고 지켜야 다음 세대도 만날 수 있어요. 고마워요!'], null, '천연기념물 지킴이', 'professor');
+  setFlag('legend-all'); state.items.heal += 10; state.coins += 300; save(); updateUI();
+  talk('김박사(무전)', ['천연기념물 전설의 우산몬 일곱이 모두 당신과 함께하게 됐어요!', '오늘부터 당신은 ‘천연기념물 지킴이’예요. 회복젤 10개와 조사 코인 300개를 보낼게요.', '천연기념물은 우리가 아끼고 지켜야 다음 세대도 만날 수 있어요. 고마워요!'], null, '천연기념물 지킴이', 'professor');
 }
 function paintLegendList() {
   const el = $('#legendList'); if (!el) return;
-  const rows = [TREE_ENTRY, ...LEGENDS].map(q => {
-    const owned = ownsSpecies(state, q.id), open = q.id !== 18 && state.flags[openFlag(q.id)], p = q.id === 18 ? null : legendProgress(q, state);
+  const rows = LEGENDS.map(q => {
+    const owned = ownsSpecies(state, q.id), open = state.flags[openFlag(q.id)], p = legendProgress(q, state);
     const status = owned ? '함께해요 ✓' : open ? `가 볼 곳: ${q.place}` : p ? `${q.need.label} (${p.cur}/${p.need})` : q.need.label;
     return `<li class="${owned ? 'done' : open ? 'open' : ''}"><canvas data-portrait="${q.id}" width="40" height="40" style="${owned || open ? '' : 'filter:brightness(0) opacity(.35)'}"></canvas><div><strong>${owned || open ? q.name : '???'}</strong><small>${esc(q.title)}</small><small>${esc(status)}</small></div></li>`;
   });
@@ -954,22 +950,38 @@ function paintLegendList() {
 
 // ── shop, party, dex, world map, notebook, menu ────────────────────────────────
 function showShop() {
-  openModal(head('쉼터', '회복 · 준비 · 동료 관리') + `<p>잠깐 쉬어 가요. 동료 회복은 언제나 무료예요.</p><div class="fact-box">조사 코인 <strong>${state.coins}</strong> · 회복젤 ${state.items.heal} · 친구 구슬 ${state.items.orb}</div><div class="modal-actions"><button id="healAll" class="primary">모두 회복하기</button><button id="buyHeal" class="neutral" ${state.coins < 20 ? 'disabled' : ''}>회복젤 +3 · 20코인</button><button id="buyOrb" class="neutral" ${state.coins < 25 ? 'disabled' : ''}>친구 구슬 +5 · 25코인</button><button id="storageBtn" class="neutral">동료 보관함 (${state.storage.length})</button></div>`, () => {
+  openModal(head('쉼터', '회복 · 준비') + `<p>잠깐 쉬어 가요. 동료 회복은 언제나 무료예요.</p><div class="fact-box">조사 코인 <strong>${state.coins}</strong> · 회복젤 ${state.items.heal}</div><div class="modal-actions"><button id="healAll" class="primary">모두 회복하기</button><button id="buyHeal" class="neutral" ${state.coins < 20 ? 'disabled' : ''}>회복젤 +3 · 20코인</button></div>`, () => {
     $('#healAll').onclick = () => { healAll(state); save(); updateUI(); closeModal(); toast('모든 동료의 체력을 회복했어요.'); beep(660, .15); };
     $('#buyHeal').onclick = () => { state.coins -= 20; state.items.heal += 3; save(); showShop(); };
-    $('#buyOrb').onclick = () => { state.coins -= 25; state.items.orb += 5; save(); showShop(); };
-    $('#storageBtn').onclick = showStorage;
   });
 }
-function showStorage() {
-  openModal(head('동료 보관함') + `<p>동료를 눌러 함께 다닐 파티를 바꿀 수 있어요. 현재 파티 ${state.party.length}/6</p><h3>함께하는 동료</h3><div class="dex-grid">${state.party.map((m, i) => `<button class="dex-card owned" data-store="${i}"><canvas data-portrait="${m.id}" width="80" height="80"></canvas><strong>${name(m)}</strong><small>Lv.${m.level} · 보관하기</small></button>`).join('')}</div><h3>쉬고 있는 동료</h3><div class="dex-grid">${state.storage.map((m, i) => `<button class="dex-card" data-take="${i}"><canvas data-portrait="${m.id}" width="80" height="80"></canvas><strong>${name(m)}</strong><small>Lv.${m.level} · 데려가기</small></button>`).join('')}</div>`, () => {
-    $$('[data-store]').forEach(b => b.onclick = () => { if (state.party.length === 1) { toast('함께할 동료 한 마리는 남겨 주세요.'); return; } state.storage.push(state.party.splice(Number(b.dataset.store), 1)[0]); state.active = 0; save(); updateUI(); showStorage(); });
-    $$('[data-take]').forEach(b => b.onclick = () => { if (state.party.length >= 6) { toast('먼저 동료 한 마리를 보관해 주세요.'); return; } state.party.push(state.storage.splice(Number(b.dataset.take), 1)[0]); save(); updateUI(); showStorage(); });
+// 동료 주머니(v0.42): 보관 기계 없이 어디서나 함께 다닐 동료를 바꿔요. 6마리가 다 차 있으면 쉬고 있는 동료와 맞바꿔요.
+function showStorage(pick = null) {
+  if (battle) return;
+  const card = (m, attr, note, cls = '') => `<button class="dex-card ${cls}" ${attr}><canvas data-portrait="${m.id}" width="80" height="80"></canvas><strong>${name(m)}</strong><small>Lv.${m.level} · ${note}</small></button>`;
+  const swapping = pick !== null && state.storage[pick];
+  openModal(head('동료 주머니', `함께 다니는 동료 ${state.party.length} / 6 · 쉬는 동료 ${state.storage.length}`) +
+    (swapping ? `<p class="swap-note"><strong>${name(state.storage[pick])}</strong>${josa(name(state.storage[pick]), '을/를').slice(name(state.storage[pick]).length)} 데려갈게요. 함께 다니는 동료 중 누구와 바꿀까요?</p>` : `<p>쉬고 있는 동료를 누르면 데려가요. 6마리가 다 차 있으면 누구와 바꿀지 골라요.</p>`) +
+    `<h3>함께 다니는 동료</h3><div class="dex-grid">${state.party.map((m, i) => card(m, `data-party-slot="${i}"`, swapping ? '이 동료와 바꾸기' : '쉬게 하기', 'owned' + (swapping ? ' swap-target' : ''))).join('')}</div>` +
+    `<h3>쉬고 있는 동료</h3><div class="dex-grid">${state.storage.length ? state.storage.map((m, i) => card(m, `data-rest-slot="${i}"`, i === pick ? '고른 동료' : state.party.length >= 6 ? '바꾸기' : '데려가기', i === pick ? 'selected' : '')).join('') : '<p class="footer-note">아직 쉬고 있는 동료가 없어요. 6마리가 넘으면 여기로 와요.</p>'}</div>` +
+    (swapping ? '<div class="modal-actions"><button id="swapCancel" class="neutral">그만두기</button></div>' : ''), () => {
+    $$('[data-party-slot]').forEach(b => b.onclick = () => {
+      const i = Number(b.dataset.partySlot);
+      if (swapping) { const out = state.party[i]; state.party[i] = state.storage.splice(pick, 1)[0]; state.storage.push(out); toast(`${josa(name(state.party[i]), '이/가')} 함께해요. ${josa(name(out), '은/는')} 쉬러 갔어요.`); }
+      else { if (state.party.length === 1) { toast('함께할 동료 한 마리는 남겨 주세요.'); return; } state.storage.push(state.party.splice(i, 1)[0]); }
+      state.active = Math.min(state.active, state.party.length - 1); save(); updateUI(); showStorage();
+    });
+    $$('[data-rest-slot]').forEach(b => b.onclick = () => {
+      const i = Number(b.dataset.restSlot);
+      if (state.party.length < 6) { state.party.push(state.storage.splice(i, 1)[0]); save(); updateUI(); showStorage(); }
+      else showStorage(i);
+    });
+    $('#swapCancel')?.addEventListener('click', () => showStorage());
   });
 }
 function partyDetail(index) {
   if (battle) return; const m = state.party[index]; if (!m) return; const sp = getSpecies(m.id);
-  openModal(head(sp.name, `함께하는 동료 · Lv.${m.level}`) + `<div class="monster-detail"><canvas data-portrait="${m.id}" width="160" height="160"></canvas><div><span class="type-chip">${TYPES[sp.type].name}</span><p>${sp.motif} 모티브</p><div class="stat-list"><span>체력 ${m.hp}/${m.maxHp}</span><span>정답의 힘 ${m.attack}</span><span>튼튼함 ${m.defense}</span></div></div></div><div class="fact-box">결투에서는 ‘결투’나 정화 기술을 고른 뒤 문제를 풀어요. 맞힌 답이 사나워진 우산몬의 검은 기운을 걷어 내요.</div><div class="modal-actions"><button id="leadMon" class="primary" ${m.hp <= 0 ? 'disabled' : ''}>첫 번째로 내보내기</button><button id="fieldHeal" class="neutral" ${state.items.heal <= 0 ? 'disabled' : ''}>회복젤 사용 (${state.items.heal})</button></div>`, () => {
+  openModal(head(sp.name, `함께하는 동료 · Lv.${m.level}`) + `<div class="monster-detail"><canvas data-portrait="${m.id}" width="160" height="160"></canvas><div><span class="type-chip">${TYPES[sp.type].name}</span><p>${sp.motif} 모티브</p><div class="stat-list"><span>체력 ${m.hp}/${m.maxHp}</span><span>공격 ${m.attack}</span><span>방어 ${m.defense}</span><span>스피드 ${m.speed}</span></div></div></div><div class="fact-box">결투에서는 ‘문제 풀기’를 누르면 바로 문제가 나와요. 맞힌 답이 사나워진 우산몬의 검은 기운을 걷어 내요. 상성이 좋은 상대에게는 1.5배!</div><div class="modal-actions"><button id="leadMon" class="primary" ${m.hp <= 0 ? 'disabled' : ''}>첫 번째로 내보내기</button><button id="fieldHeal" class="neutral" ${state.items.heal <= 0 ? 'disabled' : ''}>회복젤 사용 (${state.items.heal})</button></div>`, () => {
     $('#leadMon').onclick = () => { state.active = index; save(); updateUI(); closeModal(); };
     $('#fieldHeal').onclick = () => { state.items.heal--; m.hp = Math.min(m.maxHp, m.hp + Math.ceil(m.maxHp * .45)); save(); updateUI(); partyDetail(index); };
   });
@@ -988,8 +1000,9 @@ function dexDetail(id, filter, view = 'dot') {
     ? `<figure class="dex-photo"><img src="${assetURL(photoKey(id))}" alt="${esc(credit.name)} 실제 사진" loading="lazy"><figcaption>사진: ${esc(credit.by)} · ${esc(LICENSE_TEXT[credit.license] || credit.license)}${credit.note ? `<br>${esc(credit.note)}` : ''}</figcaption></figure>`
     : `<canvas data-portrait="${dotId}" width="160" height="160" style="${seen ? '' : 'filter:brightness(0) opacity(.2)'}"></canvas>`;
   const toggles = seen ? `<div class="dex-view">${[['dot', '도트 그림'], ...(hasForms ? [['form2', '변환폼']] : []), ...(credit ? [['photo', '실제 사진 보기']] : [])].map(([v, label]) => `<button data-view="${v}" class="${view === v ? 'selected' : ''}" aria-pressed="${view === v}">${label}</button>`).join('')}</div>` : '';
+  const statBars = seen && m.base ? `<div class="base-stats" aria-label="기본 능력치">${[['체력', 'hp'], ['공격', 'attack'], ['방어', 'defense'], ['스피드', 'speed']].map(([l, k]) => `<div><span>${l}</span><i><b style="width:${Math.round(m.base[k] / 140 * 100)}%"></b></i><em>${m.base[k]}</em></div>`).join('')}</div>` : '';
   const legendNote = m.legendary ? `<br><strong>전설의 우산몬</strong>${hasForms ? ' · 결투에서 형태변환을 쓸 수 있어요' : ''}` : '';
-  openModal(head(seen ? m.name : '아직 만나지 못한 친구', `NO.${String(id).padStart(3, '0')}${m.legendary ? ' · 전설' : ''}`) + `<div class="monster-detail${photo ? ' with-photo' : ''}">${picture}<div><span class="type-chip">${seen ? TYPES[m.type].name : '발견 전'}</span><p>${seen ? m.detail : `${ZONES[m.zone].name} 부근에서 단서를 찾아보세요.`}</p></div></div>${toggles}${seen ? `<div class="fact-box"><strong>실제 생물 모티브 · ${m.motif}</strong><br>${esc(m.area)} · ${esc(m.group)}<br>기록 확인: ${esc(m.recordStatus)}<br>${esc(m.recordNote)}${legendNote}<br>모습과 능력은 게임용 창작이에요.${m.source ? `<br><a href="${m.source}" target="_blank" rel="noopener" class="source-link">관련 자료 살펴보기 ↗</a>` : ''}</div>` : ''}<div class="modal-actions"><button id="backDex" class="neutral">← 도감으로</button></div>`, () => {
+  openModal(head(seen ? m.name : '아직 만나지 못한 친구', `NO.${String(id).padStart(3, '0')}${m.legendary ? ' · 전설' : ''}`) + `<div class="monster-detail${photo ? ' with-photo' : ''}">${picture}<div><span class="type-chip">${seen ? TYPES[m.type].name : '발견 전'}</span><p>${seen ? m.detail : `${ZONES[m.zone].name} 부근에서 단서를 찾아보세요.`}</p></div></div>${toggles}${statBars}${seen ? `<div class="fact-box"><strong>실제 생물 모티브 · ${m.motif}</strong><br>${esc(m.area)} · ${esc(m.group)}<br>기록 확인: ${esc(m.recordStatus)}<br>${esc(m.recordNote)}${legendNote}<br>모습과 능력은 게임용 창작이에요.${m.source ? `<br><a href="${m.source}" target="_blank" rel="noopener" class="source-link">관련 자료 살펴보기 ↗</a>` : ''}</div>` : ''}<div class="modal-actions"><button id="backDex" class="neutral">← 도감으로</button></div>`, () => {
     $('#backDex').onclick = () => showDex(filter);
     $$('[data-view]').forEach(b => b.onclick = () => dexDetail(id, filter, b.dataset.view));
   });
@@ -1101,7 +1114,7 @@ function showMenu() {
     $('#menuTutorial').onclick = () => { closeModal(); state.tutorial = { battle: false, walk: 0 }; save(); renderCoachPanel(); startTutorial(); };
     $('#menuAvatar').onclick = () => chooseAvatar(id => { state.avatar = id; save(); updateUI(); toast('탐험대원을 바꿨어요.'); });
     $('#restartBtn').onclick = () => { saved = state.started ? state : saved; startNew(); };
-    $('#menuHelp').onclick = () => openModal(head('천천히, 함께 탐험해요') + '<div class="fact-box">이동: 방향키 / WASD / 조이스틱(터치 화면) / 지도 화면 누르기<br>건물: 문 바로 아래에서 위로 걸으면(또는 건물을 누르면) 들어가요. 계단을 밟으면 위아래 층으로, 문 깔개를 밟으면 밖으로 나가요<br>대화·조사: 가까이에서 E·스페이스 / 대화 버튼<br>자동 안내: 수첩의 목적지 안내<br>다음 지역: 관장 인증 후 마을 오른쪽 다리 → 길을 따라 걷기<br>세계 지도: 가 본 마을로 바로 이동<br>결투 명령: 정화하기 · 도구 · 동료 · 물러나기<br>정화하기: 배운 기술 중 하나를 골라 문제를 풀어요. 처음엔 기술 2가지, 레벨 8과 12에 새 기술을 배워요<br>사나워진 우산몬: 문제를 맞히면 검은 기운을 걷어 내요. 모두 걷히면 평온을 되찾아요<br>정화 기술: 틀리면 마음이 닿지 않아요(피해 없음)<br>날뛰는 우산몬의 문제: 맞히면 조금만 아프고, 틀리면 그대로 충격을 받아요<br>관장과는 인증 결투로 겨뤄요<br>힌트: 문제 아래 기록 힌트 · 학습 기록에 도움 표시<br>대화와 컷신: 클릭·엔터·스페이스로 넘기기</div><p>길에서는 표지판, 관찰 지점, 기억 비석, 조사 상자, 길에서 만난 사람과 몽땅랜드 직원을 찾아봐요. 사나워진 야생 우산몬은 풀숲에서 만나요.</p>');
+    $('#menuHelp').onclick = () => openModal(head('천천히, 함께 탐험해요') + '<div class="fact-box">이동: 방향키 / WASD / 조이스틱(터치 화면) / 지도 화면 누르기<br>건물: 문 바로 아래에서 위로 걸으면(또는 건물을 누르면) 들어가요. 계단을 밟으면 위아래 층으로, 문 깔개를 밟으면 밖으로 나가요<br>대화·조사: 가까이에서 E·스페이스 / 대화 버튼<br>자동 안내: 수첩의 목적지 안내<br>다음 지역: 관장 인증 후 마을 오른쪽 다리 → 길을 따라 걷기<br>세계 지도: 가 본 마을로 바로 이동<br>결투 명령: 문제 풀기 · 동료 만들기 · 도구 · 동료 · 물러나기 (전설의 우산몬은 형태변환도)<br>문제 풀기: 누르면 바로 독도 문제가 나와요<br>상성(화살표 앞이 뒤에 강해요): 잎→빛→메아리→잎, 파도→바위→바람→파도. 상성이 좋으면 맞혔을 때 1.5배, 틀려도 절반은 닿아요. 상성이 나쁘면 0.75배<br>사나워진 우산몬: 문제를 맞히면 검은 기운을 걷어 내요. 모두 걷히면 평온을 되찾아요<br>상대의 문제: 맞히면 충격이 40% 줄고, 틀리면 그대로 받아요. 관장·백무 사장은 가끔 정답도 뚫고 들어와요(관통)<br>동료 만들기: 버튼을 누르면 확률로 동료가 돼요(그 차례엔 공격 못 해요). 검은 기운이 적을수록 잘 되고, 전설의 우산몬은 10%<br>동료 주머니: ‘동료’ 메뉴에서 쉬는 동료와 언제든 바꿔요<br>관장과는 인증 결투로 겨뤄요<br>힌트: 문제 아래 기록 힌트 · 학습 기록에 도움 표시<br>대화와 컷신: 클릭·엔터·스페이스로 넘기기</div><p>길에서는 표지판, 관찰 지점, 기억 비석, 조사 상자, 길에서 만난 사람과 몽땅랜드 직원을 찾아봐요. 사나워진 야생 우산몬은 풀숲에서 만나요.</p>');
     $('#importSave').onchange = async e => { const file = e.target.files[0]; if (!file) return; try { if (file.size > 3e6) throw new Error('파일이 너무 커요.'); const parsed = validateSave(JSON.parse(await file.text())); saved = parsed; closeModal(); continueGame(); toast('저장한 모험을 불러왔어요.'); } catch (err) { toast(err.message || '저장 파일을 확인해 주세요.'); } };
   });
 }
@@ -1117,6 +1130,7 @@ $('#saveBtn').onclick = () => state.started ? save(true) : toast('모험을 시�
 $('#menuBtn').onclick = showMenu; $('#mapBtn').onclick = () => { if (!battle) showMap(); }; $('#dexBtn').onclick = () => { if (!battle) showDex(); };
 $('#notebookBtn').onclick = () => { if (!battle) showNotebook(); }; $('#guideBtn').onclick = () => { closeModal(); guide(); };
 $('#questBtn').onclick = $('#questPeek').onclick = showQuest; $('#partyBtn').onclick = $('#buddyPeek').onclick = showParty;
+$('#pocketBtn').onclick = () => showStorage();
 $('#fullscreenBtn').onclick = toggleFullscreen;
 $('#soundBtn').onclick = () => { state.sound = !state.sound; if (state.sound) beep(660, .15); updateUI(); save(); };
 window.addEventListener('beforeunload', () => save());

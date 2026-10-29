@@ -5,7 +5,7 @@
 //   벽·바닥  w 벽   y 창문이 있는 벽   _ 나무 바닥   , 돌 바닥   m 깔개(걸을 수 있음)
 //   이동     D 문(밟으면 밖으로)   U 위층 계단   N 아래층 계단   a 문으로 들어왔을 때 서는 자리
 //   가구     c 계산대  k 책장  t 탁자  s 소파  e 침대  x 책상·모니터  q 화분  o 상자 더미  g 수련 기둥  v 트로피 받침
-//   숫자     그 층의 objects에 적은 것(사람·책·창밖 풍경·보관함·도감·쉼 침대·상자·복습 책상 …)
+//   숫자     그 층의 objects에 적은 것(사람·책·창밖 풍경·도감·쉼 침대·상자·복습 책상 …)
 //
 // 층마다 내용은 마을(지역)에 따라 바뀝니다: 책장의 책은 그 지역 문제의 해설(출처가 있는 사실),
 // 창밖 풍경은 그 지역 이야기, 수조의 생물은 그 지역에 사는 생물이에요. 마을·건물 모습은 게임 속 창작입니다.
@@ -39,10 +39,10 @@ export const ROOM_TEMPLATES = {
       'wq_____a____qw',
       'wwwwwwwDwwwwww'],
       objects: z => ({
-        0: { type: 'shopkeeper', actor: 'woman', name: '쉼터 직원', lines: ['어서 오세요! 회복젤과 친구 구슬을 팔아요.'] },
+        0: { type: 'shopkeeper', actor: 'woman', name: '쉼터 직원', lines: ['어서 오세요! 회복젤을 팔아요. 지친 동료는 침대에서 쉬게 해 주세요.'] },
         1: { type: 'rest', name: '푹신한 침대', furniture: 'bed' },
         2: { type: 'person', actor: 'man', name: '여행자 하람', lines: [`${ZONES[z].name}에 왔다면 ‘${ZONES[z].histTitle}’ 이야기를 꼭 들어 봐요.`, ZONES[z].hint] },
-        3: { type: 'sign', name: '쉼터 알림판', furniture: 'board', lines: ['쉼터 이용 안내: 침대에서 쉬면 동료들의 기운이 돌아와요.', '2층 동료 방에서는 함께 다닐 동료를 바꿀 수 있어요.'] }
+        3: { type: 'sign', name: '쉼터 알림판', furniture: 'board', lines: ['쉼터 이용 안내: 침대에서 쉬면 동료들의 기운이 돌아와요.', '함께 다닐 동료는 언제든 ‘동료’ 메뉴의 동료 주머니에서 바꿀 수 있어요.'] }
       }) },
     { label: '2층 · 동료 방', art: [
       'wwwyywwwwwyyww',
@@ -53,8 +53,8 @@ export const ROOM_TEMPLATES = {
       'wq__2____tt__w',
       'wwwwwwwwwwwwww'],
       objects: z => ({
-        0: { type: 'storage', name: '동료 보관함', furniture: 'pc' },
-        1: { type: 'person', actor: 'child-girl', name: '쉬러 온 아이 다솜', lines: ['보관함에서 동료를 바꿔 데려갈 수 있어.', `여기 ${ZONES[z].name}에서는 ${TYPES[ZONES[z].type].name} 속성 우산몬이 힘을 내.`] },
+        0: { type: 'sign', name: '동료 사진 액자', furniture: 'shelf', lines: ['함께 모험한 우산몬들의 사진이 걸려 있어요.', '동료는 ‘동료’ 메뉴의 동료 주머니에서 언제든 바꿀 수 있어요.'] },
+        1: { type: 'person', actor: 'child-girl', name: '쉬러 온 아이 다솜', lines: ['동료 주머니를 열면 쉬고 있는 동료와 언제든 바꿀 수 있어. 기계는 필요 없어!', `여기 ${ZONES[z].name}에서는 ${TYPES[ZONES[z].type].name} 속성 우산몬이 힘을 내.`] },
         2: { type: 'sign', name: '여행 사진첩', furniture: 'shelf', lines: book(z, 3) }
       }) }
   ],
@@ -100,7 +100,7 @@ export const ROOM_TEMPLATES = {
       objects: z => ({
         0: { type: 'landmark', name: '망원경', furniture: 'telescope', lines: [`망원경으로 ${ZONES[z].name} 둘레를 바라봐요.`, ZONES[z].fact] },
         1: { type: 'landmark', name: '큰 창', furniture: 'window', lines: [`창밖으로 ${TOWN_ISLAND[z]}의 바다가 펼쳐져요. 오늘 날씨는 ${ZONES[z].sky}.`, z === 0 ? '울릉도와 독도 주변은 따뜻한 바닷물과 차가운 바닷물이 만나는 곳이라 생물이 많아요.' : '독도 주변은 따뜻한 바닷물과 차가운 바닷물이 만나는 곳이라 생물이 많아요.'] },
-        2: { type: 'box', name: '관측 장비 상자', furniture: 'chest', give: { orb: 3 }, lines: ['친구 구슬 3개가 들어 있어요!'] },
+        2: { type: 'box', name: '관측 장비 상자', furniture: 'chest', give: { heal: 3 }, lines: ['회복젤 3개가 들어 있어요!'] },
         3: { type: 'person', actor: 'child-boy', name: '관측 동아리 이준', lines: [z === 0 ? '맑은 날에는 여기 울릉도에서도 독도가 보여! 동남쪽 수평선을 잘 봐.' : '맑은 날에는 울릉도에서도 독도가 보인대!', '본 것을 적을 때는 날짜와 날씨도 함께 적어야 해.'] }
       }) }
   ],

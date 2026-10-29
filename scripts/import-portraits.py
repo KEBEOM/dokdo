@@ -8,7 +8,7 @@ dist/assets/characters/baekmudan-{grunt,exec,boss}-portrait.png 로 저장합니
 """
 import os, sys, importlib.util
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-spec = importlib.util.spec_from_file_location('im', os.path.join(ROOT, 'scripts', 'import-monsters.py'))
+spec = importlib.util.spec_from_file_location('im', os.path.join(ROOT, 'scripts', 'image-cleanup.py'))
 im = importlib.util.module_from_spec(spec); spec.loader.exec_module(im)
 from PIL import Image
 import numpy as np
