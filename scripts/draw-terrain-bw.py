@@ -1,4 +1,4 @@
-"""지형 타일 도트 그림 (v0.39, 포켓몬스터 블랙/화이트 느낌)
+"""지형 타일 도트 그림 (v0.39, (선명한 외곽선 도트 느낌)
 
     python scripts/draw-terrain-bw.py
 
@@ -56,6 +56,26 @@ def tall(seed):
         c.r(ox + 1, oy + 15, 15, 1, '#2f6a34')
     return c
 
+def rocky(seed):
+    """v0.45 바위 들판: 독도처럼 화산 응회암 땅에 금이 가 있고, 자갈·이끼와 가끔 해국(보라)·땅채송화(노랑)가 피어 있어요."""
+    rr = random.Random(seed); c = Cell('#bfad8c')
+    for _ in range(rr.randrange(5, 8)):   # 넓적한 바위 판: 밝은 윗면 + 어두운 아래 금
+        x, y, w = rr.randrange(T), rr.randrange(T), rr.randrange(4, 8)
+        c.r(x, y, w, 2, '#cdbd9c'); c.r(x, y + 2, w, 1, '#9c8768'); c.p(x + w, y + 1, '#9c8768')
+    for _ in range(rr.randrange(3, 5)):   # 갈라진 금
+        x, y = rr.randrange(T), rr.randrange(T)
+        for i in range(rr.randrange(3, 6)): c.p(x + i, y + (i % 2), '#8a7457')
+    for _ in range(rr.randrange(4, 7)):   # 자갈
+        x, y = rr.randrange(T), rr.randrange(T); c.p(x, y, '#e2d5b8'); c.p(x + 1, y, '#a69273'); c.p(x, y + 1, '#8f7a5e')
+    for _ in range(rr.randrange(2, 4)):   # 이끼·풀 포기
+        x, y = rr.randrange(T), rr.randrange(T)
+        for dx, dy in [(0, 0), (1, -1), (2, 0)]: c.p(x + dx, y + dy, '#6fa54e')
+        c.p(x + 1, y, '#8fcb63')
+    if rr.random() < .45:                 # 해국 또는 땅채송화 한 송이
+        x, y = rr.randrange(2, T - 2), rr.randrange(2, T - 2); col, mid = rr.choice([('#b48ad8', '#f2cf4a'), ('#f2cf4a', '#e09a2a')])
+        c.p(x, y - 1, col); c.p(x - 1, y, col); c.p(x + 1, y, col); c.p(x, y + 1, col); c.p(x, y, mid); c.p(x + 2, y + 2, '#6fa54e')
+    return c
+
 def path(seed):
     rr = random.Random(seed); c = Cell('#e2c88f')
     for _ in range(rr.randrange(3, 6)):
@@ -100,8 +120,10 @@ KINDS = {
     'sand': [sand(i + 60) for i in range(8)],
     'water': [water(i + 80) for i in range(8)],
     'dock': [dock(i + 100) for i in range(8)],
+    'rocky': [rocky(i + 120) for i in range(8)],
 }
-sheet = Image.new('RGBA', (3 * 66 + 2, 2 * 130 + 2), (0, 0, 0, 0)); frames = {}
+rows = (len(KINDS) + 2) // 3
+sheet = Image.new('RGBA', (3 * 66 + 2, rows * 130 + 2), (0, 0, 0, 0)); frames = {}
 for n, (k, cells) in enumerate(KINDS.items()):
     fx, fy = 2 + (n % 3) * 66, 2 + (n // 3) * 130
     for i, cell in enumerate(cells): sheet.alpha_composite(cell.im, (fx + (i % 2) * T, fy + (i // 2) * T))

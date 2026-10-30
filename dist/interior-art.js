@@ -10,7 +10,7 @@ const R = (ctx, x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x
 const floorish = t => t >= 10 && t <= 15;
 const hash = (x, y) => ((x * 73856093) ^ (y * 19349663)) >>> 0;
 
-function wood(ctx, px, py, x, y) { // v0.39 밝은 나무 마루(블랙/화이트 느낌): 판마다 살짝 다른 색, 진한 이음선, 위쪽 밝은 줄
+function wood(ctx, px, py, x, y) { // v0.39 밝은 나무 마루(선명한 외곽선 도트 느낌): 판마다 살짝 다른 색, 진한 이음선, 위쪽 밝은 줄
   for (let i = 0; i < 4; i++) {
     const shade = ['#e2b67e', '#d9ab72', '#e6bd88', '#dcb078'][(hash(x, y * 4 + i) >> 3) % 4];
     R(ctx, px, py + i * 8, T, 8, shade); R(ctx, px, py + i * 8, T, 1, '#f0cc98'); R(ctx, px, py + i * 8 + 7, T, 1, '#a9784a');
@@ -44,7 +44,7 @@ export function drawInterior(ctx, map, time, view) {
 }
 function wall(ctx, map, th, x, y, px, py) {
   if (floorish(map[y + 1]?.[x])) { // the back wall you look at: plaster with a wooden skirting
-    // 무늬 벽지 + 굵은 몰딩 + 걸레받이 (블랙/화이트 느낌)
+    // 무늬 벽지 + 굵은 몰딩 + 걸레받이 (선명한 외곽선 도트 느낌)
     R(ctx, px, py, T, T, th.wall);
     for (let i = 0; i < T; i += 8) { R(ctx, px + i + 3, py + 6, 2, 15, '#00000012'); R(ctx, px + i + 7, py + 9, 1, 1, '#ffffff66'); R(ctx, px + i + 7, py + 17, 1, 1, '#ffffff66'); }
     R(ctx, px, py, T, 5, th.trim); R(ctx, px, py + 5, T, 1, '#2b2622'); R(ctx, px, py, T, 1, '#ffffff40');
@@ -75,7 +75,7 @@ function stairs(ctx, up, px, py, time) {
   ctx.globalAlpha = 1;
 }
 
-// v0.39: 가구마다 1도트 진한 외곽선(블랙/화이트 느낌). 가구 모양을 한 번 그려 테두리만 만들어 두고(캐시), 매번 그 위에 가구를 그려요.
+// v0.39: 가구마다 1도트 진한 외곽선(선명한 외곽선 도트 느낌). 가구 모양을 한 번 그려 테두리만 만들어 두고(캐시), 매번 그 위에 가구를 그려요.
 const outlineCache = new Map();
 function outlineFor(kind, opts) {
   if (typeof document === 'undefined') return null;

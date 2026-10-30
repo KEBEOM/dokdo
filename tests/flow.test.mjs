@@ -1,5 +1,5 @@
 // Real-browser playthrough (Playwright + Chromium): opening cutscene, starter, walking between maps,
-// route objects, Dragon Quest–style quiz battles, all 8 chapters, legend, ending, saves and legacy saves.
+// route objects, turn-based quiz battles, all 8 chapters, legend, ending, saves and legacy saves.
 // Setup once: npm install && npx playwright install chromium
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -139,7 +139,7 @@ await page.click('#questBtn'); assert.equal(await G(() => window.__dokdo.state.t
 await page.click('#guideBtn'); assert.equal(await G(() => window.__dokdo.state.tutorial.walk), 4, 'used the destination guide'); assert.equal(await page.$('#coachPanel'), null, 'tutorial finished');
 await G(() => { const d = window.__dokdo, s = d.map.spawns.a; d.state.x = s.x; d.state.y = s.y; });
 
-// ── 4. Dragon Quest battle mechanics ──
+// ── 4. turn-based battle mechanics ──
 await G(() => { Math.random = () => .5; window.__dokdo.startBattle('wild', 21); });
 assert.equal(await page.$('.dq-trainer'), null, 'wild battles show no 백무단 member');
 await page.click('#dqMessage'); assert.match(await page.textContent('.dq-text'), /나타났다/);

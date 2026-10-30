@@ -1,13 +1,13 @@
 import { PROPS_ATLAS } from './props-atlas.js';
 import { TERRAIN_ATLAS } from './terrain-atlas.js';
-// 독도 탐험대 v0.36 — screens, movement between maps, story cutscenes and Dragon Quest–style quiz battles.
+// 독도 탐험대 v0.36 — screens, movement between maps, story cutscenes and turn-based quiz battles.
 import { CUTSCENE_ATLAS } from './cutscene-atlas.js';
 import { worldScale } from './layout.js';
 import { createJoystick } from './joystick.js';
 import { roomId, parseRoomId } from './interiors.js';
 import { MONSTERS, ZONES, TYPES, STARTERS, getSpecies, isUnique } from './data.js';
 import { CONCEPTS, QUESTIONS, SOURCES } from './learning.js';
-import { newState, validateSave, createMonster, damage, enemyHit, attackHit, advantage, healAll, gainXP, captureChance, runChance, addMonster, recordAnswer, BOSS_KINDS, PIERCE_CHANCE, QUESTION_POWER } from './engine.js';
+import { newState, validateSave, createMonster, damage, enemyHit, attackHit, advantage, healAll, gainXP, captureChance, runChance, xpForDefeat, BENCH_RATE, addMonster, recordAnswer, BOSS_KINDS, PIERCE_CHANCE, QUESTION_POWER } from './engine.js';
 import { portrait, look } from './sprites.js';
 import { LEGENDS, ALL_LEGEND_IDS, legendProgress, legendScene, openFlag, metFlag, ownsSpecies } from './legends.js';
 import { PHOTO_CREDITS, LICENSE_TEXT, photoKey } from './photo-credits.js';
@@ -25,7 +25,7 @@ import { OPENING, STARTER_MEET, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.43';
+const VERSION = '0.46';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -621,7 +621,7 @@ function tutorialEvent(kind) {
   else renderCoachPanel();
 }
 
-// ── Dragon Quest–style duel: calm berserk (사나워짐) 우산몬 by clearing their dark energy ──
+// ── turn-based duel: calm berserk (사나워짐) 우산몬 by clearing their dark energy ──
 // Wild and 몽땅랜드 우산몬 are 사나워짐 (wrapped in 검은 기운). A correct answer clears some of it;
 // at zero they find their calm again. 관장 duels are friendly certification matches.
 const active = () => state.party[state.active];
@@ -656,7 +656,7 @@ function startBattle(kind, id, opts = {}) {
   }
   else if (kind === 'enemy') { const pool = z().wild.filter(i => !STARTERS.includes(i)); enemies = (state.zone === 7 ? bossTeam() : [pool[2] || pool[0] || 21]).map(i => createMonster(i, base)); }
   else if (kind === 'trainer') enemies = (opts.npc.team?.length ? opts.npc.team : [z().wild.filter(i => !STARTERS.includes(i))[3]]).map(i => createMonster(i, base));
-  else enemies = z().bossTeam.slice(0, kind === 'rematch' ? 3 : 2).map(i => createMonster(i, base + 1 + (kind === 'rematch' ? 2 : 0)));
+  else enemies = z().bossTeam.slice(0, kind === 'rematch' ? 3 : 2).map(i => createMonster(i, kind === 'rematch' ? base + 1 : Math.max(3, base - 2))); // v0.44 관장 약하게: 인증 결투는 이 장 기준 레벨 −2
   for (const m of enemies) if (!state.seen.includes(m.id)) state.seen.push(m.id);
   preloadMonsters(enemies.map(m => m.id));
   for (const r of ['grunt', 'exec', 'boss']) assetImage(`characters/baekmudan-${r}-portrait`);
@@ -738,6 +738,7 @@ async function befriend(b) {
   if (sure || Math.random() < chance) {
     addMonster(state, createMonster(e.id, e.level)); beep(850, .2);
     await battleUI.say(`검은 기운이 걷히고, ${josa(name(e), '이/가')} 마음을 열어 동료가 되었다!`, { tone: 'good' });
+    await awardXP(b, e); if (battle !== b) return 'end';
     finishBattle(false, false, { captured: e, legend: b.kind === 'legend' ? b : null }); return 'end';
   }
   await battleUI.say(sp.legendary ? `${josa(name(e), '은/는')} 아직 마음을 열지 않았다. (전설의 우산몬은 10%의 확률로만 동료가 돼요)` : '아직 마음을 열지 않았다. 검은 기운을 더 걷어 내면 잘 돼요.'); return 'turn';
@@ -800,12 +801,27 @@ async function allyFainted(b) {
   state.active = next; refreshBattle(); battleUI.allyAct?.('enter'); updateUI();
   await battleUI.say(`${name(active())}, 부탁해!`); return true;
 }
+// 상대 우산몬을 정화하거나 동료로 만들었을 때 경험치(engine.js xpForDefeat): 나와 있던 동료는 전부, 나머지는 절반
+async function awardXP(b, foe) {
+  const lines = [];
+  state.party.forEach((m, i) => {
+    if (m.hp <= 0 && i !== state.active) return;
+    const xp = xpForDefeat(m.level, foe.level, i === state.active ? 1 : BENCH_RATE), before = m.level;
+    gainXP(m, xp);
+    if (i === state.active) lines.push(`${josa(name(m), '이/가')} 경험치 ${xp}을 얻었다! (상대 Lv.${foe.level} · 내 Lv.${before})`);
+    if (m.level > before) lines.push(`${name(m)}의 레벨이 올라 Lv.${josa(String(m.level), '이/가')} 되었다!`);
+  });
+  if (state.party.length > 1) lines.splice(1, 0, '함께한 다른 동료들도 경험치를 절반씩 얻었다.');
+  refreshBattle(); updateUI(); save();
+  for (const line of lines.slice(0, 7)) { if (battle !== b) return; beep(line.includes('레벨이') ? 980 : 760, .1); await battleUI.say(line, { tone: 'good' }); }
+}
 async function enemyFainted(b) {
   const e = enemy(); battleUI.enemyCalmed?.(); battleUI.setAura(0);
   tip(b, '검은 기운이 모두 걷혔어요! 이렇게 우산몬을 원래대로 돌려 주면 돼요.');
   if (berserk(b)) await battleUI.say(`${name(e)}의 검은 기운이 모두 사라졌다! ${josa(name(e), '이/가')} 원래대로 돌아왔다.`, { tone: 'good' });
   else await battleUI.say(`${josa(name(e), '이/가')} 기운을 다 써서 물러났다!`);
   if (battle !== b) return false;
+  await awardXP(b, e); if (battle !== b) return false;
   if (b.index + 1 < b.enemies.length) {
     b.index++; b.turn++; refreshBattle();
     battleUI.enemyEnter(); // 몽땅랜드 직원은 결투를 시작할 때 한 번만 나와요
@@ -818,18 +834,13 @@ async function enemyFainted(b) {
   await victory(b); return false;
 }
 async function victory(b) {
-  const kind = b.kind, coins = { wild: 12, enemy: 45, trainer: 30, tutorial: 10 }[kind] ?? 80, xp = kind === 'tutorial' ? 10 : kind === 'wild' ? 25 + state.zone * 15 : 65 + state.zone * 40;
+  const kind = b.kind, coins = { wild: 12, enemy: 45, trainer: 30, tutorial: 10 }[kind] ?? 80;
   state.coins += coins;
-  const ups = [];
-  for (const m of state.party) {
-    const before = m.level; gainXP(m, xp);
-    if (m.level > before) ups.push(`${name(m)}의 레벨이 올라 Lv.${josa(String(m.level), '이/가')} 되었다!`);
-    if (!state.caught.includes(m.id)) state.caught.push(m.id); if (!state.seen.includes(m.id)) state.seen.push(m.id);
-  }
+  for (const m of state.party) { if (!state.caught.includes(m.id)) state.caught.push(m.id); if (!state.seen.includes(m.id)) state.seen.push(m.id); }
   refreshBattle(); updateUI(); save();
   if (kind === 'wild') await battleUI.say(`원래대로 돌아온 ${josa(name(enemy()), '이/가')} 고마운 듯 풀숲으로 돌아갔다.`, { tone: 'good' });
-  await battleUI.say(`동료들이 경험치 ${xp}을 얻었다. 조사 코인 ${coins}개를 받았다!`, { tone: 'good' });
-  for (const line of ups.slice(0, 6)) { if (battle !== b) return; beep(980, .12); await battleUI.say(line, { tone: 'good' }); }
+  if (battle !== b) return;
+  await battleUI.say(`조사 코인 ${coins}개를 받았다!`, { tone: 'good' });
   if (battle === b) finishBattle(true);
 }
 async function runBattle(b) {
@@ -986,8 +997,12 @@ function partyDetail(index) {
     $('#fieldHeal').onclick = () => { state.items.heal--; m.hp = Math.min(m.maxHp, m.hp + Math.ceil(m.maxHp * .45)); save(); updateUI(); partyDetail(index); };
   });
 }
+// 도감: 만나지 못한 우산몬은 검은 실루엣, 발견·결투한 우산몬은 원래 모습, 동료로 만든 우산몬은 왼쪽 위에 도트 별(★)
+const PIXEL_STAR = (() => { const rows = ['....#....', '...#o#...', '...#o#...', '####o####', '#ooooooo#', '.#ooooo#.', '..#o#o#..', '.#o#.#o#.', '.##...##.'];
+  const px = rows.flatMap((r, y) => [...r].map((c, x) => c === '.' ? '' : `<rect x="${x}" y="${y}" width="1" height="1" fill="${c === '#' ? '#5a3a10' : y < 4 ? '#ffe680' : '#f5c331'}"/>`)).join('');
+  return `<i class="dex-star" role="img" aria-label="동료"><svg viewBox="0 0 9 9" shape-rendering="crispEdges">${px}</svg></i>`; })();
 function showDex(filter = 'all') {
-  openModal(head('우산몬 도감', `100개의 만남 · 동료 ${state.caught.length}종`) + `<div class="filter-row">${[['all', '전체 100종'], ['caught', '동료'], ['seen', '발견'], ['bird', '조류'], ['fish', '어류'], ['plant', '식물'], ['legend', '전설']].map(([id, label]) => `<button data-filter="${id}" class="${filter === id ? 'selected' : ''}">${label}</button>`).join('')}</div><p class="footer-note">실제 생물 이름으로 만나는 100종. 레벨이 올라가도 같은 이름으로 함께해요.</p><div class="dex-grid">${MONSTERS.filter(m => filter === 'all' || filter === 'caught' && state.caught.includes(m.id) || filter === 'seen' && state.seen.includes(m.id) || filter === 'bird' && ['bird', 'raptor'].includes(m.shape) || filter === 'fish' && ['fish', 'goby'].includes(m.shape) || filter === 'plant' && ['flower', 'plant', 'kelp'].includes(m.shape) || filter === 'legend' && m.legendary).map(m => `<button data-dex="${m.id}" class="dex-card ${state.caught.includes(m.id) ? 'owned' : !state.seen.includes(m.id) ? 'locked' : ''}"><small>NO.${String(m.id).padStart(3, '0')}</small><canvas data-portrait="${m.id}" width="80" height="80"></canvas><strong>${state.seen.includes(m.id) ? m.name : '???'}</strong></button>`).join('')}</div>`, () => {
+  openModal(head('우산몬 도감', `100개의 만남 · 동료 ${state.caught.length}종`) + `<div class="filter-row">${[['all', '전체 100종'], ['caught', '동료'], ['seen', '발견'], ['bird', '조류'], ['fish', '어류'], ['plant', '식물'], ['legend', '전설']].map(([id, label]) => `<button data-filter="${id}" class="${filter === id ? 'selected' : ''}">${label}</button>`).join('')}</div><p class="footer-note">실제 생물 이름으로 만나는 100종. 레벨이 올라가도 같은 이름으로 함께해요.</p><div class="dex-grid">${MONSTERS.filter(m => filter === 'all' || filter === 'caught' && state.caught.includes(m.id) || filter === 'seen' && state.seen.includes(m.id) || filter === 'bird' && ['bird', 'raptor'].includes(m.shape) || filter === 'fish' && ['fish', 'goby'].includes(m.shape) || filter === 'plant' && ['flower', 'plant', 'kelp'].includes(m.shape) || filter === 'legend' && m.legendary).map(m => `<button data-dex="${m.id}" class="dex-card ${state.caught.includes(m.id) ? 'owned' : !state.seen.includes(m.id) ? 'locked' : ''}">${state.caught.includes(m.id) ? PIXEL_STAR : ''}<small>NO.${String(m.id).padStart(3, '0')}</small><canvas data-portrait="${m.id}" width="80" height="80"></canvas><strong>${state.seen.includes(m.id) ? m.name : '???'}</strong></button>`).join('')}</div>`, () => {
     $$('[data-filter]').forEach(b => b.onclick = () => showDex(b.dataset.filter)); $$('[data-dex]').forEach(b => b.onclick = () => dexDetail(Number(b.dataset.dex), filter));
   });
 }
@@ -1027,7 +1042,7 @@ function drawWorldMap(c) {
       const r = 1 + .12 * Math.sin(ang * 5 + s.cx) + .07 * Math.sin(ang * 11 + s.cy) + .05 * (rnd(Math.round(ang * 30), s.cx) - .5);
       const d = 1 - Math.hypot(dx, dy) / r; if (d > land) { land = d; isl = s; }
     }
-    // v0.39 블랙/화이트 느낌: 밝고 평평한 색, 섬 둘레 진한 선과 흰 물거품
+    // v0.39 선명한 외곽선 도트 느낌: 밝고 평평한 색, 섬 둘레 진한 선과 흰 물거품
     if (land < 0) {
       const wave = (x % 14 < 5) && (y + (x >> 3) * 3) % 11 === 0 && rnd(x >> 4, y) > .45;
       if (land > -.016) set(i, [43, 38, 34]);                      // outline

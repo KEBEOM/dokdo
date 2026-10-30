@@ -45,6 +45,7 @@ function wrap(file) {
   });
   exported[file] = names;
   if (/^\s*(import|export)\s/m.test(src)) throw new Error(`unsupported import/export form in ${file}`);
+  if (/[;}]\s*export\s/.test(src)) throw new Error(`${file}: put each export on its own line (the one-file build only handles exports at the start of a line)`);
   return `// ── ${file} ──\n__mods[${JSON.stringify(file)}] = (() => {\n${src}\nreturn { ${names.join(', ')} };\n})();\n`;
 }
 const bundle = `const __mods = {};\n${order.map(wrap).join('\n')}`;

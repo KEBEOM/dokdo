@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {MONSTERS,STARTERS,ZONES,getSpecies} from '../dist/data.js';
 import {CONCEPTS,QUESTIONS} from '../dist/learning.js';
-import {newState,createMonster,addMonster,healAll,gainXP,damage,enemyHit,attackHit,SOFTEN_RATE,PIERCE_CHANCE,LEGEND_CAPTURE,captureChance,recordAnswer,validateSave,advantage,PP_MAX,skills,knownSkills,learnedBetween} from '../dist/engine.js';
+import {newState,createMonster,addMonster,healAll,gainXP,damage,enemyHit,ENEMY_POWER,attackHit,SOFTEN_RATE,PIERCE_CHANCE,LEGEND_CAPTURE,captureChance,recordAnswer,validateSave,advantage,PP_MAX,skills,knownSkills,learnedBetween} from '../dist/engine.js';
 import {createMap,npcs,pathfind,blocked,cameraFor,TILE,W,H} from '../dist/world.js';
 import {MAPS} from '../dist/maps.js';
 import {selectBattleQuestion,shuffledChoices} from '../dist/battle-quiz.js';
@@ -40,7 +40,7 @@ test('every map: people on land, arrivals free, everyone and every exit reachabl
 test('a correct answer to the opponent question still hurts, but much less',()=>{
   const me=createMonster(1,8),foe=createMonster(34,9),rng=()=>.5;
   const full=enemyHit(foe,me,{correct:false},rng),soft=enemyHit(foe,me,{correct:true},rng);
-  assert.equal(full,damage(foe,me,1,rng).amount);assert.ok(soft>=1&&soft<full,'correct answers soften the blow');assert.equal(soft,Math.max(1,Math.round(full*SOFTEN_RATE)));
+  assert.equal(full,damage(foe,me,ENEMY_POWER,rng).amount);assert.ok(soft>=1&&soft<full,'correct answers soften the blow');assert.equal(soft,Math.max(1,Math.round(full*SOFTEN_RATE)));
   assert.equal(SOFTEN_RATE,.6,'a correct answer takes 40% off');assert.equal(enemyHit(foe,me,{correct:true,pierce:true},rng),full,'boss pierce: full damage even when correct');assert.ok(PIERCE_CHANCE>0&&PIERCE_CHANCE<1);
   // my attack: type advantage x1.5 when correct, half of the plain hit when wrong; neutral/weak wrong answers miss
   const leaf=createMonster(1,10),light=createMonster(28,10),rock=createMonster(55,10);const fixed=()=>.5;
@@ -142,4 +142,12 @@ test('v0.42: every 우산몬 has its own 체력·공격·방어·스피드, lege
   assert.ok(stats(56,10).defense>stats(94,10).defense&&stats(94,10).speed>stats(56,10).speed,'거북손 is tough, 칼새 is fast');
   const a=stats(10,20);assert.ok(a.maxHp>stats(10,5).maxHp&&a.attack>stats(10,5).attack,'stats grow with level');
   assert.ok(runChance({speed:30},{speed:10})>runChance({speed:10},{speed:30}));
+});
+test('v0.44: XP per purified or befriended foe — a share of my next level, more for stronger foes',async()=>{
+  const {xpForDefeat,XP_RATE,XP_CAP,BENCH_RATE}=await import('../dist/engine.js');
+  assert.equal(xpForDefeat(10,10),Math.round(10*13*XP_RATE),'same level: 35% of a level');
+  assert.ok(xpForDefeat(10,15)>xpForDefeat(10,10)&&xpForDefeat(10,5)<xpForDefeat(10,10),'stronger foes give more');
+  assert.equal(xpForDefeat(5,50),Math.round(5*13*XP_CAP),'capped at 150% of a level');
+  assert.equal(xpForDefeat(10,10,BENCH_RATE),Math.round(10*13*XP_RATE*BENCH_RATE),'friends on the bench get half');
+  assert.ok(xpForDefeat(30,30)>xpForDefeat(5,5),'measured against my own level');
 });

@@ -12,12 +12,15 @@ export function advantage(a,b){const ring={wave:'rock',rock:'wind',wind:'wave',l
 export function damage(attacker,defender,power=1,rng=Math.random){const mult=advantage(getSpecies(attacker.id).type,getSpecies(defender.id).type);return {amount:Math.max(3,Math.round((attacker.attack*power-defender.defense*.45)*mult*(.9+rng()*.2))),mult};}
 // v0.42 결투 규칙
 //  막기: 상대의 문제 공격은 늘 들어오지만, 정답을 맞히면 충격이 40% 줄어요(60%만 받아요).
-//        관장 결투와 마지막 백무 사장 결투(보스)는 PIERCE_CHANCE 확률로 정답을 맞혀도 그대로 들어와요(관통).
+//        관장 결투와 마지막 백무 사장 결투(보스)는 PIERCE_CHANCE(15%) 확률로 정답을 맞혀도 그대로 들어와요(관통).
 //  공격: 문제 카드를 골라 풀어요. 맞히면 정화(상성이 좋으면 1.5배, 나쁘면 0.75배).
 //        틀리면 빗나가지만, 상성이 좋은 상대에게는 틀려도 보통 위력의 절반이 닿아요.
-export const SOFTEN_RATE=.6, PIERCE_CHANCE=.3, QUESTION_POWER=1.3, WRONG_ADVANTAGE_RATE=.5;
+export const SOFTEN_RATE=.6, PIERCE_CHANCE=.15, QUESTION_POWER=1.3, WRONG_ADVANTAGE_RATE=.5;
 export const BOSS_KINDS=['boss','rematch']; // + 마지막 백무 사장 결투(game.js isBoss)
-export function enemyHit(attacker,defender,{correct=false,guard=false,pierce=false}={},rng=Math.random){let d=damage(attacker,defender,1,rng).amount;if(correct&&!pierce)d=Math.max(1,Math.round(d*SOFTEN_RATE));if(guard)d=Math.max(1,Math.ceil(d/2));return d;}
+// ENEMY_POWER: 상대가 문제로 공격할 때의 위력(난이도 손잡이). 낮출수록 쉬워요.
+export let ENEMY_POWER=.6;
+export function setEnemyPower(v){ENEMY_POWER=v;}
+export function enemyHit(attacker,defender,{correct=false,guard=false,pierce=false}={},rng=Math.random){let d=damage(attacker,defender,ENEMY_POWER,rng).amount;if(correct&&!pierce)d=Math.max(1,Math.round(d*SOFTEN_RATE));if(guard)d=Math.max(1,Math.ceil(d/2));return d;}
 // 내 공격: {amount, mult}. 틀렸을 때 상성이 좋으면 보통 위력(상성 1배)의 절반, 아니면 0.
 export function attackHit(attacker,defender,correct,power=QUESTION_POWER,rng=Math.random){const d=damage(attacker,defender,power,rng);if(correct)return d;if(d.mult>1)return {amount:Math.max(1,Math.round(d.amount/d.mult*WRONG_ADVANTAGE_RATE)),mult:d.mult};return {amount:0,mult:d.mult};}
 // 기술: 처음(Lv1)에는 손길(정화)과 보호 두 가지, Lv8에 숨 고르기(회복), Lv12에 파동(강한 정화)을 배웁니다.
@@ -31,6 +34,11 @@ export function knownSkills(m){return skills(m).filter(s=>m.level>=s.learn).sort
 // Skills learned when the level rises from `from` to `to`.
 export function learnedBetween(m,from,to){return skills(m).filter(s=>s.learn>from&&s.learn<=to);}
 export function healAll(state){for(const m of state.party){const st=stats(m.id,m.level);Object.assign(m,st);m.hp=m.maxHp;m.pp=PP_MAX.slice();}return state;}
+// v0.44 경험치: 결투가 끝날 때가 아니라, 상대 우산몬을 정화하거나 동료로 만들 때마다 받아요.
+//   내 레벨에서 다음 레벨까지 필요한 경험치(레벨×13)의 XP_RATE(35%)를 기준으로, 상대 레벨이 높을수록 더 많이(상대 레벨 ÷ 내 레벨).
+//   한 번에 다음 레벨까지 필요한 양의 150%를 넘지 않아요. 결투에 나와 있던 동료는 전부, 나머지 동료는 절반을 받아요.
+export const XP_RATE=.35,XP_CAP=1.5,BENCH_RATE=.5;
+export function xpForDefeat(myLevel,foeLevel,share=1){const need=myLevel*13;return Math.max(1,Math.round(Math.min(need*XP_CAP,need*XP_RATE*foeLevel/myLevel)*share));}
 export function gainXP(m,amount){m.xp+=amount;const changes=[];while(m.xp>=m.level*13){m.xp-=m.level*13;m.level++;changes.push(`${getSpecies(m.id).name} Lv.${m.level}`);const sp=getSpecies(m.id);if(sp.evolvesTo&&m.level>=sp.evolveLevel){m.id=sp.evolvesTo;changes.push(`${sp.name} → ${getSpecies(m.id).name}`);}Object.assign(m,stats(m.id,m.level));m.hp=m.maxHp;m.pp=PP_MAX.slice();}return changes;}
 // 동료 만들기: 검은 기운이 적을수록 잘 돼요. 전설의 우산몬은 언제나 10%.
 export const LEGEND_CAPTURE=.1;

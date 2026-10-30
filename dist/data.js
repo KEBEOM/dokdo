@@ -2330,4 +2330,7 @@ export const isUnique=m=>m.legendary||STARTERS.includes(m.id);
 for(let zone=0;zone<ZONES.length;zone++){const local=MONSTERS.filter(m=>!isUnique(m)&&m.zone===zone);ZONES[zone].wild=local.map(m=>m.id);const matching=MONSTERS.filter(m=>!isUnique(m)&&m.type===ZONES[zone].type&&m.zone<=zone);ZONES[zone].bossTeam=[...matching,...local].slice(-3).map(m=>m.id);}
 // The final region revisits late-game species before the legendary encounter.
 ZONES[7].wild=MONSTERS.filter(m=>!isUnique(m)&&m.zone===6).map(m=>m.id);
-ZONES[7].bossTeam=[73,52,50];
+// v0.44 관장 팀은 수호관 속성에 맞춰 직접 골라요(앞 두 마리는 인증 결투, 세 마리 모두는 다시 대련).
+//   1장 해온(파도)은 처음이라 어느 스타팅(잎·바람·파도)에게도 상성이 나쁘지 않은 파도 물고기만 내보내요.
+export const GYM_TEAMS=[[35,36,37],[73,74,69],[34,45,38],[81,52,62],[11,19,13],[27,28,30],[49,50,47],[52,97,98]];
+GYM_TEAMS.forEach((t,i)=>{ZONES[i].bossTeam=t.slice();});

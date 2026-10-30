@@ -170,7 +170,7 @@ function blit(ctx, name, cx, bottom, dot = 2) {
   if (b.canvas) ctx.drawImage(b.canvas, Math.round(cx - b.w / 2), Math.round(bottom - b.h));
   else ctx.fillRect(Math.round(cx - b.w / 2), Math.round(bottom - b.h), b.w, b.h); // node tests
 }
-// v0.39 블랙/화이트 느낌 소품 그림(scripts/draw-props-bw.py). 아래 가운데를 발 위치에 맞춰 그려요. 아직 없으면 false.
+// v0.39 선명한 외곽선 도트 느낌 소품 그림(scripts/draw-props-bw.py). 아래 가운데를 발 위치에 맞춰 그려요. 아직 없으면 false.
 export function propArt(ctx, name, cx, bottom) {
   const sheet = assetImage(PROPS_ATLAS.key), f = PROPS_ATLAS.frames[name]; if (!sheet || !f) return false;
   ctx.drawImage(sheet, f[0], f[1], f[2], f[3], Math.round(cx - f[2] / 2), Math.round(bottom + 2 - f[3]), f[2], f[3]); return true;

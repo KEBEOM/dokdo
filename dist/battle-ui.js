@@ -1,4 +1,4 @@
-// Dragon Quest–style battle screen: status window, framed backdrop, command window and a typed message window.
+// turn-based battle screen: status window, framed backdrop, command window and a typed message window.
 // The game logic (game.js) drives it with await ui.say(...), await ui.menu(...), await ui.quiz(...).
 import { createTypewriter } from './typewriter.js';
 import { portrait, battlePortrait, look } from './sprites.js';
@@ -59,7 +59,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
   function paintBackdrop(kind, sky, island = '') {
     const c = els.backdrop.getContext('2d'), sheet = assetImage(TERRAIN_ATLAS.key), monument = assetImage(SCENERY_ATLAS.monument.key);
     c.imageSmoothingEnabled = false;
-    // v0.38 포켓몬스터 블랙/화이트 느낌: 도트 하늘·먼 섬·바다·원근감 있는 바닥 + 우산몬이 서는 둥근 받침대
+    // v0.38 (선명한 외곽선 도트 느낌): 도트 하늘·먼 섬·바다·원근감 있는 바닥 + 우산몬이 서는 둥근 받침대
     const pics = assetImage(CUTSCENE_ATLAS.key), F = CUTSCENE_ATLAS.frames;
     if (pics) {
       const ground = kind === 'shore' ? 'sand' : kind === 'town' ? 'path' : 'grass', blit = (k, x, y, crop) => { const f = F[k]; c.drawImage(pics, f[0], f[1], f[2], crop || f[3], x, y, f[2], crop || f[3]); };
