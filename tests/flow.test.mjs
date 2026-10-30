@@ -28,7 +28,15 @@ const G = fn => page.evaluate(fn);
 const until = (fn, ms = 60000, arg = null) => page.waitForFunction(fn, arg, { timeout: ms, polling: 50 });
 const answerOf = prompt => QUESTIONS.find(q => q.prompt === prompt).answer;
 
-async function dismiss() { for (let i = 0; i < 30; i++) { if (!(await page.$('#dialogue:not(.hidden) #nextTalk'))) return; await page.click('#nextTalk'); } }
+const closeAll = async () => { await G(() => window.__dokdo.closeModal()); for (let i = 0; i < 10 && await page.$('#dialogue:not(.hidden) #nextTalk'); i++) await page.click('#nextTalk'); };
+let stampsSeen = 0; // v0.47: 독도 지킴이를 이기면 모험 수첩에 도장이 찍히는 창이 열려요
+async function dismiss() {
+  for (let i = 0; i < 30; i++) {
+    if (await page.$('#dialogue:not(.hidden) #nextTalk')) { await page.click('#nextTalk'); continue; }
+    if (await page.$('#stampClose')) { assert.ok(await page.$('.stamp-slot.fresh .stamp'), 'the new stamp lands in the notebook'); stampsSeen++; await page.click('#stampClose'); continue; }
+    return;
+  }
+}
 async function npc(id) { await dismiss(); await until(() => !window.__dokdo.busy, 15000); const ok = await page.evaluate(id => { const d = window.__dokdo, n = d.npcs().find(n => n.id === id); if (n) d.interact(n); return !!n; }, id); assert.ok(ok, `no ${id} here`); await dismiss(); }
 async function answerStudy(makeMistake = false) {
   let first = true;
@@ -110,7 +118,7 @@ await page.waitForTimeout(1200); const fp0 = await G(() => window.__dokdo.people
 await page.waitForTimeout(2500); assert.notEqual(await G(() => window.__dokdo.people().filter(p => p.kind === 'friend').map(p => `${p.x},${p.y}`).join('|')), fp0, 'they walk around freely');
 const meet = id => page.evaluate(id => window.__dokdo.interact(window.__dokdo.people().find(p => p.kind === 'friend' && p.species === id)), id);
 await meet(67); await page.waitForSelector('#takeFriend');
-assert.match(await page.textContent('#modal'), /괭이갈매기/); assert.match(await page.textContent('#modal'), /바람 속성/); assert.match(await page.textContent('#modal'), /첫 관장 해온/);
+assert.match(await page.textContent('#modal'), /괭이갈매기/); assert.match(await page.textContent('#modal'), /바람 속성/); assert.match(await page.textContent('#modal'), /첫 독도 지킴이 해온/);
 assert.ok(await page.$('#modal .base-stats'), 'stats help you decide');
 await page.click('#keepLooking'); assert.equal(await G(() => window.__dokdo.state.party.length), 0, 'just looking does not take it along');
 assert.ok(await G(() => window.__dokdo.state.seen.includes(67)), 'talking to it fills the dex');
@@ -149,6 +157,12 @@ await dismiss(); assert.equal(await G(() => window.__dokdo.state.progress[0].met
 assert.equal(await G(() => window.__dokdo.state.tutorial.walk), 2, 'talked to someone');
 await page.click('#questBtn'); assert.equal(await G(() => window.__dokdo.state.tutorial.walk), 3, 'opened the notebook');
 await page.click('#guideBtn'); assert.equal(await G(() => window.__dokdo.state.tutorial.walk), 4, 'used the destination guide'); assert.equal(await page.$('#coachPanel'), null, 'tutorial finished');
+// 공부 수첩: [독도 공부] 쪽을 읽으면 표시가 남고, 확인 문제로 이어져요 · [배움의 기록] 탭
+await closeAll(); await page.click('#notebookBtn'); await page.waitForSelector('[data-page]'); assert.equal(await page.locator('[data-page]').count(), 8, '8 독도 공부 pages');
+await page.click('[data-page="history"]'); await page.waitForSelector('.study-timeline'); assert.match(await page.textContent('.study-timeline'), /1900년[\s\S]*칙령 제41호/);
+assert.ok(await G(() => window.__dokdo.state.flags['study:history']), 'reading a page marks it'); assert.equal(await page.textContent('#learningProgress'), '1 / 8');
+await page.click('[data-tab="record"]'); await page.waitForSelector('#exportLearning'); await page.click('[data-tab="study"]'); await page.waitForSelector('[data-page]');
+await G(() => window.__dokdo.closeModal());
 await G(() => { const d = window.__dokdo, s = d.map.spawns.a; d.state.x = s.x; d.state.y = s.y; });
 
 // ── 4. turn-based battle mechanics ──
@@ -244,7 +258,8 @@ for (let zone = 0; zone < 8; zone++) {
   }
   await npc('shop'); await page.click('#healAll');
   await npc('boss'); await answerStudy(); totalTurns += await fight(); assert.ok(await G(() => window.__dokdo.state.badges.includes(window.__dokdo.state.zone)), `badge ${zone}`);
-  if (zone === 7) { assert.equal(await G(() => window.__dokdo.cutscene()), 'epilogue'); await skipCutscene(); await page.click('#endContinue'); break; }
+  await dismiss(); assert.equal(stampsSeen, zone + 1, `stamp ${zone + 1} in the 모험 수첩`);
+  if (zone === 7) { await until(() => window.__dokdo.cutscene() === 'epilogue', 10000); await skipCutscene(); await page.click('#endContinue'); break; }
   if (zone === 0) {
     // buildings: walk in through the door, climb the stairs, read, review and walk back out with the guide
     const inside = async id => until(id => window.__dokdo.map.id === id && !window.__dokdo.transition, 20000, id);
@@ -292,7 +307,7 @@ st = await G(() => { const s = window.__dokdo.state; return { ended: s.ended, ba
 assert.deepEqual(st, { ended: true, badges: 8, legend: true, concepts: 12, revisited: true, visited: 8 });
 const studyLog = await G(() => window.__dokdo.state.answerLog.filter(a => a.mode === 'study'));
 assert.equal(studyLog[0].correct, false); assert.equal(studyLog[1].correct, true); assert.equal(studyLog[1].assisted, true);
-await page.click('#notebookBtn'); assert.equal(await page.locator('[data-review]').count(), 12); await page.keyboard.press('Escape');
+await page.click('#notebookBtn'); await page.click('[data-tab="record"]'); await page.waitForSelector('#exportLearning'); assert.equal(await page.locator('[data-review]').count(), 12); await page.keyboard.press('Escape');
 await page.click('#dexBtn'); assert.equal(await page.locator('[data-dex]').count(), 100); await page.keyboard.press('Escape');
 
 // ── 6b. 전설의 우산몬(천연기념물): 조건을 채우면 김박사 무전 → 금빛 기운 → 만남 장면 → 정화 결투 → 동료 ──

@@ -1,4 +1,4 @@
-// 결투 난이도: 정답을 60% 맞히는 학생도 관장을 이길 수 있는지, 정해진 난수로 결투를 여러 번 흉내 내서 확인해요.
+// 결투 난이도: 정답을 60% 맞히는 학생도 독도 지킴이를 이길 수 있는지, 정해진 난수로 결투를 여러 번 흉내 내서 확인해요.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createMonster, attackHit, enemyHit, PIERCE_CHANCE } from '../dist/engine.js';
@@ -20,10 +20,10 @@ function winRate(party, team, p, n, rng) {
   }
   return wins / n;
 }
-// 관장 인증 결투: 상대는 이 장 기준 레벨 −2, 나는 지난 인증 보너스 레벨(1장은 첫 동료 Lv6)
+// 독도 지킴이 인증 결투: 상대는 이 장 기준 레벨 −2, 나는 지난 인증 보너스 레벨(1장은 첫 동료 Lv6)
 const gym = z => ({ me: z === 0 ? STARTER_LEVEL : 8 + 4 * (z - 1), team: ZONES[z].bossTeam.slice(0, z === 7 ? 3 : 2).map(i => [i, Math.max(3, 5 + 4 * z - 2)]) });
 
-test('the first gym (도동항 관장 해온) can be beaten alone by any 우산몬 you pick on the field, answering 60% right', () => {
+test('the first gym (도동항 물결 지킴이 해온) can be beaten alone by any 우산몬 you pick on the field, answering 60% right', () => {
   const rng = seeded(11), { me, team } = gym(0);
   for (const st of STARTERS) assert.ok(winRate([[st, me]], team, .6, 300, rng) >= .8, `${getSpecies(st).name} vs 해온`);
 });
@@ -34,7 +34,7 @@ test('every gym can be beaten by a team of three, answering 60% right', () => {
     const { me, team } = gym(z), pool = MONSTERS.filter(m => !isUnique(m) && m.zone <= Math.max(0, z - 1)).map(m => m.id);
     for (const st of STARTERS.filter((_, i) => i % 9 === z % 9)) {
       const party = [[st, me], [pool[(z * 7) % pool.length], me], [pool[(z * 13 + 5) % pool.length], me]];
-      assert.ok(winRate(party, team, .6, 300, rng) >= .75, `${z + 1}장 관장 with ${getSpecies(st).name} + 2`);
+      assert.ok(winRate(party, team, .6, 300, rng) >= .75, `${z + 1}장 지킴이 with ${getSpecies(st).name} + 2`);
     }
   }
 });

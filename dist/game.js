@@ -5,8 +5,10 @@ import { CUTSCENE_ATLAS } from './cutscene-atlas.js';
 import { worldScale } from './layout.js';
 import { createJoystick } from './joystick.js';
 import { roomId, parseRoomId } from './interiors.js';
-import { MONSTERS, ZONES, TYPES, getSpecies, isUnique, pickStarterField, STARTER_LEVEL } from './data.js';
+import { MONSTERS, ZONES, TYPES, getSpecies, isUnique, pickStarterField, STARTER_LEVEL, keeperName } from './data.js';
 import { CONCEPTS, QUESTIONS, SOURCES } from './learning.js';
+import { STUDY_PAGES } from './study.js';
+import { stampSVG } from './stamps.js';
 import { newState, validateSave, createMonster, damage, enemyHit, attackHit, advantage, TYPE_RING, TYPE_REASON, healAll, gainXP, captureChance, runChance, xpForDefeat, BENCH_RATE, addMonster, recordAnswer, BOSS_KINDS, PIERCE_CHANCE, QUESTION_POWER } from './engine.js';
 import { portrait, look } from './sprites.js';
 import { LEGENDS, ALL_LEGEND_IDS, legendProgress, legendScene, openFlag, metFlag, ownsSpecies } from './legends.js';
@@ -25,7 +27,7 @@ import { OPENING, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.47';
+const VERSION = '0.50';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -237,7 +239,7 @@ function meetFriend(n) {
   const m = getSpecies(n.species), type = TYPES[m.type].name, weak = Object.keys(STRONG).find(k => STRONG[k] === m.type);
   if (!state.seen.includes(m.id)) state.seen.push(m.id);
   const bars = m.base ? `<div class="base-stats" aria-label="기본 능력치">${[['체력', 'hp'], ['공격', 'attack'], ['방어', 'defense'], ['스피드', 'speed']].map(([l, k]) => `<div><span>${l}</span><i><b style="width:${Math.round(m.base[k] / 140 * 100)}%"></b></i><em>${m.base[k]}</em></div>`).join('')}</div>` : '';
-  const gym = TYPES[ZONES[0].type].name, vsGym = STRONG[m.type] === ZONES[0].type ? `첫 관장 해온의 ${gym} 속성 우산몬에게 강해요!` : STRONG[ZONES[0].type] === m.type ? `첫 관장 해온의 ${gym} 속성 우산몬에게는 조금 약하지만, 정답을 맞히면 이길 수 있어요.` : `첫 관장 해온은 ${gym} 속성 우산몬을 데려와요.`;
+  const gym = TYPES[ZONES[0].type].name, vsGym = STRONG[m.type] === ZONES[0].type ? `첫 독도 지킴이 ${ZONES[0].boss}의 ${gym} 속성 우산몬에게 강해요!` : STRONG[ZONES[0].type] === m.type ? `첫 독도 지킴이 ${ZONES[0].boss}의 ${gym} 속성 우산몬에게는 조금 약하지만, 정답을 맞히면 이길 수 있어요.` : `첫 독도 지킴이 ${ZONES[0].boss}은 ${gym} 속성 우산몬을 데려와요.`;
   openModal(head(m.name, `나리분지 초원 · 첫 동료 고르기`) + `<div class="monster-detail meet-friend"><canvas data-portrait="${m.id}" width="160" height="160"></canvas><div><span class="type-chip">${type} 속성</span> <span class="type-chip">${esc(m.group || '')}</span><p class="meet-hello">${esc(josa(m.name, '이/가'))} ${FRIEND_HELLO[m.group] || '고개를 갸웃하며 바라봐요.'}</p>${bars}<p class="meet-type">${type} 속성은 <b>${TYPES[STRONG[m.type]].name}</b> 속성에 강하고, <b>${TYPES[weak].name}</b> 속성에 약해요.<br><small>${TYPE_REASON[m.type]}</small><br>${vsGym}</p></div></div><div class="modal-actions"><button id="takeFriend" class="primary">이 친구를 동료로 데려갈래요</button><button id="keepLooking" class="neutral">조금 더 둘러볼래요</button></div>`, () => {
     $('#takeFriend').onclick = () => { closeModal(); chooseFriend(m.id, n.uid); };
     $('#keepLooking').onclick = () => { closeModal(); toast('천천히 둘러보세요. 다른 친구에게도 말을 걸어 봐요!'); };
@@ -272,9 +274,9 @@ function questInfo() {
     return { title: `${map.name}을 따라서`, desc: `오른쪽 끝까지 걸어가면 ${next.name}에 도착해요. 표지판·관찰 지점·기억 비석도 살펴봐요. (길에서 해낸 일 ${found})`, stage: -1 };
   }
   const p = progress(), stage = !p.met ? 0 : p.studied < 2 ? 1 : !p.enemy ? 2 : !p.boss ? 3 : 4;
-  const titles = [state.zone === 0 ? '우산몬의 비밀을 찾아서' : '기억 속 인물을 찾아서', '기록판의 단서를 읽어요', '빼앗긴 기록을 되찾자', `${z().boss} 관장의 시험`, state.zone === 7 ? '두 섬의 기억을 되찾았어요' : '새로운 길이 열렸어요'];
+  const titles = [state.zone === 0 ? '우산몬의 비밀을 찾아서' : z().helper ? '시간을 건너온 조상님' : '기억 속 인물을 찾아서', '기록판의 단서를 읽어요', '빼앗긴 기록을 되찾자', `${keeperName(z())}의 시험`, state.zone === 7 ? '두 섬의 기억을 되찾았어요' : '새로운 길이 열렸어요'];
   const nextRoute = state.zone < 7 ? getMapDef(nextMapId(map.id)) : null, nextTown = state.zone < 7 ? getMapDef(townId(state.zone + 1)) : null;
-  const desc = [`${z().npc}에게 말을 걸어 이 지역의 이야기를 들어보세요.`, '배운 사실과 지난 기록을 연결해 두 가지 조사를 마치세요.', `${z().enemy}에게 다가가 기록을 돌려받으세요.`, '수호관 앞에서 관장과 대화하세요. 쉼터에서 동료를 회복할 수 있어요.',
+  const desc = [`${z().npc}에게 말을 걸어 이 지역의 이야기를 들어보세요.`, '배운 사실과 지난 기록을 연결해 두 가지 조사를 마치세요.', `${z().enemy}에게 다가가 기록을 돌려받으세요.`, `수호관 앞에서 ${josa(keeperName(z()), '과/와')} 대화하세요. 쉼터에서 동료를 회복할 수 있어요.`,
     state.zone === 7 ? '두 섬의 기억을 되찾았어요! 도감과 다른 지역의 모험이 기다려요.' : `오른쪽 다리를 건너 ‘${nextRoute.name}’을 따라 ${josa(nextTown.name, '으로/로')} 가요.`];
   return { title: titles[stage], desc: desc[stage], stage };
 }
@@ -288,10 +290,10 @@ function updateUI() {
   $('#questCounter').textContent = String(state.zone + 1).padStart(2, '0');
   const q = questInfo();
   $('#questTitle').textContent = state.started ? q.title : '첫 동료를 만나러'; $('#questDesc').textContent = state.started ? q.desc : '새로운 모험을 시작해 보세요.';
-  $('#questSteps').innerHTML = state.started && q.stage >= 0 ? ['인물과 이야기하기', '기록 조사하기', '기록 되찾기', '관장 인증 받기'].map((v, i) => `<div class="quest-step ${i < q.stage ? 'done' : i === q.stage ? 'current' : ''}"><i>${i < q.stage ? '✓' : i + 1}</i>${v}</div>`).join('') : '';
-  $('#badges').innerHTML = ZONES.map((zone, i) => `<span class="badge ${state.badges.includes(i) ? 'earned' : ''}" title="${zone.badge} 인증">${zone.icon}</span>`).join('');
+  $('#questSteps').innerHTML = state.started && q.stage >= 0 ? ['인물과 이야기하기', '기록 조사하기', '기록 되찾기', '지킴이 인증 받기'].map((v, i) => `<div class="quest-step ${i < q.stage ? 'done' : i === q.stage ? 'current' : ''}"><i>${i < q.stage ? '✓' : i + 1}</i>${v}</div>`).join('') : '';
+  $('#badges').innerHTML = stampsHTML();
   $('#badgeCount').textContent = `${state.badges.length} / 8`; $('#partyCount').textContent = `${state.party.length} / 6`;
-  $('#dexProgress').textContent = `${state.caught.length} / 100`; $('#learningProgress').textContent = `${Object.keys(state.learning).length} / 12`; $('#dailyNote').textContent = z().fact;
+  $('#dexProgress').textContent = `${state.caught.length} / 100`; $('#learningProgress').textContent = `${studyRead()} / ${STUDY_PAGES.length}`; $('#dailyNote').textContent = z().fact;
   $('#soundBtn').setAttribute('aria-label', state.sound ? '소리 끄기' : '소리 켜기'); $('#soundBtn').title = state.sound ? '소리 끄기' : '소리 켜기'; $('#soundBtn').innerHTML = `♪ <span>소리 ${state.sound ? '켜짐' : '꺼짐'}</span>`;
   $('#partyCards').innerHTML = state.party.length ? state.party.map((m, i) => `<button class="party-card ${i === state.active ? 'active' : ''}" data-party="${i}"><canvas data-portrait="${m.id}" width="64" height="64"></canvas><strong>${name(m)}</strong><small>Lv.${m.level} · ${m.hp}/${m.maxHp}</small><div class="hp-track"><i style="width:${m.hp / m.maxHp * 100}%"></i></div></button>`).join('') + Array.from({ length: 6 - state.party.length }, () => '<div class="party-slot">+</div>').join('') : '<p class="empty-party">첫 번째 동료가 당신을 기다리고 있어요.</p>';
   $$('[data-party]').forEach(b => b.onclick = () => partyDetail(Number(b.dataset.party)));
@@ -390,9 +392,9 @@ function interact(n) {
       if (state.zone === 7) { playStory(BOSS_REVEAL).then(() => startBattle('enemy')); return; }
       return talk(n.name, VILLAIN_TALES[state.zone].before, () => startBattle('enemy'), '몽땅랜드 · 창작 대화', n.actor);
     case 'boss':
-      if (!p.enemy) return talk(`관장 ${z().boss}`, ['마을의 기록이 아직 돌아오지 않았어요. 기록판을 조사하고 몽땅랜드의 계획부터 막아 주세요.']);
-      if (p.boss) return talk(`관장 ${z().boss}`, ['인증을 받은 뒤에도 새로운 상황에 배운 내용을 적용해 봐요. 다시 대련하고 싶다면 준비할게요.'], () => startBattle('rematch'));
-      return talk(`관장 ${z().boss}`, ['잘 왔어요. 먼저 여행에서 배운 사실을 하나 확인해 볼까요?', '그다음에는 우산몬과 호흡을 맞춰 봐요. 준비된 동료와 함께 도전하세요!'], () => beginStudy('boss'));
+      if (!p.enemy) return talk(keeperName(z()), ['마을의 기록이 아직 돌아오지 않았어요. 기록판을 조사하고 몽땅랜드의 계획부터 막아 주세요.']);
+      if (p.boss) return talk(keeperName(z()), ['인증을 받은 뒤에도 새로운 상황에 배운 내용을 적용해 봐요. 다시 대련하고 싶다면 준비할게요.'], () => startBattle('rematch'));
+      return talk(keeperName(z()), ['잘 왔어요. 먼저 여행에서 배운 사실을 하나 확인해 볼까요?', '그다음에는 우산몬과 호흡을 맞춰 봐요. 준비된 동료와 함께 도전하세요!'], () => beginStudy('boss'));
     case 'shop': return showShop();
     case 'shopkeeper': return talk(n.name, n.lines, () => showShop(), '쉼터 · 회복과 준비', n.actor);
     case 'storage': return showStorage(); // (예전 저장 지도 호환) 지금은 동료 메뉴에서 열어요
@@ -400,7 +402,7 @@ function interact(n) {
     case 'rest': return talk(n.name, ['포근한 자리에서 잠깐 쉬었어요.', '동료들이 모두 기운을 되찾았어요!'], () => { healAll(state); beep(660, .15); updateUI(); save(); }, '쉬어 가기');
     case 'badges': {
       const got = state.badges.slice().sort((a, b) => a - b).map(i => `${ZONES[i].badge}(${ZONES[i].name})`);
-      return talk(n.name, got.length ? [`지금까지 받은 인증 ${got.length}개: ${got.join(', ')}`, '인증을 받을 때마다 진열장에 이름이 새겨져요.'] : ['아직 받은 인증이 없어요.', `관장 ${z().boss}의 시험을 통과하면 여기에 ‘${z().badge}’ 인증이 새겨져요.`], null, '수호관 · 인증 진열장');
+      return talk(n.name, got.length ? [`지금까지 받은 인증 ${got.length}개: ${got.join(', ')}`, '인증을 받을 때마다 진열장에 이름이 새겨져요.'] : ['아직 받은 인증이 없어요.', `${keeperName(z())}의 시험을 통과하면 여기에 ‘${z().badge}’ 인증이 새겨져요.`], null, '수호관 · 인증 진열장');
     }
     case 'wild': return startBattle('wild', n.species, { roamer: n.uid });
     case 'friend': return meetFriend(n);
@@ -452,7 +454,7 @@ function useStairs(s) {
 
 // ── walking, exits and encounters ──────────────────────────────────────────────
 function exitLocked(x, y) { return map.exits.get(`${x},${y}`) === 'next' && map.kind === 'town' && !state.badges.includes(state.zone); }
-const lockedMessage = () => map.def.island === '울릉도' ? `관장 ${z().boss}의 인증을 받으면 독도행 배를 탈 수 있어요.` : `관장 ${z().boss}의 인증을 받으면 다리 건너 길이 열려요.`;
+const lockedMessage = () => map.def.island === '울릉도' ? `${keeperName(z())}의 인증을 받으면 독도행 배를 탈 수 있어요.` : `${keeperName(z())}의 인증을 받으면 다리 건너 길이 열려요.`;
 function move(dx, dy, now) {
   if (moving || busy() || Math.abs(dx) + Math.abs(dy) !== 1) return false;
   const nx = state.x + dx, ny = state.y + dy; state.dir = dx < 0 ? 'left' : dx > 0 ? 'right' : dy < 0 ? 'up' : 'down';
@@ -582,7 +584,7 @@ function beginStudy(kind = 'review', concept = null, opts = {}) {
   if (battle) return;
   const count = kind === 'board' ? 2 : kind === 'boss' ? (state.zone === 7 ? 3 : 1) : kind === 'stone' ? 1 : 2;
   const questions = chooseQuestions(count, concept); let index = 0, assisted = false;
-  const title = { boss: '관장의 기억 확인', board: '기록을 연결해요', stone: '기억 비석의 질문' }[kind] || '배운 내용을 다시 만나기';
+  const title = { boss: '지킴이의 기억 확인', board: '기록을 연결해요', stone: '기억 비석의 질문' }[kind] || '배운 내용을 다시 만나기';
   function show() {
     const q = questions[index];
     openModal(head(title, `${map.name} · ${index + 1}/${questions.length}`) + `<div class="progress-dots">${questions.map((_, i) => `<i class="${i < index ? 'done' : ''}"></i>`).join('')}</div><div class="question-tag">${CONCEPTS.find(c => c.id === q.concept)?.title || '기록 탐구'}</div><h3 class="question-title">${esc(q.prompt)}</h3><div class="answer-options">${q.options.map((opt, i) => `<button class="answer-option" data-answer="${i}"><b>${i + 1}</b><span>${esc(opt)}</span></button>`).join('')}</div><div id="feedbackArea"></div><p class="footer-note">틀려도 괜찮아요. 자료를 함께 읽고 다음에 다시 확인해요.</p>`, () => {
@@ -650,11 +652,11 @@ function tutorialEvent(kind) {
 
 // ── turn-based duel: calm berserk (사나워짐) 우산몬 by clearing their dark energy ──
 // Wild and 몽땅랜드 우산몬 are 사나워짐 (wrapped in 검은 기운). A correct answer clears some of it;
-// at zero they find their calm again. 관장 duels are friendly certification matches.
+// at zero they find their calm again. 독도 지킴이 duels are friendly certification matches.
 const active = () => state.party[state.active];
 const enemy = () => battle.enemies[battle.index];
 const berserk = b => b.kind !== 'boss' && b.kind !== 'rematch';
-function opponentName(b) { return b.kind === 'enemy' ? z().enemy : b.kind === 'trainer' ? b.npc.name : `관장 ${z().boss}`; }
+function opponentName(b) { return b.kind === 'enemy' ? z().enemy : b.kind === 'trainer' ? b.npc.name : keeperName(z()); }
 function backdropKind() { const t = map[state.y]?.[state.x]; return t === 3 ? 'field' : t === 4 || t === 6 || map.kind === 'route' ? 'shore' : 'town'; }
 // 몽땅랜드 battle pictures: 직원 / 팀장 / 백무 사장 (dist/assets/characters/baekmudan-*-portrait.png)
 function villainPortrait(actor) {
@@ -683,7 +685,7 @@ function startBattle(kind, id, opts = {}) {
   }
   else if (kind === 'enemy') { const pool = z().wild; enemies = (state.zone === 7 ? bossTeam() : [pool[2] || pool[0] || 21]).map(i => createMonster(i, base)); }
   else if (kind === 'trainer') enemies = (opts.npc.team?.length ? opts.npc.team : [z().wild[3]]).map(i => createMonster(i, base));
-  else enemies = z().bossTeam.slice(0, kind === 'rematch' ? 3 : 2).map(i => createMonster(i, kind === 'rematch' ? base + 1 : Math.max(3, base - 2))); // v0.44 관장 약하게: 인증 결투는 이 장 기준 레벨 −2
+  else enemies = z().bossTeam.slice(0, kind === 'rematch' ? 3 : 2).map(i => createMonster(i, kind === 'rematch' ? base + 1 : Math.max(3, base - 2))); // v0.44 독도 지킴이 약하게: 인증 결투는 이 장 기준 레벨 −2
   for (const m of enemies) if (!state.seen.includes(m.id)) state.seen.push(m.id);
   preloadMonsters(enemies.map(m => m.id));
   for (const r of ['grunt', 'exec', 'boss']) assetImage(`characters/baekmudan-${r}-portrait`);
@@ -708,7 +710,7 @@ function explanationHTML(q) { return `<p class="dq-explain">${esc(q.explanation)
 // 내 차례: ‘문제 풀기’를 누르면 바로 독도 문제가 나와요. 상성은 내 우산몬과 상대 우산몬의 속성으로 정해요.
 const conceptTitle = q => CONCEPTS.find(c => c.id === q.concept)?.title || '기억 확인';
 const matchup = (a, e) => advantage(getSpecies(a.id).type, getSpecies(e.id).type);
-const isBoss = b => BOSS_KINDS.includes(b.kind) || (b.kind === 'enemy' && state.zone === 7); // 관장 · 백무 사장
+const isBoss = b => BOSS_KINDS.includes(b.kind) || (b.kind === 'enemy' && state.zone === 7); // 독도 지킴이 · 백무 사장
 function attackRule(b, mult) {
   if (mult > 1) return '상성이 좋아요! 맞히면 1.5배로 걷어 내고, 틀려도 절반은 닿아요.';
   if (mult < 1) return '상성이 나빠요. 맞혀도 0.75배만 닿고, 틀리면 빗나가요.';
@@ -924,7 +926,7 @@ function finishBattle(win, escaped = false, info = {}) {
       progress().boss = true; if (!state.badges.includes(state.zone)) state.badges.push(state.zone);
       for (const m of state.party) { const goal = 8 + state.zone * 4; while (m.level < goal) gainXP(m, m.level * 13); if (!state.caught.includes(m.id)) state.caught.push(m.id); if (!state.seen.includes(m.id)) state.seen.push(m.id); }
       healAll(state); state.items.heal += 4; labelKey = '';
-      talk(`관장 ${z().boss}`, [`훌륭해요! ${z().badge} 인증을 드릴게요. 우산몬과 함께 한 걸음 더 성장했어요.`, state.zone === 7 ? '울릉도와 독도, 두 섬의 기억을 되찾은 당신은 이제 두 섬의 수호사예요!' : `이제 마을 오른쪽 다리가 열렸어요. ‘${getMapDef(nextMapId(map.id)).name}’을 따라 다음 지역으로 가 보세요!`], () => { if (state.zone === 7) { state.ended = true; save(); playStory(EPILOGUE).then(showEnding); } });
+      talk(keeperName(z()), [`훌륭해요! 모험 수첩을 펴 보세요. ‘${z().badge}’ 도장을 꾹 찍어 드릴게요.`, state.zone === 7 ? '울릉도와 독도, 두 섬의 기억을 되찾은 당신은 이제 두 섬의 수호사예요!' : `이제 마을 오른쪽 다리가 열렸어요. ‘${getMapDef(nextMapId(map.id)).name}’을 따라 다음 지역으로 가 보세요!`], () => stampCeremony(state.zone, () => { if (state.zone === 7) { state.ended = true; save(); playStory(EPILOGUE).then(showEnding); } }));
     }
   } else if (!escaped) {
     healAll(state); returnToShelter();
@@ -1133,13 +1135,51 @@ async function travel(zone) {
   closeModal(); await changeMap(townId(zone), 'a', { heal: true });
   toast(`${boat ? '배를 타고 ' : ''}${map.name}에 도착했어요. 동료들도 기운을 되찾았어요.`);
 }
+// ── 독도 지킴이 도장 (v0.47): 지킴이를 이기면 모험 수첩에 도장이 찍혀요 ──
+function stampHTML(i, fresh = false) {
+  const zone = ZONES[i], got = state.badges.includes(i);
+  return got
+    ? `<div class="stamp-slot earned${fresh ? ' fresh' : ''}" title="${esc(keeperName(zone))}"><span class="stamp">${stampSVG(i)}</span><small>${esc(zone.badge)} · ${esc(zone.boss)}</small></div>`
+    : `<div class="stamp-slot"><span class="stamp empty" aria-label="아직 받지 않은 도장">${zone.icon}</span><small>${esc(zone.name)}</small></div>`;
+}
+function stampsHTML(fresh = -1) { return ZONES.map((_, i) => stampHTML(i, i === fresh)).join(''); }
+function stampCeremony(zone, then) {
+  const z0 = ZONES[zone];
+  modalReturn = then || null;
+  openModal(head('도장을 받았어요!', `${keeperName(z0)} · 도장 ${state.badges.length} / 8`) + `<p class="stamp-line">쾅! <b>${esc(keeperName(z0))}</b>의 ‘${esc(z0.badge)}’ 도장이 찍혔어요.</p><div class="badge-grid stamp-book">${stampsHTML(zone)}</div><div class="modal-actions"><button id="stampClose" class="primary">수첩 덮기</button></div>`, () => {
+    $('#stampClose').onclick = closeModal; setTimeout(() => beep(150, .18), 380);
+  });
+}
+// ── 공부 수첩 (v0.47): [독도 공부] 쪽 읽기 · [배움의 기록] 학습 기록 ──
+const studyRead = () => STUDY_PAGES.filter(p => state.flags[`study:${p.id}`]).length;
+function noteTabs(active) { return `<div class="note-tabs" role="tablist">${[['study', '독도 공부'], ['record', '배움의 기록']].map(([k, l]) => `<button role="tab" data-tab="${k}" class="${active === k ? 'selected' : ''}" aria-selected="${active === k}">${l}</button>`).join('')}</div>`; }
+function bindTabs() { $$('[data-tab]').forEach(b => b.onclick = () => b.dataset.tab === 'study' ? showStudy() : showNotebook()); }
+const sourceOf = r => typeof r === 'number' ? SOURCES[r] : r;
+function showStudy(pageId = null) {
+  const at = STUDY_PAGES.findIndex(p => p.id === pageId), p = STUDY_PAGES[at];
+  if (!p) {
+    openModal(head('공부 수첩', `독도 공부 · 읽은 쪽 ${studyRead()} / ${STUDY_PAGES.length}`) + noteTabs('study') + `<p>독도에 관한 지식을 언제든 펼쳐 읽어요. 다 읽은 쪽은 ‘확인 문제’로 스스로 점검해 봐요.</p><div class="study-grid">${STUDY_PAGES.map((q, i) => { const read = !!state.flags[`study:${q.id}`]; return `<button class="study-card${read ? ' read' : ''}" data-page="${q.id}"><span class="study-icon" aria-hidden="true">${q.icon}</span><strong>${i + 1}. ${esc(q.title)}</strong><small>${read ? '읽음 ✓' : '아직 안 읽음'}</small></button>`; }).join('')}</div>`, () => {
+      bindTabs(); $$('[data-page]').forEach(b => b.onclick = () => showStudy(b.dataset.page));
+    });
+    return;
+  }
+  if (state.started && !state.flags[`study:${p.id}`]) { state.flags[`study:${p.id}`] = true; save(); updateUI(); }
+  const timeline = p.timeline ? `<ol class="study-timeline">${p.timeline.map(([y, t]) => `<li><b>${esc(y)}</b><span>${esc(t)}</span></li>`).join('')}</ol>` : '';
+  const quiz = p.concepts.map(c => `<button class="primary" data-review="${c}" ${!state.started ? 'disabled' : ''}>확인 문제 · ${esc(CONCEPTS.find(x => x.id === c).title)}</button>`).join('');
+  const refs = p.sources.map(sourceOf).filter(Boolean).map(r => `<a href="${r.url}" target="_blank" rel="noopener" class="source-link">${esc(r.title)} ↗</a>`).join('');
+  openModal(head(p.title, `독도 공부 수첩 · ${at + 1} / ${STUDY_PAGES.length}`) + noteTabs('study') + `<ul class="study-points">${p.points.map(t => `<li>${esc(t)}</li>`).join('')}</ul>${timeline}<div class="modal-actions study-quiz">${quiz}</div><div class="modal-actions study-nav"><button id="studyPrev" class="neutral" ${at === 0 ? 'disabled' : ''}>← 앞 쪽</button><button id="studyIndex" class="neutral">목차</button><button id="studyNext" class="neutral" ${at === STUDY_PAGES.length - 1 ? 'disabled' : ''}>다음 쪽 →</button></div><div class="study-sources"><strong>근거 자료</strong>${refs}</div>`, () => {
+    bindTabs();
+    $('#studyPrev').onclick = () => showStudy(STUDY_PAGES[at - 1]?.id); $('#studyNext').onclick = () => showStudy(STUDY_PAGES[at + 1]?.id); $('#studyIndex').onclick = () => showStudy();
+    $$('[data-review]').forEach(b => b.onclick = () => beginStudy('review', b.dataset.review));
+  });
+}
 function showNotebook() {
-  openModal(head('배움의 기록', `발견한 개념 ${Object.keys(state.learning).length}/12`) + `<p>게임 레벨과 배움의 기록은 달라요. 힌트 없이 해결한 경험과 여러 번의 학습을 함께 살펴봐요.</p>${CONCEPTS.map(c => { const r = state.learning[c.id]; const status = !r ? '아직 발견 전' : r.independent >= 3 && r.sessions.length >= 2 ? '반복 확인 중' : r.independent ? '혼자 해결한 경험' : '도움받아 배우는 중'; return `<div class="knowledge-row"><div><strong>${c.title}</strong><small>${c.standard} · ${status}</small><small>독립 정답 ${r?.independent || 0} · 학습 세션 ${r?.sessions.length || 0}</small></div><button data-review="${c.id}" ${!state.started ? 'disabled' : ''}>다시 보기</button></div>`; }).join('')}<div class="modal-actions"><button id="exportLearning" class="neutral">학습 기록 내려받기</button><button id="sourceBtn" class="neutral">학습 자료 출처</button></div><p class="footer-note">이 기록만으로 성취기준 도달을 확정하지 않아요. 학생의 설명과 지연 확인을 함께 살펴보세요.</p>`, () => {
-    $$('[data-review]').forEach(b => b.onclick = () => beginStudy('review', b.dataset.review)); $('#exportLearning').onclick = exportLearning; $('#sourceBtn').onclick = showSources;
+  openModal(head('공부 수첩', `배움의 기록 · 발견한 개념 ${Object.keys(state.learning).length}/12`) + noteTabs('record') + `<p>게임 레벨과 배움의 기록은 달라요. 힌트 없이 해결한 경험과 여러 번의 학습을 함께 살펴봐요.</p>${CONCEPTS.map(c => { const r = state.learning[c.id]; const status = !r ? '아직 발견 전' : r.independent >= 3 && r.sessions.length >= 2 ? '반복 확인 중' : r.independent ? '혼자 해결한 경험' : '도움받아 배우는 중'; return `<div class="knowledge-row"><div><strong>${c.title}</strong><small>${c.standard} · ${status}</small><small>독립 정답 ${r?.independent || 0} · 학습 세션 ${r?.sessions.length || 0}</small></div><button data-review="${c.id}" ${!state.started ? 'disabled' : ''}>다시 보기</button></div>`; }).join('')}<div class="modal-actions"><button id="exportLearning" class="neutral">학습 기록 내려받기</button><button id="sourceBtn" class="neutral">학습 자료 출처</button></div><p class="footer-note">이 기록만으로 성취기준 도달을 확정하지 않아요. 학생의 설명과 지연 확인을 함께 살펴보세요.</p>`, () => {
+    bindTabs(); $$('[data-review]').forEach(b => b.onclick = () => beginStudy('review', b.dataset.review)); $('#exportLearning').onclick = exportLearning; $('#sourceBtn').onclick = showSources;
   });
 }
 function showSources() {
-  openModal(head('사실과 창작을 구분해요') + `<p>지역 이름은 실제 독도의 지명이에요. 우산몬·마을·건물·NPC 대사·기억의 세계는 창작입니다. 실제 역사와 자연은 아래 자료를 바탕으로 살펴봐요.</p><div class="resource-list">${SOURCES.map(s => `<a href="${s.url}" target="_blank" rel="noopener">${esc(s.title)} ↗</a>`).join('')}<a href="https://www.moe.go.kr/boardCnts/viewRenew.do?boardID=141&boardSeq=93458&lev=0&m=040401" target="_blank" rel="noopener">교육부 · 2022 개정 교육과정 고시 ↗</a></div><div class="fact-box">중심 성취기준: 사회 [6사01-02]<br>자료 신뢰성: 국어 [6국06-02]<br>생태계 보전: 과학 [4과14-01~03]의 선수학습 복습</div><p class="footer-note">개별 생물 모티브는 도감의 자료 링크에서 확인할 수 있어요. 수업 효과는 아직 검증하지 않았어요.</p>`);
+  openModal(head('사실과 창작을 구분해요') + `<p>지역 이름은 실제 독도의 지명이에요. 우산몬·마을·건물·NPC 대사·기억의 세계는 창작입니다. 시간을 건너온 조상님 이서부·이규운·안응복·심흥탁·홍순팔도 창작 인물이고, 그들이 들려주는 이사부·이규원·안용복·심흥택·홍순칠의 활동은 실제 기록이에요. 실제 역사와 자연은 아래 자료를 바탕으로 살펴봐요. 타이틀 그림은 생성형 AI로 만든 그림을 실제 독도(동도의 등대·경비대 건물·태극기, 맞은편 서도, 괭이갈매기)에 맞게 다듬어 썼어요.</p><div class="resource-list">${SOURCES.map(s => `<a href="${s.url}" target="_blank" rel="noopener">${esc(s.title)} ↗</a>`).join('')}<a href="https://www.moe.go.kr/boardCnts/viewRenew.do?boardID=141&boardSeq=93458&lev=0&m=040401" target="_blank" rel="noopener">교육부 · 2022 개정 교육과정 고시 ↗</a></div><div class="fact-box">중심 성취기준: 사회 [6사01-02]<br>자료 신뢰성: 국어 [6국06-02]<br>생태계 보전: 과학 [4과14-01~03]의 선수학습 복습</div><p class="footer-note">개별 생물 모티브는 도감의 자료 링크에서 확인할 수 있어요. 수업 효과는 아직 검증하지 않았어요.</p>`);
 }
 function exportLearning() {
   const quote = v => '"' + String(v).replace(/"/g, '""') + '"';
@@ -1149,28 +1189,30 @@ function exportLearning() {
 function download(fileName, content, type = 'application/json') { const blob = new Blob([content], { type }), url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = fileName; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 function showMenu() {
   if (battle) { toast('결투를 마친 뒤 메뉴를 열어 주세요.'); return; }
-  openModal(head('모험 메뉴', `DOKDO EXPLORERS · BUILD ${VERSION}`) + `<div class="settings-grid"><button id="menuSave" class="neutral" ${!state.started ? 'disabled' : ''}>▣ 지금 저장하기</button><button id="exportSave" class="neutral" ${!state.started ? 'disabled' : ''}>↓ 저장 파일 내려받기</button><label class="neutral">↑ 저장 파일 불러오기 <input id="importSave" type="file" accept="application/json,.json"></label><button id="menuLearn" class="neutral">✎ 배움의 기록 · 교사용 내보내기</button><button id="menuSources" class="neutral">학습 자료와 출처</button><button id="menuHelp" class="neutral">조작 방법</button><button id="menuOpening" class="neutral" ${!state.started ? 'disabled' : ''}>오프닝 다시 보기</button><button id="menuTutorial" class="neutral" ${!state.started ? 'disabled' : ''}>튜토리얼 다시 하기</button><button id="menuAvatar" class="neutral" ${!state.started ? 'disabled' : ''}>탐험대원 바꾸기</button><button id="restartBtn" class="neutral danger">새로운 모험</button></div><p class="footer-note">진행은 현재 브라우저에 저장돼요. 다른 기기에서는 저장 파일을 불러와 이어갈 수 있어요. 서버에 학생 이름이나 기록을 전송하지 않아요.</p>`, () => {
+  openModal(head('모험 메뉴', `DOKDO EXPLORERS · BUILD ${VERSION}`) + `<div class="settings-grid"><button id="menuSave" class="neutral" ${!state.started ? 'disabled' : ''}>▣ 지금 저장하기</button><button id="exportSave" class="neutral" ${!state.started ? 'disabled' : ''}>↓ 저장 파일 내려받기</button><label class="neutral">↑ 저장 파일 불러오기 <input id="importSave" type="file" accept="application/json,.json"></label><button id="menuLearn" class="neutral">✎ 공부 수첩 · 배움의 기록 내보내기</button><button id="menuSources" class="neutral">학습 자료와 출처</button><button id="menuHelp" class="neutral">조작 방법</button><button id="menuOpening" class="neutral" ${!state.started ? 'disabled' : ''}>오프닝 다시 보기</button><button id="menuTutorial" class="neutral" ${!state.started ? 'disabled' : ''}>튜토리얼 다시 하기</button><button id="menuAvatar" class="neutral" ${!state.started ? 'disabled' : ''}>탐험대원 바꾸기</button><button id="restartBtn" class="neutral danger">새로운 모험</button></div><p class="footer-note">진행은 현재 브라우저에 저장돼요. 다른 기기에서는 저장 파일을 불러와 이어갈 수 있어요. 서버에 학생 이름이나 기록을 전송하지 않아요.</p>`, () => {
     $('#menuSave').onclick = () => save(true); $('#exportSave').onclick = () => download('dokdomon-save.json', JSON.stringify(state, null, 2));
-    $('#menuLearn').onclick = showNotebook; $('#menuSources').onclick = showSources;
+    $('#menuLearn').onclick = () => showStudy(); $('#menuSources').onclick = showSources;
     $('#menuOpening').onclick = async () => { closeModal(); await playStory({ id: 'opening', scenes: OPENING.scenes }); };
     $('#menuTutorial').onclick = () => { closeModal(); state.tutorial = { battle: false, walk: 0 }; save(); renderCoachPanel(); startTutorial(); };
     $('#menuAvatar').onclick = () => chooseAvatar(id => { state.avatar = id; save(); updateUI(); toast('탐험대원을 바꿨어요.'); });
     $('#restartBtn').onclick = () => { saved = state.started ? state : saved; startNew(); };
-    $('#menuHelp').onclick = () => openModal(head('천천히, 함께 탐험해요') + '<div class="fact-box">이동: 방향키 / WASD / 조이스틱(터치 화면) / 지도 화면 누르기<br>건물: 문 바로 아래에서 위로 걸으면(또는 건물을 누르면) 들어가요. 계단을 밟으면 위아래 층으로, 문 깔개를 밟으면 밖으로 나가요<br>대화·조사: 가까이에서 E·스페이스 / 대화 버튼<br>자동 안내: 수첩의 목적지 안내<br>다음 지역: 관장 인증 후 마을 오른쪽 다리 → 길을 따라 걷기<br>세계 지도: 가 본 마을로 바로 이동<br>결투 명령: 문제 풀기 · 동료 만들기 · 도구 · 동료 · 물러나기 (전설의 우산몬은 형태변환도)<br>문제 풀기: 누르면 바로 독도 문제가 나와요<br>상성(화살표 앞이 뒤에 강해요): 잎→빛→메아리→잎, 파도→바위→바람→파도. 상성이 좋으면 맞혔을 때 1.5배, 틀려도 절반은 닿아요. 상성이 나쁘면 0.75배<br>사나워진 우산몬: 문제를 맞히면 검은 기운을 걷어 내요. 모두 걷히면 평온을 되찾아요<br>상대의 문제: 맞히면 충격이 40% 줄고, 틀리면 그대로 받아요. 관장·백무 사장은 가끔 정답도 뚫고 들어와요(관통)<br>동료 만들기: 버튼을 누르면 확률로 동료가 돼요(그 차례엔 공격 못 해요). 검은 기운이 적을수록 잘 되고, 전설의 우산몬은 10%<br>동료 주머니: ‘동료’ 메뉴에서 쉬는 동료와 언제든 바꿔요<br>관장과는 인증 결투로 겨뤄요<br>힌트: 문제 아래 기록 힌트 · 학습 기록에 도움 표시<br>대화와 컷신: 클릭·엔터·스페이스로 넘기기</div>' + typeRingHTML() + '<p>길에서는 표지판, 관찰 지점, 기억 비석, 조사 상자, 길에서 만난 사람과 몽땅랜드 직원을 찾아봐요. 사나워진 야생 우산몬은 마을과 마을 사이의 길 위를 걸어 다녀요.</p>');
+    $('#menuHelp').onclick = () => openModal(head('천천히, 함께 탐험해요') + '<div class="fact-box">이동: 방향키 / WASD / 조이스틱(터치 화면) / 지도 화면 누르기<br>건물: 문 바로 아래에서 위로 걸으면(또는 건물을 누르면) 들어가요. 계단을 밟으면 위아래 층으로, 문 깔개를 밟으면 밖으로 나가요<br>대화·조사: 가까이에서 E·스페이스 / 대화 버튼<br>자동 안내: 수첩의 목적지 안내<br>다음 지역: 독도 지킴이 인증 후 마을 오른쪽 다리 → 길을 따라 걷기<br>세계 지도: 가 본 마을로 바로 이동<br>결투 명령: 문제 풀기 · 동료 만들기 · 도구 · 동료 · 물러나기 (전설의 우산몬은 형태변환도)<br>문제 풀기: 누르면 바로 독도 문제가 나와요<br>상성(화살표 앞이 뒤에 강해요): 잎→빛→메아리→잎, 파도→바위→바람→파도. 상성이 좋으면 맞혔을 때 1.5배, 틀려도 절반은 닿아요. 상성이 나쁘면 0.75배<br>사나워진 우산몬: 문제를 맞히면 검은 기운을 걷어 내요. 모두 걷히면 평온을 되찾아요<br>상대의 문제: 맞히면 충격이 40% 줄고, 틀리면 그대로 받아요. 독도 지킴이·백무 사장은 가끔 정답도 뚫고 들어와요(관통)<br>동료 만들기: 버튼을 누르면 확률로 동료가 돼요(그 차례엔 공격 못 해요). 검은 기운이 적을수록 잘 되고, 전설의 우산몬은 10%<br>동료 주머니: ‘동료’ 메뉴에서 쉬는 동료와 언제든 바꿔요<br>독도 지킴이와는 인증 결투로 겨뤄요<br>힌트: 문제 아래 기록 힌트 · 학습 기록에 도움 표시<br>대화와 컷신: 클릭·엔터·스페이스로 넘기기</div>' + typeRingHTML() + '<p>길에서는 표지판, 관찰 지점, 기억 비석, 조사 상자, 길에서 만난 사람과 몽땅랜드 직원을 찾아봐요. 사나워진 야생 우산몬은 마을과 마을 사이의 길 위를 걸어 다녀요.</p>');
     $('#importSave').onchange = async e => { const file = e.target.files[0]; if (!file) return; try { if (file.size > 3e6) throw new Error('파일이 너무 커요.'); const parsed = validateSave(JSON.parse(await file.text())); saved = parsed; closeModal(); continueGame(); toast('저장한 모험을 불러왔어요.'); } catch (err) { toast(err.message || '저장 파일을 확인해 주세요.'); } };
   });
 }
 function showEnding() {
-  openModal(head('울릉도와 독도의 기억을 되찾았어요', '두 섬의 수호사 · 여덟 개의 인증') + `<div class="end-screen"><canvas data-portrait="100" width="160" height="160"></canvas><h2>모험은 기억으로 남아요.</h2><p>우산몬과 함께 걸으며 자연과 역사를 만났어요.<br>이제 확인한 사실을 여러분의 말로 전해 주세요.</p><div class="fact-box">수호사 인증 ${state.badges.length}/8 · 동료 ${state.caught.length}/100<br>발견한 개념 ${Object.keys(state.learning).length}/12 · 기록한 답변 ${state.answerLog.length}개</div><div class="modal-actions"><button id="endContinue" class="primary">계속 탐험하기 →</button><button id="endJournal" class="neutral">배움의 기록</button></div></div>`, () => { $('#endContinue').onclick = closeModal; $('#endJournal').onclick = showNotebook; });
+  openModal(head('울릉도와 독도의 기억을 되찾았어요', '두 섬의 수호사 · 여덟 개의 지킴이 도장') + `<div class="end-screen"><canvas data-portrait="100" width="160" height="160"></canvas><h2>모험은 기억으로 남아요.</h2><p>우산몬과 함께 걸으며 자연과 역사를 만났어요.<br>이제 확인한 사실을 여러분의 말로 전해 주세요.</p><div class="fact-box">수호사 인증 ${state.badges.length}/8 · 동료 ${state.caught.length}/100<br>발견한 개념 ${Object.keys(state.learning).length}/12 · 기록한 답변 ${state.answerLog.length}개</div><div class="modal-actions"><button id="endContinue" class="primary">계속 탐험하기 →</button><button id="endJournal" class="neutral">배움의 기록</button></div></div>`, () => { $('#endContinue').onclick = closeModal; $('#endJournal').onclick = showNotebook; });
 }
 
 // ── start-up ───────────────────────────────────────────────────────────────────
 try { const raw = localStorage.getItem(KEY); if (raw) saved = validateSave(JSON.parse(raw)); } catch (e) { console.warn('Save recovery:', e.message); }
+// 타이틀 그림(v0.47): 동도 정상에서 서도를 바라보는 두 탐험대원 — 생성형 AI로 만든 그림을 고증에 맞게 다듬어 썼어요.
+$('#titleScreen').style.backgroundImage = `url("${assetURL('scenery/title-dokdo.jpg')}")`;
 if (saved?.started) $('#continueBtn').classList.remove('hidden');
 $('#startBtn').onclick = startNew; $('#continueBtn').onclick = continueGame;
 $('#saveBtn').onclick = () => state.started ? save(true) : toast('모험을 시작하면 저장할 수 있어요.');
 $('#menuBtn').onclick = showMenu; $('#mapBtn').onclick = () => { if (!battle) showMap(); }; $('#dexBtn').onclick = () => { if (!battle) showDex(); };
-$('#notebookBtn').onclick = () => { if (!battle) showNotebook(); }; $('#guideBtn').onclick = () => { closeModal(); guide(); };
+$('#notebookBtn').onclick = () => { if (!battle) showStudy(); }; $('#guideBtn').onclick = () => { closeModal(); guide(); };
 $('#questBtn').onclick = $('#questPeek').onclick = showQuest; $('#partyBtn').onclick = $('#buddyPeek').onclick = showParty;
 $('#pocketBtn').onclick = () => showStorage();
 $('#fullscreenBtn').onclick = toggleFullscreen;
@@ -1187,7 +1229,7 @@ updateUI(); paintPortraits(); requestAnimationFrame(frame);
 if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('test')) {
   window.__dokdo = {
     get state() { return state; }, get battle() { return battle; }, get busy() { return busy(); }, get transition() { return transition; }, get talk() { return dialogueState; }, get map() { return map; },
-    cutscene: () => cutscenes.current, people: liveNPCs, guide, interact, nextTalk, startBattle, closeModal, travel, changeMap, save, continueGame,
+    cutscene: () => cutscenes.current, people: liveNPCs, guide, interact, nextTalk, startBattle, closeModal, stampCeremony, showStudy, travel, changeMap, save, continueGame,
     motion: () => ({ view: { ...view }, walkDistance, moving }), npcs: () => npcs(map, progress(), state.flags),
     playStory, stories: { OPENING, GUIDE, BOSS_REVEAL, BOSS_FALL, TREE_JOINS },
     get longestQuestion() { return QUESTIONS.reduce((m, q) => (q.prompt.length + q.options.join('').length + q.explanation.length > m.prompt.length + m.options.join('').length + m.explanation.length ? q : m)); },

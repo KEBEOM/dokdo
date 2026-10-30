@@ -95,7 +95,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
     els.allyWrap.classList.toggle('tired', m.hp <= 0);
   }
   function setFoe(e, info, extra = '') {
-    // 사나워진 우산몬: a purple 검은 기운 gauge; 관장 duels: a plain 기운 gauge
+    // 사나워진 우산몬: a purple 검은 기운 gauge; 독도 지킴이 duels: a plain 기운 gauge
     const r = Math.max(0, e.hp / e.maxHp);
     const nums = `<b>${Math.ceil(Math.max(0, e.hp))}</b> / ${e.maxHp}`; // 퍼센트 대신 남은 수치 / 처음 수치
     const gauge = info.dark ? `<div class="dq-gauge-label">${esc(info.gauge)} ${nums}</div><div class="dq-barrow"><b class="dq-tag dark">기운</b><div class="dq-bar dark"><i style="width:${r * 100}%"></i></div></div>` : `<div class="dq-gauge-label">${esc(info.gauge || '기운')} ${nums}</div>${bar(e.hp, e.maxHp, '기운')}`;

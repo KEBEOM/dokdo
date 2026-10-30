@@ -140,6 +140,7 @@ async function runDevice(d) {
   await page.keyboard.press('Escape'); await page.waitForTimeout(300); await G(() => window.__dokdo.closeModal());
   await tap('#mapBtn'); await check('15-world-map', 600); await G(() => window.__dokdo.closeModal());
   await tap('#dexBtn'); await check('16-dex', 600); await G(() => window.__dokdo.closeModal());
+  await tap('#notebookBtn'); await check('19-study-notebook', 600); await tap('[data-page="history"]'); await check('20-study-page', 600); await G(() => window.__dokdo.closeModal());
   // inside a building: the room sits in the middle of the screen with its labels
   await G(() => window.__dokdo.goInside('lab')); await until(() => window.__dokdo.map.id === 'town0/lab/1' && !window.__dokdo.transition);
   await check('18-inside', 2900);
@@ -160,4 +161,4 @@ await Promise.all(Array.from({ length: 4 }, async () => { while (queue.length) a
 await browser.close(); server.close();
 const failed = report.filter(([, p]) => p.length);
 assert.equal(failed.length, 0, `cut-off screens on ${failed.map(([id]) => id).join(', ')}`);
-console.log(`PASS: ${report.length} screen sizes, 18 screens each — nothing cut off.`);
+console.log(`PASS: ${report.length} screen sizes, 20 screens each — nothing cut off.`);

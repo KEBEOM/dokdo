@@ -96,7 +96,7 @@ test('former starters, exact spreadsheet names and NO.100',()=>{
  assert.equal(getSpecies(3).name,'섬기린초');assert.equal(getSpecies(100).name,'강치');
  assert.deepEqual(MONSTERS.filter(m=>m.legendary).map(m=>m.name),['사철나무','소쩍새','뿔쇠오리','매','황조롱이','고니','흑두루미','강치'],'천연기념물 7종 + 강치 are legendary');
  assert.deepEqual(MONSTERS.filter(m=>m.forms===2).map(m=>m.id),[18,68,70,71,72,75,76],'seven legendaries have a 변환폼 (v0.47: 사철나무 too)');
- // legendary 우산몬 exist once in the whole game: never in the grass, a 관장 team or a 백무단 team
+ // legendary 우산몬 exist once in the whole game: never in the grass, a 지킴이 team or a 백무단 team
  const reachable=new Set(ZONES.flatMap(z=>[...z.wild,...z.bossTeam]));assert.equal(new Set(ZONES.flatMap(z=>z.wild)).size,92,"100 - 8 legendaries (the old starters now live in the wild too)");
  for(const id of [18,68,70,71,72,75,76,100])assert.ok(!reachable.has(id),`${id} is unique`);
 });

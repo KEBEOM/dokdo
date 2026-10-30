@@ -10,7 +10,7 @@
 // 층마다 내용은 마을(지역)에 따라 바뀝니다: 책장의 책은 그 지역 문제의 해설(출처가 있는 사실),
 // 창밖 풍경은 그 지역 이야기, 수조의 생물은 그 지역에 사는 생물이에요. 마을·건물 모습은 게임 속 창작입니다.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ZONES, TYPES, MONSTERS, isUnique } from './data.js';
+import { ZONES, TYPES, MONSTERS, isUnique, keeperName } from './data.js';
 import { QUESTIONS, CONCEPTS, SOURCES } from './learning.js';
 
 export const ROOM_W = 42, ROOM_H = 30; // rooms sit in the middle of a normal-size map
@@ -116,7 +116,7 @@ export const ROOM_TEMPLATES = {
       'wwwwwwwDwwwwww'],
       objects: z => ({
         0: { type: 'badges', name: '인증 진열장', furniture: 'trophy' },
-        1: { type: 'person', actor: 'child-boy', name: '수련생 마루', lines: [`관장 ${ZONES[z].boss}님은 수호관 앞에서 도전자를 기다리셔.`, '도전하기 전에 기록판 문제를 먼저 풀어 두면 마음이 든든해!'] },
+        1: { type: 'person', actor: 'child-boy', name: '수련생 마루', lines: [`${keeperName(ZONES[z])}님은 수호관 앞에서 도전자를 기다리셔.`, '도전하기 전에 기록판 문제를 먼저 풀어 두면 마음이 든든해!'] },
         2: { type: 'sign', name: '수호관 안내판', furniture: 'board', lines: [`${ZONES[z].name} 수호관 · ${ZONES[z].badge} 인증`, '2층 수련장에서 복습 문제를 풀고, 3층 전망대에서 마을을 내려다볼 수 있어요.'] }
       }) },
     { label: '2층 · 수련장', art: [

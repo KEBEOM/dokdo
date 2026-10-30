@@ -738,3 +738,67 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
 @media (max-width:600px){#gameApp .monster-detail{grid-template-columns:1fr;justify-items:center;gap:10px}#gameApp .monster-detail>canvas{width:120px;height:120px}#gameApp .monster-detail>div{width:100%}}
 .battle-screen.dq .dq-answer{flex-wrap:nowrap}.battle-screen.dq .dq-answer>span:not(.dq-cursor){min-width:0;white-space:normal}.battle-screen.dq .dq-answer .dq-cursor{display:none}
 @media (max-width:600px){#gameApp .filter-row{gap:4px;flex-wrap:nowrap}#gameApp .filter-row button{padding:5px 7px;font-size:12px}}
+
+/* v0.47 타이틀: 동도 정상의 두 탐험대원 그림을 배경으로, 위에는 현판 · 아래에는 시작 단추 */
+#gameApp .title-screen{background-color:#2c6fa8;background-size:cover;background-position:51% 42%;background-repeat:no-repeat;justify-content:space-between;align-items:center;gap:12px;padding:max(18px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));overflow:hidden}
+#gameApp .title-screen::before{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,#0a1a2c99 0,#0a1a2c33 22%,transparent 34%,transparent 66%,#0a1a2c66 80%,#0a1a2ccc 100%)}
+#gameApp .title-top,#gameApp .title-bottom{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;max-width:100%}
+#gameApp .title-screen p,#gameApp .title-screen .title-kicker,#gameApp .title-screen small{text-shadow:0 1px 0 #0a1a2c,0 0 8px #0a1a2c}
+#gameApp .title-screen h1{margin:4px 0}
+#gameApp .title-buttons{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
+#gameApp .title-buttons .secondary{margin-top:0;background:#0a1a2cb3;color:#fff6df;border-color:#f0d68c}
+#gameApp .title-screen small{margin-top:2px}
+@media (max-width:520px){#gameApp .title-screen{background-position:52% 40%}#gameApp .title-screen h1{font-size:30px}#gameApp .title-screen p{font-size:14px}#gameApp .title-screen small{font-size:11px}}
+@media (max-height:520px){#gameApp .title-screen .title-kicker,#gameApp .title-screen small{display:none}#gameApp .title-screen h1{font-size:30px}}
+@media (max-width:600px){#gameApp .title-screen{padding-top:max(70px,calc(env(safe-area-inset-top) + 62px))}}
+
+/* v0.47 독도 지킴이 도장: 붉은 낙관(도장) · 빈 자리는 점선 동그라미 */
+#gameApp .badge-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 6px;justify-items:center}
+#gameApp .stamp-slot{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;text-align:center}
+#gameApp .stamp-slot small{font-size:11px;color:var(--meok-soft);white-space:nowrap}
+#gameApp .stamp{width:58px;height:58px;display:grid;place-items:center;grid-template-rows:auto auto auto;align-content:center;border-radius:12px;font-family:var(--serif);line-height:1.05}
+#gameApp .stamp:not(.empty){color:#b8322a;border:3px solid #b8322a;box-shadow:inset 0 0 0 2px #fbf3df,inset 0 0 0 3.5px #b8322acc;background:radial-gradient(circle at 30% 30%,#b8322a14,transparent 60%),#fbf3df;transform:rotate(-7deg)}
+#gameApp .stamp-slot:nth-child(even) .stamp:not(.empty){transform:rotate(6deg);border-radius:50%}
+#gameApp .stamp i{font-style:normal;font-size:12px}#gameApp .stamp b{font-size:17px;letter-spacing:.04em}#gameApp .stamp em{font-style:normal;font-size:9px;letter-spacing:.2em}
+#gameApp .stamp.empty{border:2px dashed #b9a57c;color:#c9b88f;border-radius:50%;font-size:20px}
+#gameApp .stamp-book{margin:12px auto;max-width:420px}
+#gameApp .stamp-line{font-size:16px}
+#gameApp .stamp-slot.fresh .stamp{animation:stamp-in .55s cubic-bezier(.2,.9,.3,1.3) .25s both}
+@keyframes stamp-in{0%{transform:scale(2.4) rotate(-22deg);opacity:0}60%{transform:scale(.9) rotate(-7deg);opacity:1}100%{transform:scale(1) rotate(-7deg);opacity:1}}
+@media (prefers-reduced-motion:reduce){#gameApp .stamp-slot.fresh .stamp{animation:none}}
+/* v0.47 공부 수첩: [독도 공부] [배움의 기록] 탭과 쪽 */
+#gameApp .note-tabs{display:flex;justify-content:center;gap:6px;margin:0 0 12px}
+#gameApp .note-tabs button{padding:7px 16px;border:2px solid var(--wood);border-radius:5px 5px 0 0;background:#efe4c8;color:var(--meok);font-weight:800;white-space:nowrap}
+#gameApp .note-tabs button.selected{background:var(--wood);color:var(--gold)}
+#gameApp .study-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+#gameApp .study-card{display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 10px;border:2px solid #8a6f42;border-radius:6px;background:var(--fiber),linear-gradient(180deg,var(--hj-hi),#f3e7cb);box-shadow:0 3px 0 #4a2e1a55;text-align:center;color:var(--meok)}
+#gameApp .study-card.read{border-color:var(--chung)}
+#gameApp .study-card .study-icon{font-size:22px;color:var(--hong)}
+#gameApp .study-card small{color:var(--meok-soft)}#gameApp .study-card.read small{color:var(--chung);font-weight:800}
+#gameApp .study-points{list-style:none;margin:6px 0 10px;padding:0;text-align:left}
+#gameApp .study-points li{position:relative;padding:8px 10px 8px 26px;margin:6px 0;background:#fbf3df;border-left:4px solid var(--chung);border-radius:0 6px 6px 0;line-height:1.7;color:var(--meok)}
+#gameApp .study-points li::before{content:'·';position:absolute;left:10px;top:6px;font-weight:900;color:var(--hong)}
+#gameApp .study-timeline{list-style:none;margin:8px 0 12px;padding:0 0 0 14px;border-left:3px solid var(--wood);text-align:left}
+#gameApp .study-timeline li{position:relative;margin:8px 0;padding-left:10px;line-height:1.6;color:var(--meok)}
+#gameApp .study-timeline li::before{content:'';position:absolute;left:-21px;top:6px;width:11px;height:11px;border-radius:50%;background:var(--hong);border:2px solid #fbf3df}
+#gameApp .study-timeline b{display:inline-block;min-width:92px;color:var(--hong);font-family:var(--serif)}
+#gameApp .study-quiz{flex-wrap:wrap}
+#gameApp .study-sources{margin-top:10px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px}
+#gameApp .study-sources .source-link{margin-top:2px}
+@media (max-width:600px){#gameApp .study-grid{grid-template-columns:1fr}#gameApp .stamp{width:52px;height:52px}#gameApp .stamp b{font-size:15px}}
+@media (max-width:600px){#gameApp .study-timeline b{display:block;min-width:0}}
+/* v0.48 장소마다 다른 도장 그림(stamps.js): 붉은 인주 SVG */
+#gameApp .stamp:not(.empty){width:64px;height:64px;padding:0;border:0;box-shadow:none;background:none;border-radius:0;color:#b8322a;transform:rotate(-7deg)}
+#gameApp .stamp-slot:nth-child(even) .stamp:not(.empty){transform:rotate(6deg);border-radius:0}
+#gameApp .stamp .stamp-svg{width:100%;height:100%;display:block;mix-blend-mode:multiply}
+#gameApp .stamp.empty{width:58px;height:58px;margin:3px}
+#gameApp .stamp-book .stamp:not(.empty){width:78px;height:78px}#gameApp .stamp-book .stamp.empty{width:68px;height:68px;margin:5px}
+@media (max-width:600px){#gameApp .stamp:not(.empty){width:56px;height:56px}#gameApp .stamp-book .stamp:not(.empty){width:66px;height:66px}#gameApp .stamp-book .stamp.empty{width:58px;height:58px}}
+/* v0.50 문제는 가운데 정렬하지 않아요: 결투 문제 · 복습 문제의 질문 · 답 · 힌트 · 해설은 왼쪽 정렬 */
+.dq-quiz-head{justify-content:space-between;text-align:left}
+.dq-quiz .quiz-rule,.dq-quiz #battleQuestionTitle,.dq-hint,.dq-hint-row{text-align:left}
+.dq-hint-row{justify-content:flex-start}
+.battle-screen.dq .dq-answer{justify-content:flex-start;text-align:left}
+#gameApp .question-title,#gameApp .question-tag,#gameApp .feedback,#gameApp .answer-option,#gameApp .battle-answer{text-align:left}
+#gameApp .answer-option,#gameApp .battle-answer{justify-content:flex-start}
+#gameApp .modal .feedback p,#gameApp .modal .question-title+p{text-align:left}

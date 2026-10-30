@@ -1,4 +1,4 @@
-import { ZONES, EXTRA_NPCS, getSpecies } from './data.js';
+import { ZONES, EXTRA_NPCS, getSpecies, keeperName } from './data.js';
 import { drawHuman, drawMonster, facing } from './sprites.js';
 import { drawScenery, drawIslandArt } from './scenery.js';
 import { drawTerrain } from './terrain.js';
@@ -59,7 +59,7 @@ export function npcs(ref = 0, progress = {}, flags = {}) {
       ['guide', { name: '나루' }],
       ['board', { name: '탐험 기록판', kind: 'board' }],
       ['enemy', { name: z.enemy, kind: 'enemy', hidden: !!progress.enemy }],
-      ['boss', { name: `관장 ${z.boss}` }],
+      ['boss', { name: keeperName(z) }],
       ['shop', { name: '쉼터지기' }],
       ['prof', { name: '연구 안내원' }]
     ];

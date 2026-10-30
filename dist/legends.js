@@ -6,7 +6,7 @@
 // 전설의 우산몬은 자연을 아끼는 탐험대 앞에만 나타나요. 조건을 채우면 김박사가 무전으로 알려 주고,
 // 지도 위 정해진 자리에 금빛 기운이 생겨요. 다가가 말을 걸면 만남 장면 → 정화 결투 → 동료가 돼요.
 //
-//   need.type  badge: 그 장 관장 인증 · observe/trainer/trash/stone: 지도 위에서 해낸 일의 수 · seen: 도감 발견 수
+//   need.type  badge: 그 장 독도 지킴이 인증 · observe/trainer/trash/stone: 지도 위에서 해낸 일의 수 · seen: 도감 발견 수
 //   x, y       전설의 기운이 나타나는 칸 (걸어서 닿을 수 있는 빈칸, tests/legends.test.mjs가 확인해요)
 // 사철나무(18)는 대한봉에서 백무 사장을 막으면 풀려나 천장굴 길로 돌아가요(need.type story).
 // 전설의 우산몬은 정화해도 저절로 동료가 되지 않아요. 결투에서 ‘동료 만들기’를 눌러 10% 확률로 동료가 돼요.
@@ -23,7 +23,7 @@ export const countDone = (state, type) => (TYPE_FLAGS[type] || []).filter(f => s
 export const LEGENDS = [
   {
     id: 68, name: '소쩍새', monument: '천연기념물 제324-6호', map: 'town0', x: 28, y: 6, place: '도동항 뒷산 숲 가장자리',
-    title: '밤 숲의 소쩍 소리', need: { type: 'badge', zone: 0, n: 1, label: '도동항 관장 해온의 인증 받기' },
+    title: '밤 숲의 소쩍 소리', need: { type: 'badge', zone: 0, n: 1, label: '도동항 물결 지킴이 해온의 인증 받기' },
     radio: ['도동항 사람들이 밤마다 뒷산 숲에서 ‘소쩍 소쩍’ 소리를 들었대요.', '공사 소음에 놀라 숨어 있던 전설의 우산몬일지도 몰라요. 수호관 오른쪽 숲 가장자리를 살펴봐 줄래요?'],
     scene: { bg: 'sea', island: 'ulleung', night: true, caption: '도동항 뒷산 · 밤' },
     meet: ['깜깜한 숲에서 ‘소쩍… 소쩍…’ 하는 소리가 들려온다.', '귀깃이 쫑긋한 작은 새가 나뭇가지 사이에서 노란 눈을 반짝인다!'],

@@ -17,7 +17,7 @@ export function advantage(a,b){return TYPE_RING[a]===b?1.5:TYPE_RING[b]===a?.75:
 export function damage(attacker,defender,power=1,rng=Math.random){const mult=advantage(getSpecies(attacker.id).type,getSpecies(defender.id).type);return {amount:Math.max(3,Math.round((attacker.attack*power-defender.defense*.45)*mult*(.9+rng()*.2))),mult};}
 // v0.42 결투 규칙
 //  막기: 상대의 문제 공격은 늘 들어오지만, 정답을 맞히면 충격이 40% 줄어요(60%만 받아요).
-//        관장 결투와 마지막 백무 사장 결투(보스)는 PIERCE_CHANCE(15%) 확률로 정답을 맞혀도 그대로 들어와요(관통).
+//        독도 지킴이 결투와 마지막 백무 사장 결투(보스)는 PIERCE_CHANCE(15%) 확률로 정답을 맞혀도 그대로 들어와요(관통).
 //  공격: 문제 카드를 골라 풀어요. 맞히면 정화(상성이 좋으면 1.5배, 나쁘면 0.75배).
 //        틀리면 빗나가지만, 상성이 좋은 상대에게는 틀려도 보통 위력의 절반이 닿아요.
 export const SOFTEN_RATE=.6, PIERCE_CHANCE=.15, QUESTION_POWER=1.3, WRONG_ADVANTAGE_RATE=.5;
