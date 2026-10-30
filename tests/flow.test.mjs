@@ -74,6 +74,7 @@ async function walkTo(target) {
   assert.equal(await G(() => window.__dokdo.map.id), target, `walked from ${from} to ${target}`);
 }
 
+await page.addInitScript(() => { window.__dokdoStarterField = () => { const ids = [1, 67, 66]; for (let i = 2; ids.length < 30; i++) if (![66, 67, 18, 68, 70, 71, 72, 75, 76, 100].includes(i)) ids.push(i); return ids; }; }); // a fixed field so the test can pick 해국
 await page.goto(url); await page.evaluate(() => localStorage.clear()); await page.reload();
 
 // ── 1. New game: avatar → opening (read line by line) → choice → starter → guide ──
@@ -96,17 +97,28 @@ for (let i = 0; i < 400 && await G(() => window.__dokdo.cutscene() === 'opening'
   await page.click('.cs-box').catch(() => { });
 }
 assert.ok(choiceSeen, 'the mission choice appeared'); assert.ok(lines >= 30, `opening lines read: ${lines}`);
-// then the three starters are introduced one by one at 김박사's research base
-await until(() => window.__dokdo.cutscene() === 'starters' || !!document.querySelector('[data-start]'), 10000);
-assert.equal(await G(() => window.__dokdo.cutscene()), 'starters', 'a starter cutscene before choosing');
-let starterText = '';
-for (let i = 0; i < 200 && await G(() => window.__dokdo.cutscene() === 'starters'); i++) { starterText += ' ' + await page.textContent('.cs-text'); await page.click('.cs-box').catch(() => { }); }
-for (const n of ['해국', '괭이갈매기', '독도새우']) assert.ok(starterText.includes(n), `${n} is introduced`);
-await page.waitForSelector('[data-start]');
-await page.click('[data-start="1"]');
+// then 나리분지 초원: 김박사's 30 우산몬 walk around; talk to them and decide who comes along
+await until(() => !window.__dokdo.cutscene() && window.__dokdo.map?.id === 'meadow0', 15000);
+await page.waitForSelector('#dialogue:not(.hidden)'); assert.match(await page.textContent('#dialogue'), /나리분지/, '김박사 explains the meadow');
+for (let i = 0; i < 8 && await page.$('#dialogue:not(.hidden) #nextTalk'); i++) await page.click('#nextTalk');
+assert.equal(await page.textContent('#questTitle'), '함께 떠날 첫 동료 고르기');
+const friends = await G(() => window.__dokdo.people().filter(p => p.kind === 'friend').map(p => p.species));
+assert.equal(friends.length, 30, '30 우산몬 in the meadow'); assert.equal(new Set(friends).size, 30, 'all different');
+assert.ok(!friends.some(i => [18, 68, 70, 71, 72, 75, 76, 100].includes(i)), 'no legendary or story 우산몬 in the meadow');
+assert.equal(await G(() => window.__dokdo.state.party.length), 0);
+await page.waitForTimeout(1200); const fp0 = await G(() => window.__dokdo.people().filter(p => p.kind === 'friend').map(p => `${p.x},${p.y}`).join('|'));
+await page.waitForTimeout(2500); assert.notEqual(await G(() => window.__dokdo.people().filter(p => p.kind === 'friend').map(p => `${p.x},${p.y}`).join('|')), fp0, 'they walk around freely');
+const meet = id => page.evaluate(id => window.__dokdo.interact(window.__dokdo.people().find(p => p.kind === 'friend' && p.species === id)), id);
+await meet(67); await page.waitForSelector('#takeFriend');
+assert.match(await page.textContent('#modal'), /괭이갈매기/); assert.match(await page.textContent('#modal'), /바람 속성/); assert.match(await page.textContent('#modal'), /첫 관장 해온/);
+assert.ok(await page.$('#modal .base-stats'), 'stats help you decide');
+await page.click('#keepLooking'); assert.equal(await G(() => window.__dokdo.state.party.length), 0, 'just looking does not take it along');
+assert.ok(await G(() => window.__dokdo.state.seen.includes(67)), 'talking to it fills the dex');
+await meet(1); await page.waitForSelector('#takeFriend'); assert.match(await page.textContent('#modal'), /해국/);
+await page.click('#takeFriend');
 await until(() => window.__dokdo.cutscene() === 'guide');
 await until(() => (document.querySelector('.cs-text')?.textContent || '').length > 3); await page.click('.cs-box'); assert.match(await page.textContent('.cs-text'), /해국과 함께라면/);
-await page.click('.cs-skip'); await until(() => !window.__dokdo.cutscene());
+await page.click('.cs-skip'); await until(() => !window.__dokdo.cutscene() && window.__dokdo.map?.id === 'town0');
 let st = await G(() => ({ started: window.__dokdo.state.started, party: window.__dokdo.state.party.map(m => m.id), map: window.__dokdo.map.id, avatar: window.__dokdo.state.avatar }));
 assert.deepEqual(st, { started: true, party: [1], map: 'town0', avatar: 'girl' });
 assert.equal(await page.textContent('#questTitle'), '우산몬의 비밀을 찾아서');

@@ -14,7 +14,7 @@ const await_maps = await import('../dist/maps.js');
 test('legend spots are free, reachable tiles that appear only after the quest opens', () => {
   for (const q of LEGENDS) {
     const map = createMap(q.map), sp = getSpecies(q.id);
-    assert.ok(sp.legendary && (sp.forms === 2 || q.id === 18), `${q.name} is a legendary (two forms except 사철나무)`);
+    assert.ok(sp.legendary && sp.forms === 2, `${q.name} is a legendary with two forms`);
     assert.ok([1, 2, 3, 4].includes(map[q.y][q.x]), `${q.name} stands on land (${q.map} ${q.x},${q.y})`);
     assert.ok(!map.keepClear.has(`${q.x},${q.y}`) && !map.solid.has(`${q.x},${q.y}`), `${q.name} spot is not a door, exit or wall`);
     const closed = npcs(map, {}, {}); assert.ok(!closed.some(n => n.kind === 'legend'), 'hidden before the quest opens');

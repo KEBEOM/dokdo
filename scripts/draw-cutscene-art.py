@@ -2,7 +2,7 @@
 
     python scripts/draw-cutscene-art.py        # Pillow 필요
 
-  dist/assets/scenery/cutscene-art-v38.png   그림 모음
+  dist/assets/scenery/cutscene-art-v47.png   그림 모음
   dist/cutscene-atlas.js                     그림마다 자리(rect)
 
 컷신 화면은 320×180 도트예요. 여기 그림은 그 크기 그대로(1도트 = 화면 1도트) 그립니다.
@@ -13,7 +13,7 @@ import json, math, os, random
 from PIL import Image, ImageDraw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT_PNG = os.path.join(ROOT, 'dist', 'assets', 'scenery', 'cutscene-art-v38.png')
+OUT_PNG = os.path.join(ROOT, 'dist', 'assets', 'scenery', 'cutscene-art-v47.png')
 OUT_JS = os.path.join(ROOT, 'dist', 'cutscene-atlas.js')
 
 def hexc(s, a=255):
@@ -635,7 +635,7 @@ ITEMS = {
     **{f'pad-{k}': pad(k, 96, 22) for k in GROUND},
     'sand': sand(),
     'deck': deck(),
-    'meadow': meadow(path=(60, 74, 160, 32)),
+    'meadow': meadow(),  # v0.47: 흙길 없이 온통 풀밭
     'rocky-top': rocky_top(),
     'tent': tent(),
     'signboard': signboard(),
@@ -662,5 +662,5 @@ os.makedirs(os.path.dirname(OUT_PNG), exist_ok=True)
 sheet.save(OUT_PNG)
 with open(OUT_JS, 'w') as f:
     f.write('// 컷신 배경 도트 그림의 자리. scripts/draw-cutscene-art.py가 만들어요.\n')
-    f.write('export const CUTSCENE_ATLAS=' + json.dumps({'key': 'scenery/cutscene-art-v38', 'width': sheet.width, 'height': sheet.height, 'frames': rects}, ensure_ascii=False) + ';\n')
+    f.write('export const CUTSCENE_ATLAS=' + json.dumps({'key': 'scenery/cutscene-art-v47', 'width': sheet.width, 'height': sheet.height, 'frames': rects}, ensure_ascii=False) + ';\n')
 print('cutscene art', sheet.size, len(rects), 'pictures')

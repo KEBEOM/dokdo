@@ -670,7 +670,50 @@ export const MAPS = [
   }
 ];
 
-export const MAP_BY_ID = Object.fromEntries([...MAPS, ...ROOM_DEFS].map(m => [m.id, m]));
+// ── 첫 동료를 고르는 곳 (v0.47): 울릉도 나리분지 초원 ─────────────────────────────
+// 마을·길 순서(MAPS)에는 들어가지 않는 특별한 지도예요. 김박사가 미리 데려다 놓은 우산몬 30마리가
+// 잔디 위를 자유롭게 걸어 다니고(roamers.js), 다가가 말을 걸면 동료로 데려갈지 고를 수 있어요.
+// 동료를 정하면 도동항(town0)으로 이동해요. 나가는 길(< >)은 없어요.
+export const STARTER_MEADOW = {
+  id: 'meadow0', kind: 'meadow', zone: 0, name: '나리분지 초원', island: '울릉도',
+  art: [
+   'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
+   'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
+   'TTTT...T....T....T....T....T....T....TTTTT',
+   'TTTT..................................TTTT',
+   'TT............................~~~~~....TTT',
+   'TT......................rr...~~~~~~~....TT',
+   'TT...........TT..............~~~~~~~....TT',
+   'TTT..........T................~~~~~.....TT',
+   'TT....................=.................TT',
+   'TT...T................=................TTT',
+   'TT................p...=.................TT',
+   'TT....................=.................TT',
+   'TTT...................=...p.............TT',
+   'TT....r...............=............TT...TT',
+   'TT....................=................TTT',
+   'TT....................=.................TT',
+   'TT...================================...TT',
+   'TTT......=..............................TT',
+   'TT.......=.....................p........TT',
+   'TT.......=..p..........................TTT',
+   'TT.......=..........p................p..TT',
+   'TT.......=..............................TT',
+   'TTT......=.................TT...........TT',
+   'TT.......=1......T..........T...........TT',
+   'TT.......=.............................TTT',
+   'TT......a=.2....................rr......TT',
+   'TTTT..................................TTTT',
+   'TTTT...T....T....T....T....T....T....TTTTT',
+   'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
+   'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT'
+  ],
+  objects: {
+    '1': { type: 'person', actor: 'professor', name: '김박사', lines: ['여기 있는 우산몬들은 모두 검은 기운에 물들지 않은 친구들이에요.', '천천히 돌아다니며 말을 걸어 보세요. 속성과 능력치를 보고 마음이 가는 친구를 데려가면 돼요.', '어떤 친구를 골라도 끝까지 함께할 수 있어요!'] },
+    '2': { type: 'sign', name: '나리분지 안내판', flag: 'meadow:sign', lines: ['나리분지 · 울릉도', '울릉도는 산이 바다에서 곧바로 솟은 화산섬이라 평평한 땅이 매우 적어요.', '나리분지는 화산의 분화구 둘레가 무너져 내려앉아 생긴 넓은 분지로, 울릉도에서 가장 넓은 평지예요.', '둘레를 산이 감싸고 있어서, 섬 한가운데에 숨은 초원처럼 보인답니다.'] }
+  }
+};
+export const MAP_BY_ID = Object.fromEntries([...MAPS, STARTER_MEADOW, ...ROOM_DEFS].map(m => [m.id, m]));
 export const townId = zone => `town${zone}`;
 export const routeId = index => `route${index}`;
 export function getMapDef(id) { return MAP_BY_ID[typeof id === 'number' ? townId(id) : id] || MAP_BY_ID.town0; }

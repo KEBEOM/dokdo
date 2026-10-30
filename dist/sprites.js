@@ -33,7 +33,7 @@ ctx.restore();}
 //   변환폼('68-2')은 FORM_FRONT에 있으면 정면이에요. 그림을 새로 바꾸면 여기 번호를 맞춰 주세요.
 export const FACES_RIGHT=new Set([21,22,23,31,32,33]);
 export const FACES_FRONT=new Set([1,4,5,6,7,13,14,15,17,18,19,52,53,55,56,58,59,60,61,62,63,64,65,68,73]);
-export const FORM_FRONT=new Set([]); // 변환폼 그림은 모두 왼쪽을 바라봐요 → 내 쪽에서는 뒤집어 오른쪽을 봐요
+export const FORM_FRONT=new Set(['18-2']); // 사철나무 변환폼만 정면, 나머지 변환폼은 왼쪽을 바라봐요 → 내 쪽에서는 뒤집어 오른쪽을 봐요
 export function facing(id){const s=String(id);if(s.includes('-')&&!s.endsWith('-1'))return FORM_FRONT.has(s)?'front':'left';const n=parseInt(s,10);return FACES_RIGHT.has(n)?'right':FACES_FRONT.has(n)?'front':'left';}
 // 그림 번호: 결투 중 형태변환한 전설의 우산몬은 '68-2', 나머지는 번호 그대로.
 export const look=m=>m&&m.form===2?`${m.id}-2`:m?.id;

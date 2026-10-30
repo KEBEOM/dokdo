@@ -1,4 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
+// v0.47: 나리분지 초원(kind 'meadow')에서는 김박사가 데려다 놓은 순한 우산몬(setFriends로 받은 목록)이
+// 한 마리씩 걸어 다녀요. 검은 기운이 없고, 부딪혀도 결투하지 않고, 말을 걸면 동료로 고를 수 있어요.
 // 길 위를 걸어 다니는 야생 우산몬 (v0.43)
 //
 // 마을에는 야생 우산몬이 나오지 않아요. 마을과 마을 사이의 길(route)에서만, 잔디와 풀숲 위를
@@ -22,8 +24,9 @@ export function roamerPool(zone) {
   return MONSTERS.filter(m => m.stage === 1 && !isUnique(m) && m.zone >= zone && m.zone <= hi).map(m => m.id);
 }
 
+const walksHere = map => map.kind === 'route' || map.kind === 'meadow';
 export function createRoamers(rng = Math.random) {
-  let list = [], mapId = null, nextSpawn = 0, seq = 0, pausedAt = 0;
+  let list = [], mapId = null, nextSpawn = 0, seq = 0, pausedAt = 0, friends = [];
   const between = ([a, b]) => a + rng() * (b - a);
   const near = (a, b, r) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y) <= r;
   const isFree = (map, x, y, others, player, self = null) =>
@@ -31,19 +34,20 @@ export function createRoamers(rng = Math.random) {
     !list.some(r => r !== self && ((r.x === x && r.y === y) || (r.fromX === x && r.fromY === y && r.moving))) &&
     !(player && ((player.x === x && player.y === y) || (player.toX === x && player.toY === y)));
 
-  function spawn(map, others, player, now) {
-    const pool = roamerPool(map.zone), spots = [];
+  function spawn(map, others, player, now, fixed = null) {
+    const pool = fixed ? [fixed] : roamerPool(map.zone), spots = [];
     const keep = Object.values(map.spawns || {});
     for (let y = 0; y < map.length; y++) for (let x = 0; x < map[y].length; x++) {
       if (!isFree(map, x, y, others, player)) continue;
-      if (player && near({ x, y }, player, 5)) continue;         // 플레이어 눈앞에서 갑자기 생기지 않게
+      if (player && near({ x, y }, player, fixed ? 3 : 5)) continue; // 플레이어 눈앞에서 갑자기 생기지 않게
       if (keep.some(s => near({ x, y }, s, 2))) continue;        // 길 입구는 비워 둬요
       spots.push({ x, y });
     }
     if (!spots.length || !pool.length) return null;
     const p = spots[Math.floor(rng() * spots.length)], species = pool[Math.floor(rng() * pool.length)];
     const m = MONSTERS.find(m => m.id === species);
-    const r = { uid: `${map.id}:wild-${++seq}`, id: 'wild', kind: 'wild', species, name: `사나워진 ${m.name}`, x: p.x, y: p.y, fromX: p.x, fromY: p.y, dir: 'down', moving: null, nextMove: now + between(WAIT_MS), bornAt: now };
+    const kind = fixed ? 'friend' : 'wild';
+    const r = { uid: `${map.id}:${kind}-${++seq}`, id: kind, kind, species, name: fixed ? m.name : `사나워진 ${m.name}`, x: p.x, y: p.y, fromX: p.x, fromY: p.y, dir: 'down', moving: null, nextMove: now + between(WAIT_MS), bornAt: now };
     list.push(r); return r;
   }
 
@@ -52,10 +56,11 @@ export function createRoamers(rng = Math.random) {
     if (map.id === mapId) return;
     mapId = map.id; list = []; nextSpawn = now + between(RESPAWN_MS);
     if (map.kind === 'route') for (let i = 0; i < ROAMER_COUNT; i++) spawn(map, others, player, now);
+    if (map.kind === 'meadow') for (const id of friends) spawn(map, others, player, now, id);
   }
 
   function update(map, others, player, now, paused) {
-    if (map.kind !== 'route') { list = []; return; }
+    if (!walksHere(map)) { list = []; return; }
     if (paused) { if (!pausedAt) pausedAt = now; return; }
     if (pausedAt) { const d = now - pausedAt; pausedAt = 0; nextSpawn += d; for (const r of list) { r.nextMove += d; if (r.moving) r.moving.t0 += d; } }
     for (const r of list) {
@@ -68,7 +73,7 @@ export function createRoamers(rng = Math.random) {
       const [dx, dy, dir] = step;
       r.dir = dir; r.fromX = r.x; r.fromY = r.y; r.x += dx; r.y += dy; r.moving = { t0: now };
     }
-    if (list.length < ROAMER_COUNT && now >= nextSpawn) { spawn(map, others, player, now); nextSpawn = now + between(RESPAWN_MS); }
+    if (map.kind === 'route' && list.length < ROAMER_COUNT && now >= nextSpawn) { spawn(map, others, player, now); nextSpawn = now + between(RESPAWN_MS); }
   }
 
   // 그릴 위치(칸 사이를 부드럽게)와 함께
@@ -82,5 +87,7 @@ export function createRoamers(rng = Math.random) {
   // 결투가 끝난 우산몬은 사라지고, 잠시 뒤 다른 자리에 새로 나타나요.
   function remove(uid, now = 0) { list = list.filter(r => r.uid !== uid); nextSpawn = Math.max(nextSpawn, now + between(RESPAWN_MS)); }
   function reset() { list = []; mapId = null; pausedAt = 0; }
-  return { sync, update, snapshot, at, remove, reset, get count() { return list.length; }, get list() { return list; } };
+  // 초원의 우산몬 목록(종 번호). 바꾸면 다음 sync 때 새로 놓여요.
+  function setFriends(ids) { friends = [...ids]; mapId = null; }
+  return { sync, update, snapshot, at, remove, reset, setFriends, get count() { return list.length; }, get list() { return list; } };
 }

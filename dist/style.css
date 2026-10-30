@@ -675,3 +675,66 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
   .battle-screen.dq .dq-command .dq-option::after{width:14px;height:14px;margin-top:-7px;left:10px}}
 #gameApp .dialogue .speaker{display:inline-flex;align-items:center;gap:8px}
 #gameApp .dialogue .speaker-name{background:none;box-shadow:none;color:var(--gold);padding:3px 2px;margin:0;font-family:var(--serif)}
+/* v0.47 나리분지 초원: 우산몬에게 말을 걸면 열리는 ‘첫 동료’ 카드 */
+#gameApp .meet-friend .meet-hello{font-weight:700;color:var(--meok);margin:10px 0 6px}
+#gameApp .meet-friend .meet-type{font-size:14px;color:var(--meok-soft);margin:8px 0 0;line-height:1.7}
+#gameApp .meet-friend .meet-type b{color:var(--meok)}
+.place-banner{white-space:nowrap;max-width:calc(100% - 24px)}.place-banner strong,.place-banner small{white-space:nowrap}
+
+/* ───────── v0.47 글자 정리: 되도록 한 줄, 가운데 정렬 (대사는 왼쪽 그대로) ─────────
+   한국어 낱말이 줄 끝에서 쪼개지지 않게(keep-all) 하고, 짧은 이름·단추 글자는 한 줄로 둬요.
+   대사(마을 대화창 · 컷신 대사 · 결투 대사창 · 김박사 안내 말풍선)만 왼쪽 정렬로 남겨요. */
+#gameApp{word-break:keep-all;overflow-wrap:break-word}
+/* 화면 위 안내 */
+#gameApp .hud-top .location{justify-content:center;text-align:center}
+#gameApp .location strong,#gameApp .location small,#gameApp .location #weather{white-space:nowrap}
+#gameApp .mission-peek,#gameApp .buddy-peek{text-align:center;justify-content:center}
+#gameApp .mission-peek small{justify-content:center}
+#gameApp .game-dock strong,#gameApp .game-dock small,#gameApp .hud-actions button,#gameApp .interact-prompt{white-space:nowrap}
+/* 창(모달) */
+#gameApp .modal-head{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:start;gap:8px;text-align:center}
+#gameApp .modal-head::before{content:''}
+#gameApp .modal-head>div{min-width:0}
+#gameApp .modal-head .modal-close{justify-self:end}
+#gameApp .modal-head h2{white-space:nowrap;font-size:clamp(19px,5.2vw,25px)}
+#gameApp .modal-head .eyebrow{justify-content:center;white-space:nowrap}
+#gameApp .modal p,#gameApp .fact-box,#gameApp .feedback,#gameApp .question-title,#gameApp .question-tag{text-align:center}
+#gameApp .modal-actions,#gameApp .filter-row,#gameApp .dex-view{justify-content:center}
+#gameApp .modal-actions button,#gameApp .filter-row button,#gameApp .type-chip,#gameApp .settings-grid button{white-space:nowrap}
+#gameApp .settings-grid button,#gameApp .knowledge-row,#gameApp .map-card,#gameApp .party-card,#gameApp .starter-card,#gameApp .explorer-card{text-align:center}
+#gameApp .monster-detail>div{text-align:center}
+#gameApp .dex-card strong,#gameApp .dex-card small{white-space:nowrap}
+#gameApp .answer-option,#gameApp .battle-answer{justify-content:center;text-align:center}
+#gameApp .quest-step{justify-content:center}
+#gameApp .mission,#gameApp .mission .eyebrow{text-align:center;justify-content:center}
+.place-banner,.cs-caption{text-align:center}
+/* 컷신 선택지(대사가 아니라 고르는 단추) */
+.cs-choices{align-items:center}
+.cs-choice{text-align:center;padding-left:16px;padding-right:16px}
+.cs-choice:focus::before,.cs-choice:hover::before{content:none}
+/* 결투 */
+.battle-screen.dq .dq-status,.battle-screen.dq .dq-foe{text-align:center;align-items:center}
+.battle-screen.dq .dq-status-row{justify-content:center}
+.battle-screen.dq .dq-foe .dq-barrow{margin-left:0}
+.battle-screen.dq .dq-status strong,.battle-screen.dq .dq-foe strong,.battle-screen.dq .dq-lv,.dq-tag{white-space:nowrap}
+.battle-screen.dq .dq-command .dq-command-title{text-align:center}
+.battle-screen.dq .dq-command .dq-option{justify-content:center;text-align:center}
+.battle-screen.dq .dq-command .dq-option>span:not(.dq-cursor),.battle-screen.dq .dq-command .dq-option small{white-space:nowrap;text-align:center}
+.battle-screen.dq .dq-command .dq-option small{flex-basis:100%}
+.dq-quiz-head{justify-content:center;flex-wrap:wrap;text-align:center}
+.dq-quiz .quiz-rule,.dq-quiz #battleQuestionTitle,.dq-hint-row,.dq-hint{text-align:center}
+.dq-hint-row{display:flex;justify-content:center}
+.battle-screen.dq .dq-answer{justify-content:center;text-align:center}
+.dq-result-more{text-align:center}
+/* v0.47 속성 고리: 파도→바위→바람→풀→빛→파도 */
+#gameApp .type-ring{margin:14px 0;padding:12px 14px;border:2px solid #8a6f42;border-radius:6px;background:var(--fiber),#fbf3df;text-align:center}
+#gameApp .type-ring>strong{font-family:var(--serif);display:block;margin-bottom:6px}
+#gameApp .type-ring .ring-row{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px}
+#gameApp .type-ring .ring-row b{color:var(--meok-soft)}
+#gameApp .type-ring .type-chip{background:var(--type);color:#fffaf0;font-weight:800;text-shadow:0 1px 0 #0003}
+#gameApp .type-ring ul{list-style:none;margin:10px 0 6px;padding:0;font-size:13px;line-height:1.7;color:var(--meok)}
+#gameApp .type-ring small{color:var(--meok-soft)}
+#gameApp .type-ring li{margin:6px 0}#gameApp .type-ring li b{display:block}
+@media (max-width:600px){#gameApp .monster-detail{grid-template-columns:1fr;justify-items:center;gap:10px}#gameApp .monster-detail>canvas{width:120px;height:120px}#gameApp .monster-detail>div{width:100%}}
+.battle-screen.dq .dq-answer{flex-wrap:nowrap}.battle-screen.dq .dq-answer>span:not(.dq-cursor){min-width:0;white-space:normal}.battle-screen.dq .dq-answer .dq-cursor{display:none}
+@media (max-width:600px){#gameApp .filter-row{gap:4px;flex-wrap:nowrap}#gameApp .filter-row button{padding:5px 7px;font-size:12px}}

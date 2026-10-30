@@ -202,8 +202,8 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
     const fx = n.x * 32 + (32 - CHARACTER_SIZE) / 2, fy = n.y * 32 + 28 - CHARACTER_SIZE;
     if (n.furniture) drawFurniture(ctx, n.furniture, n.x, n.y, time, { open: n.used, glow: n.kind === 'rest' });
     else if (n.kind === 'board') drawIslandArt(ctx, 'record-board', n.x * 32 - 8, n.y * 32 - 16, 48, 54);
-    else if (n.kind === 'wild') { // 걸어 다니는 사나워진 우산몬: 가는 쪽을 보고, 걸을 때 통통 튀어요
-      darkWisps(ctx, n.x, n.y, time);
+    else if (n.kind === 'wild' || n.kind === 'friend') { // 걸어 다니는 우산몬: 가는 쪽을 보고, 걸을 때 통통 튀어요 (사나워진 우산몬만 검은 기운)
+      if (n.kind === 'wild') darkWisps(ctx, n.x, n.y, time);
       const f = facing(n.species), flip = (n.dir === 'right' && f === 'left') || (n.dir === 'left' && f === 'right'), hop = n.walking ? Math.abs(Math.sin(time / 70)) * 3 : 0;
       ctx.save(); if (flip) { ctx.translate(n.x * 32 * 2 + 32, 0); ctx.scale(-1, 1); }
       drawMonster(ctx, n.species, n.x * 32 - 6, n.y * 32 - 12 - hop, 44, time / 1000); ctx.restore();

@@ -1,4 +1,4 @@
-export const TYPES={wave:{name:'파도',color:'#5fa8bf'},wind:{name:'바람',color:'#85b9a2'},rock:{name:'바위',color:'#b6a078'},leaf:{name:'잎',color:'#91b86b'},light:{name:'빛',color:'#d6b56c'},echo:{name:'메아리',color:'#9a92ba'}};
+export const TYPES={wave:{name:'파도',color:'#5fa8bf'},wind:{name:'바람',color:'#85b9a2'},rock:{name:'바위',color:'#b6a078'},leaf:{name:'풀',color:'#91b86b'},light:{name:'빛',color:'#d6b56c'}};
 // Roster v2: spreadsheet order; #066 is the requested starter, replacing 청각.
 export const ROSTER_VERSION=2;
 export const LEGACY_SPECIES_MAP={"1":67,"2":67,"3":67,"4":68,"5":68,"6":68,"7":69,"8":69,"9":69,"10":71,"11":71,"12":71,"13":72,"14":72,"15":72,"16":73,"17":73,"18":73,"19":91,"20":91,"21":49,"22":49,"23":49,"24":35,"25":35,"26":35,"27":51,"28":51,"29":51,"30":34,"31":34,"32":34,"33":36,"34":36,"35":36,"36":38,"37":38,"38":38,"39":35,"40":35,"41":52,"42":52,"43":52,"44":52,"45":52,"46":52,"47":53,"48":53,"49":53,"50":53,"51":53,"52":53,"53":59,"54":59,"55":59,"56":57,"57":57,"58":57,"59":66,"60":66,"61":66,"62":54,"63":54,"64":54,"65":57,"66":57,"67":1,"68":1,"69":1,"70":3,"71":3,"72":3,"73":17,"74":17,"75":17,"76":2,"77":2,"78":2,"79":8,"80":8,"81":8,"82":6,"83":6,"84":6,"85":63,"86":63,"87":63,"88":65,"89":65,"90":65,"91":64,"92":64,"93":30,"94":30,"95":30,"96":21,"97":21,"98":27,"99":27,"100":100};
@@ -403,6 +403,7 @@ export const MONSTERS=[
     "base": {"hp": 130, "attack": 85, "defense": 130, "speed": 45},
     "color": "#d7c27a",
     "stage": 1,
+    "forms": 2,
     "stages": 1,
     "family": 17,
     "baseId": 18,
@@ -1181,7 +1182,7 @@ export const MONSTERS=[
     "name": "참문어",
     "motif": "참문어",
     "shape": "octopus",
-    "type": "echo",
+    "type": "rock",
     "base": {"hp": 80, "attack": 95, "defense": 60, "speed": 85},
     "color": "#c397b4",
     "stage": 1,
@@ -1411,7 +1412,7 @@ export const MONSTERS=[
     "name": "보석말미잘",
     "motif": "보석말미잘",
     "shape": "anemone",
-    "type": "echo",
+    "type": "light",
     "base": {"hp": 75, "attack": 90, "defense": 70, "speed": 55},
     "color": "#c5a1b4",
     "stage": 1,
@@ -1549,7 +1550,7 @@ export const MONSTERS=[
     "name": "소쩍새",
     "motif": "소쩍새",
     "shape": "bird",
-    "type": "echo",
+    "type": "wind",
     "base": {"hp": 90, "attack": 95, "defense": 80, "speed": 105},
     "color": "#a8987c",
     "stage": 1,
@@ -1808,7 +1809,7 @@ export const MONSTERS=[
     "name": "민물가마우지",
     "motif": "민물가마우지",
     "shape": "bird",
-    "type": "wind",
+    "type": "wave",
     "base": {"hp": 80, "attack": 85, "defense": 65, "speed": 80},
     "color": "#a58e74",
     "stage": 1,
@@ -1831,7 +1832,7 @@ export const MONSTERS=[
     "name": "쇠가마우지",
     "motif": "쇠가마우지",
     "shape": "bird",
-    "type": "wind",
+    "type": "wave",
     "base": {"hp": 80, "attack": 85, "defense": 65, "speed": 80},
     "color": "#c28e64",
     "stage": 1,
@@ -1854,7 +1855,7 @@ export const MONSTERS=[
     "name": "아비",
     "motif": "아비",
     "shape": "bird",
-    "type": "echo",
+    "type": "wave",
     "base": {"hp": 85, "attack": 80, "defense": 70, "speed": 75},
     "color": "#ccd7d0",
     "stage": 1,
@@ -1992,7 +1993,7 @@ export const MONSTERS=[
     "name": "청호반새",
     "motif": "청호반새",
     "shape": "bird",
-    "type": "wind",
+    "type": "light",
     "base": {"hp": 65, "attack": 90, "defense": 55, "speed": 105},
     "color": "#a58e74",
     "stage": 1,
@@ -2015,7 +2016,7 @@ export const MONSTERS=[
     "name": "물총새",
     "motif": "물총새",
     "shape": "bird",
-    "type": "wind",
+    "type": "light",
     "base": {"hp": 55, "attack": 90, "defense": 50, "speed": 115},
     "color": "#c28e64",
     "stage": 1,
@@ -2038,7 +2039,7 @@ export const MONSTERS=[
     "name": "후투티",
     "motif": "후투티",
     "shape": "bird",
-    "type": "wind",
+    "type": "light",
     "base": {"hp": 70, "attack": 80, "defense": 60, "speed": 90},
     "color": "#ccd7d0",
     "stage": 1,
@@ -2061,7 +2062,7 @@ export const MONSTERS=[
     "name": "꾀꼬리",
     "motif": "꾀꼬리",
     "shape": "bird",
-    "type": "wind",
+    "type": "light",
     "base": {"hp": 65, "attack": 75, "defense": 60, "speed": 100},
     "color": "#9b8e74",
     "stage": 1,
@@ -2222,7 +2223,7 @@ export const MONSTERS=[
     "name": "호랑지빠귀",
     "motif": "호랑지빠귀",
     "shape": "bird",
-    "type": "echo",
+    "type": "wind",
     "base": {"hp": 75, "attack": 80, "defense": 65, "speed": 85},
     "color": "#ccd7d0",
     "stage": 1,
@@ -2245,7 +2246,7 @@ export const MONSTERS=[
     "name": "개똥지빠귀",
     "motif": "개똥지빠귀",
     "shape": "bird",
-    "type": "echo",
+    "type": "wind",
     "base": {"hp": 70, "attack": 75, "defense": 65, "speed": 90},
     "color": "#9b8e74",
     "stage": 1,
@@ -2291,7 +2292,7 @@ export const MONSTERS=[
     "name": "강치",
     "motif": "강치",
     "shape": "seal",
-    "type": "echo",
+    "type": "wave",
     "base": {"hp": 130, "attack": 110, "defense": 100, "speed": 95},
     "color": "#759fa4",
     "stage": 1,
@@ -2311,26 +2312,30 @@ export const MONSTERS=[
   }
 ];
 export const getSpecies=id=>MONSTERS.find(m=>m.id===Number(id))||MONSTERS[0];
-export const STARTERS=[1,67,66];
+// 첫 동료(v0.47): 울릉도 들판에 무작위로 풀어 둔 30마리 가운데 하나를 골라요. 전설·이야기 우산몬은 나오지 않아요.
+// 어떤 친구를 골라도 첫 관장을 혼자 이길 수 있게 Lv6에서 시작해요(tests/balance.test.mjs).
+export const STARTER_LEVEL=6, STARTER_FIELD_SIZE=30;
+export const starterPool=()=>MONSTERS.filter(m=>!m.legendary).map(m=>m.id);
+export function pickStarterField(rng=Math.random,n=STARTER_FIELD_SIZE){const pool=starterPool();for(let i=pool.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}return pool.slice(0,n);}
 export const ZONES=[
  {name:'도동항',subtitle:'몽땅랜드 공사가 시작된 울릉도 항구',boss:'해온',type:'wave',badge:'물결',icon:'≈',sky:'☀ 맑음',color:'#70b4b3',grass:'#9fc884',path:'#ead5a0',npc:'김박사',history:['우산몬의 비밀을 찾으려면, 먼저 두 섬을 정확히 알아야 해요.','여기는 울릉도예요. 독도는 바로 이곳에서 동남쪽으로 약 87.4km 떨어진 동해의 섬이에요. 동도와 서도, 그리고 주변의 작은 바위섬들로 이루어져 있지요.','옛날에는 울릉도를 중심으로 독도와 주변 바다를 아우른 우산국이 있었어요. 우산몬이라는 이름도 거기서 따왔지요.','섬기린초처럼 울릉도와 독도에서만 자라는 특산식물도 있어요. 두 섬은 자연으로도 이어져 있답니다.','몽땅랜드가 이 마을에서도 기록을 노리고 있어요. 저기 노란 표시가 있는 탐험 기록판부터 지켜 주세요.','…그런데 저 노란 표시는 누가 띄워 놓은 걸까요? 저한테는 늘 반짝여 보이던데. 아, 아니에요. 혼잣말이에요!'],enemy:'몽땅랜드 수집원',story:'몽땅랜드가 가져간 조사 상자를 되찾았어요. 그런데 상자 속 쪽지에 ‘다음 공사지: 독도’라고 적혀 있어요!',bossTeam:[21,47],histTitle:'첫 조사',hint:'노란 별이 있는 기록판으로 가 보세요. 몽땅랜드를 막은 뒤 부두 끝에서 독도행 배를 타요.',wild:[19,47,85,67,21,1],fact:'도동항은 울릉도의 실제 항구 이름이지만, 마을과 건물은 게임 속 창작이에요.'},
  {name:'우산봉',subtitle:'바람 속에 남겨진 옛 항로',boss:'소라',type:'wind',badge:'바람',icon:'✧',sky:'≋ 바람',color:'#85bac1',grass:'#acd397',path:'#e7d7aa',npc:'이사부의 기억',history:['나는 신라 시대의 이사부. 여기서 만나는 나는 역사 기록을 바탕으로 재구성한 기억이란다.','512년 우산국이 신라에 복속된 사건과 나를 연결해 기억하렴. 그 기록이 말하는 장소와 시대를 함께 살펴야 해.','내가 독도에 직접 상륙해 일본군과 싸웠다는 이야기는 확인된 사실로 만들면 안 된단다.'],enemy:'몽땅랜드 지도 수집원',story:'지도에서 지워진 표지가 돌아왔어요. 오래된 기록도 맥락이 중요해요.',bossTeam:[4,7],histTitle:'512년 · 신라',hint:'전망대 아래 기록판에서 옛 기록을 읽어 보세요.',wild:[4,7,70,19,1,22],fact:'역사 인물의 이름뿐 아니라 시대와 활동을 함께 기억해요.'},
  {name:'한반도바위',subtitle:'관찰일지가 가리키는 길',boss:'단우',type:'rock',badge:'바위',icon:'◆',sky:'☀ 맑음',color:'#85b0ba',grass:'#a7bd8a',path:'#d6ccb0',npc:'이규원의 기억',history:['나는 1882년 울릉도를 조사한 이규원의 기록에서 왔네.','지도를 그리고 관찰한 내용을 일지에 남겼지. 직접 본 것과 짐작한 것은 구분해서 적어야 하네.','바위가 보인다는 것은 관찰이지만, 그 아래 반드시 보물이 있다는 말은 확인이 필요하겠지?'],enemy:'몽땅랜드 조사원',story:'관찰 기록과 추측을 구별해 조사 일지를 복원했어요.',bossTeam:[27,10,47],histTitle:'1882년 · 울릉도 조사',hint:'기록판에서 직접 관찰한 사실을 찾아보세요.',wild:[27,10,73,50,88,93],fact:'관찰은 직접 확인한 내용, 추론은 근거를 바탕으로 생각한 내용이에요.'},
- {name:'탕건봉',subtitle:'두 번의 항해, 남겨진 기록',boss:'윤서',type:'echo',badge:'기록',icon:'▤',sky:'☁ 옅은 안개',color:'#829eae',grass:'#aab999',path:'#dfcfaa',npc:'안용복의 기억',history:['나는 안용복의 기억이네. 내 활동은 1693년과 1696년의 관련 기록을 함께 살펴보게.','1693년에는 박어둔과 함께 일본으로 연행된 사건이 있었지. 두 해의 일을 한 사건처럼 섞지 말아야 하네.','주장을 들었다면 어떤 기록이 뒷받침하는지 찾아보게. 문장의 앞뒤도 함께 읽어야 하네.'],enemy:'먹선 팀장',story:'먹선이 잘라낸 문장 앞뒤를 되찾았어요. 원문과 출처가 연결됐어요!',bossTeam:[41,56,4],histTitle:'1693·1696년 · 조선',hint:'서고의 기록판에서 주장에 맞는 근거를 찾아보세요.',wild:[41,53,56,30,76,44],fact:'문장 한 줄만 떼어 읽으면 원래 뜻이 달라질 수 있어요.'},
+ {name:'탕건봉',subtitle:'두 번의 항해, 남겨진 기록',boss:'윤서',type:'wind',badge:'기록',icon:'▤',sky:'☁ 옅은 안개',color:'#829eae',grass:'#aab999',path:'#dfcfaa',npc:'안용복의 기억',history:['나는 안용복의 기억이네. 내 활동은 1693년과 1696년의 관련 기록을 함께 살펴보게.','1693년에는 박어둔과 함께 일본으로 연행된 사건이 있었지. 두 해의 일을 한 사건처럼 섞지 말아야 하네.','주장을 들었다면 어떤 기록이 뒷받침하는지 찾아보게. 문장의 앞뒤도 함께 읽어야 하네.'],enemy:'먹선 팀장',story:'먹선이 잘라낸 문장 앞뒤를 되찾았어요. 원문과 출처가 연결됐어요!',bossTeam:[41,56,4],histTitle:'1693·1696년 · 조선',hint:'서고의 기록판에서 주장에 맞는 근거를 찾아보세요.',wild:[41,53,56,30,76,44],fact:'문장 한 줄만 떼어 읽으면 원래 뜻이 달라질 수 있어요.'},
  {name:'가제바위',subtitle:'사라진 울음소리의 주인',boss:'초림',type:'leaf',badge:'생명',icon:'❋',sky:'☀ 맑음',color:'#6dadad',grass:'#88ba79',path:'#e5d3a0',npc:'서하',history:['이 오래된 자료에는 독도에 살던 강치가 나와. 그런데 지금 살아 있는 강치를 만날 수 있다는 뜻은 아니야.','강치는 사람들의 남획으로 멸종했어. 생물의 수가 줄어드는 이유를 이해하고 지금의 생명을 지켜야 해.','동굴에서 들리는 울음소리는 무엇일까? 탐사 장치가 보여 주는 기억의 세계에 강치의 이야기가 남아 있는 것 같아.'],enemy:'쇄도 팀장',story:'강제로 옮겨지던 우산몬을 구했어요. 강치의 기억 조각도 찾았어요.',bossTeam:[67,76,56],histTitle:'생태 조사 · 강치의 기억',hint:'생태 기록판에서 생물을 지킬 방법을 찾아보세요.',wild:[67,79,91,96,59,85],fact:'멸종한 강치의 기억과 지금 살아 있는 생물을 구분해요.'},
  {name:'코끼리바위',subtitle:'칙령과 보고서를 잇는 별빛',boss:'시온',type:'light',badge:'별빛',icon:'✦',sky:'✧ 별빛',color:'#779fae',grass:'#99af9a',path:'#d8d1b4',npc:'심흥택의 기억',history:['1900년 대한제국 칙령 제41호와 1906년 나의 보고를 연결해 살펴보세.','나는 울도군수 심흥택이네. 독도에 관한 소식을 상부에 보고했지. 보고한 사람과 전달한 사람의 역할도 구별해야 하네.','고종의 칙령, 나의 보고, 이명래를 거친 전달 과정. 서로 다른 자료가 무엇을 말하는지 비교해 보게.'],enemy:'몽땅랜드 기록 관리자',story:'원본 자료를 비교해 편집된 기록을 바로잡았어요.',bossTeam:[24,59,70],histTitle:'1900년 칙령 · 1906년 보고',hint:'기록판에서 문서의 시기와 작성자를 확인하세요.',wild:[24,36,82,62,98,13],fact:'자료의 작성자·시기·목적·출처를 함께 확인해요.'},
  {name:'물골',subtitle:'섬을 지키고 살아가는 사람들',boss:'도하',type:'wave',badge:'등대',icon:'⌂',sky:'≋ 해풍',color:'#6c9fae',grass:'#91b29b',path:'#d8caa4',npc:'홍순칠의 기억',history:['독도를 지킨 사람들의 활동을 기록으로 살펴보자. 독도의용수비대는 여러 사람이 함께한 활동이었단다.','최종덕의 생활 기록에서는 독도에 거주하며 살아간 사람의 모습을 만날 수 있어.','수호, 거주, 조사, 관리. 서로 다른 노력들이 이어져 왔다는 것을 기억하렴.'],enemy:'무음 팀장',story:'끊어진 구조 신호가 돌아왔어요. 사람들의 서로 다른 역할이 힘을 모았어요.',bossTeam:[16,33,44],histTitle:'수호와 거주의 기록',hint:'등대 기록판에서 독도의 여러 가치를 연결하세요.',wild:[16,39,65,62,7,88],fact:'독도는 자연과 역사의 공간이면서 사람들의 삶이 이어진 곳이에요.'},
- {name:'대한봉',subtitle:'두 섬의 기억을 되찾는 날',boss:'가온',type:'echo',badge:'쌍봉',icon:'◈',sky:'✧ 여명',color:'#79a7ad',grass:'#abc099',path:'#e6d4a1',npc:'서하와 나루',history:['이곳까지 모은 기록이 모두 연결되고 있어. 위치, 생물, 역사, 사람들의 이야기 말이야.','백무는 하나의 설명만 남기려 하지만 우리는 원본을 직접 확인하고 서로 비교할 수 있어.','마지막 기록판에서 배운 사실을 다시 떠올려 봐. 강치의 기억도 곧 완전한 모습을 드러낼 거야.'],enemy:'백무 사장',story:'지우개 기계가 멈췄어요. 두 섬의 기억이 돌아오고, 파도 속에서 강치가 나타나요!',bossTeam:[3,23,69],histTitle:'마지막 기록 · 함께 지키는 섬',hint:'마지막 기록을 연결하고 백무의 계획을 막으세요.',wild:[18,32,57,80,60,95],fact:'기억한 사실을 근거로 설명할 수 있을 때 배움이 단단해져요.'}
+ {name:'대한봉',subtitle:'두 섬의 기억을 되찾는 날',boss:'가온',type:'rock',badge:'쌍봉',icon:'◈',sky:'✧ 여명',color:'#79a7ad',grass:'#abc099',path:'#e6d4a1',npc:'서하와 나루',history:['이곳까지 모은 기록이 모두 연결되고 있어. 위치, 생물, 역사, 사람들의 이야기 말이야.','백무는 하나의 설명만 남기려 하지만 우리는 원본을 직접 확인하고 서로 비교할 수 있어.','마지막 기록판에서 배운 사실을 다시 떠올려 봐. 강치의 기억도 곧 완전한 모습을 드러낼 거야.'],enemy:'백무 사장',story:'지우개 기계가 멈췄어요. 두 섬의 기억이 돌아오고, 파도 속에서 강치가 나타나요!',bossTeam:[3,23,69],histTitle:'마지막 기록 · 함께 지키는 섬',hint:'마지막 기록을 연결하고 백무의 계획을 막으세요.',wild:[18,32,57,80,60,95],fact:'기억한 사실을 근거로 설명할 수 있을 때 배움이 단단해져요.'}
 ];
 export const EXTRA_NPCS=[{name:'박어둔의 기억',zone:3,x:12,y:22,lines:['1693년 안용복과 함께 일본으로 연행된 어민 박어둔의 기억이오.','같은 사건에 여러 사람이 있었지. 누구의 기록인지 확인하고, 1696년의 일과 구별해 주시오.']},{name:'고종의 기억',zone:5,x:12,y:22,lines:['대한제국의 칙령 제41호는 1900년의 기록이네.','원문에서 어떤 구역을 관할하는지 읽고, 오늘날의 풀이와 함께 살펴보게. 이 대화는 게임용 재구성이네.']},{name:'이명래의 기억',zone:5,x:24,y:23,lines:['심흥택의 보고가 상부로 이어지는 과정을 살펴보게.','보고서를 처음 쓴 사람과 전달한 사람을 구별하면 기록의 흐름이 보인다네.']},{name:'최종덕의 기억',zone:6,x:12,y:22,lines:['나는 독도에서 살았던 최종덕의 기록을 바탕으로 한 기억이야.','1965년부터 거주한 것과 1981년 독도 주소로 주민등록한 것은 서로 다른 일이란다.','독도를 생각할 때 그곳에서 이어진 생활도 함께 살펴보렴.']}];
 
 // Distribute every ordinary species through the eight fictional exploration regions.
-// 전설(천연기념물 7종·강치)과 스타팅 우산몬(해국·괭이갈매기·독도새우)은 게임 전체에 한 마리씩만 있어서, 풀숲·관장·몽땅랜드 목록에 넣지 않습니다.
-export const isUnique=m=>m.legendary||STARTERS.includes(m.id);
+// 전설(천연기념물·사철나무·강치)은 게임 전체에 한 마리씩만 있어서, 들판·관장·몽땅랜드 목록에 넣지 않습니다.
+export const isUnique=m=>!!m.legendary;
 for(let zone=0;zone<ZONES.length;zone++){const local=MONSTERS.filter(m=>!isUnique(m)&&m.zone===zone);ZONES[zone].wild=local.map(m=>m.id);const matching=MONSTERS.filter(m=>!isUnique(m)&&m.type===ZONES[zone].type&&m.zone<=zone);ZONES[zone].bossTeam=[...matching,...local].slice(-3).map(m=>m.id);}
 // The final region revisits late-game species before the legendary encounter.
 ZONES[7].wild=MONSTERS.filter(m=>!isUnique(m)&&m.zone===6).map(m=>m.id);
 // v0.44 관장 팀은 수호관 속성에 맞춰 직접 골라요(앞 두 마리는 인증 결투, 세 마리 모두는 다시 대련).
 //   1장 해온(파도)은 처음이라 어느 스타팅(잎·바람·파도)에게도 상성이 나쁘지 않은 파도 물고기만 내보내요.
-export const GYM_TEAMS=[[35,36,37],[73,74,69],[34,45,38],[81,52,62],[11,19,13],[27,28,30],[49,50,47],[52,97,98]];
+export const GYM_TEAMS=[[35,36,37],[73,74,69],[34,45,38],[84,83,86],[11,19,13],[27,28,30],[49,50,47],[55,59,52]];
 GYM_TEAMS.forEach((t,i)=>{ZONES[i].bossTeam=t.slice();});

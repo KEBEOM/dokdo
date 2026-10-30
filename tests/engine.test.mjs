@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {MONSTERS,STARTERS,ZONES,getSpecies} from '../dist/data.js';
+import {MONSTERS,ZONES,getSpecies,starterPool,pickStarterField,STARTER_LEVEL} from '../dist/data.js';
 import {CONCEPTS,QUESTIONS} from '../dist/learning.js';
 import {newState,createMonster,addMonster,healAll,gainXP,damage,enemyHit,ENEMY_POWER,attackHit,SOFTEN_RATE,PIERCE_CHANCE,LEGEND_CAPTURE,captureChance,recordAnswer,validateSave,advantage,PP_MAX,skills,knownSkills,learnedBetween} from '../dist/engine.js';
 import {createMap,npcs,pathfind,blocked,cameraFor,TILE,W,H} from '../dist/world.js';
@@ -10,7 +10,7 @@ import {selectBattleQuestion,shuffledChoices} from '../dist/battle-quiz.js';
 test('100 collectible species and real-name roster',()=>{
   for(const zone of ZONES){assert.ok(zone.wild.length>0,'every region has encounters');for(const id of [...zone.wild,...zone.bossTeam])assert.ok(MONSTERS.some(m=>m.id===id&&!m.legendary));}
   assert.equal(MONSTERS.length,100);assert.equal(new Set(MONSTERS.map(m=>m.id)).size,100);assert.equal(new Set(MONSTERS.map(m=>m.name)).size,100);
-  assert.deepEqual(STARTERS.map(id=>getSpecies(id).stage),[1,1,1]);assert.equal(getSpecies(100).legendary,true);
+  assert.equal(starterPool().length,92);assert.ok(starterPool().every(id=>!getSpecies(id).legendary));assert.equal(STARTER_LEVEL,6);for(let k=0;k<20;k++){const f=pickStarterField();assert.equal(f.length,30);assert.equal(new Set(f).size,30);assert.ok(f.every(id=>starterPool().includes(id)));}assert.equal(getSpecies(100).legendary,true);
   for(const m of MONSTERS){assert.ok(m.zone>=0&&m.zone<8);if(m.source)assert.match(m.source,/^https:/);assert.equal(m.evolvesTo,null);if(m.evolvesTo){const to=getSpecies(m.evolvesTo);assert.equal(to.family,m.family);assert.equal(to.stage,m.stage+1);}}
   const obtainable=new Set(MONSTERS.filter(m=>m.stage===1).map(m=>m.id));for(const m of MONSTERS)if(m.evolvesTo&&obtainable.has(m.id))obtainable.add(m.evolvesTo);assert.equal(obtainable.size,100);
 });
@@ -91,14 +91,14 @@ test('combat question selection spaces repeats and revisits missed concepts',()=
   s.avatar='other';assert.equal(validateSave(s).avatar,null);
  });
 
-test('requested starters, exact spreadsheet names and NO.100',()=>{
- assert.deepEqual(STARTERS.map(id=>getSpecies(id).name),['해국','괭이갈매기','독도새우']);
+test('former starters, exact spreadsheet names and NO.100',()=>{
+ assert.deepEqual([1,67,66].map(id=>getSpecies(id).name),['해국','괭이갈매기','독도새우']);
  assert.equal(getSpecies(3).name,'섬기린초');assert.equal(getSpecies(100).name,'강치');
  assert.deepEqual(MONSTERS.filter(m=>m.legendary).map(m=>m.name),['사철나무','소쩍새','뿔쇠오리','매','황조롱이','고니','흑두루미','강치'],'천연기념물 7종 + 강치 are legendary');
- assert.deepEqual(MONSTERS.filter(m=>m.forms===2).map(m=>m.id),[68,70,71,72,75,76],'six legendaries have a 변환폼');
- // legendary and starter 우산몬 exist once in the whole game: never in the grass, a 관장 team or a 백무단 team
- const reachable=new Set(ZONES.flatMap(z=>[...z.wild,...z.bossTeam]));assert.equal(new Set(ZONES.flatMap(z=>z.wild)).size,89,"100 - 3 starters - 8 legendaries");
- for(const id of [1,66,67,18,68,70,71,72,75,76,100])assert.ok(!reachable.has(id),`${id} is unique`);
+ assert.deepEqual(MONSTERS.filter(m=>m.forms===2).map(m=>m.id),[18,68,70,71,72,75,76],'seven legendaries have a 변환폼 (v0.47: 사철나무 too)');
+ // legendary 우산몬 exist once in the whole game: never in the grass, a 관장 team or a 백무단 team
+ const reachable=new Set(ZONES.flatMap(z=>[...z.wild,...z.bossTeam]));assert.equal(new Set(ZONES.flatMap(z=>z.wild)).size,92,"100 - 8 legendaries (the old starters now live in the wild too)");
+ for(const id of [18,68,70,71,72,75,76,100])assert.ok(!reachable.has(id),`${id} is unique`);
 });
 test('v0.8 saves retain progress and migrate species once',()=>{
  const s=newState();delete s.rosterVersion;s.started=true;s.party=[createMonster(1,12),createMonster(69,16),createMonster(21,8)];s.storage=[createMonster(100,34)];s.seen=[1,2,3,67,69,100];s.caught=[1,3,69,100];s.badges=[0,1];s.progress[0].boss=true;
@@ -150,4 +150,20 @@ test('v0.44: XP per purified or befriended foe — a share of my next level, mor
   assert.equal(xpForDefeat(5,50),Math.round(5*13*XP_CAP),'capped at 150% of a level');
   assert.equal(xpForDefeat(10,10,BENCH_RATE),Math.round(10*13*XP_RATE*BENCH_RATE),'friends on the bench get half');
   assert.ok(xpForDefeat(30,30)>xpForDefeat(5,5),'measured against my own level');
+});
+test('v0.47: you can save in 나리분지 초원 before picking your first friend, and nowhere else without one',()=>{
+ const s=newState();s.started=true;s.map='meadow0';s.starterField=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,19,20,21,22,23,24,25,26,27,28,29,30,31];
+ const v=validateSave(JSON.parse(JSON.stringify(s)));assert.equal(v.map,'meadow0');assert.equal(v.party.length,0);assert.equal(v.starterField.length,30);
+ assert.throws(()=>validateSave({...JSON.parse(JSON.stringify(s)),map:'town0'}),'no friend outside the meadow');
+ assert.throws(()=>validateSave({...JSON.parse(JSON.stringify(s)),starterField:[]}),'the meadow needs its friends');
+ const done=JSON.parse(JSON.stringify(s));done.party=[createMonster(1,6)];const d=validateSave(done);assert.equal(d.map,'town0');assert.equal(d.starterField,undefined,'after picking you are never sent back to the meadow');
+});
+test('v0.47 다섯 속성 고리: 파도→바위→바람→풀→빛→파도, and every gym team matches its gym',async()=>{
+ const {TYPES,GYM_TEAMS}=await import('../dist/data.js');const {TYPE_RING,TYPE_REASON}=await import('../dist/engine.js');
+ assert.deepEqual(Object.keys(TYPES).sort(),['leaf','light','rock','wave','wind']);
+ assert.deepEqual(['wave','rock','wind','leaf','light'].map(t=>TYPES[t].name),['파도','바위','바람','풀','빛']);
+ let t='wave';const seen=[];for(let i=0;i<5;i++){seen.push(t);t=TYPE_RING[t];}assert.equal(t,'wave','one single loop');assert.equal(new Set(seen).size,5,'through all five');
+ for(const a of seen){assert.ok(TYPE_REASON[a]);for(const b of seen){const v=advantage(a,b);assert.equal(v,TYPE_RING[a]===b?1.5:TYPE_RING[b]===a?.75:1);}}
+ assert.ok(MONSTERS.every(m=>m.type in TYPES),'every 우산몬 has one of the five');
+ GYM_TEAMS.forEach((team,i)=>team.forEach(id=>assert.equal(getSpecies(id).type,ZONES[i].type,`${ZONES[i].boss}: ${getSpecies(id).name}`)));
 });

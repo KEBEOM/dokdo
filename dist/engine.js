@@ -8,7 +8,12 @@ export function stats(id,level){const b=getSpecies(id).base||DEFAULT_BASE,k=v=>(
 // 물러나기: 내 우산몬이 빠를수록 잘 돼요(30%~95%).
 export const runChance=(me,foe)=>Math.min(.95,Math.max(.3,.6+(me.speed-foe.speed)/(me.speed+foe.speed)));
 export function createMonster(id,level=4){const s=stats(id,level);return {uid:`m${Date.now().toString(36)}${Math.random().toString(36).slice(2,7)}`,id,level,xp:0,hp:s.maxHp,...s,pp:PP_MAX.slice()};}
-export function advantage(a,b){const ring={wave:'rock',rock:'wind',wind:'wave',leaf:'light',light:'echo',echo:'leaf'};return ring[a]===b?1.5:ring[b]===a?.75:1;}
+// v0.47 속성 고리(독도의 자연): 파도→바위→바람→풀→빛→파도. 화살표 앞의 속성이 뒤의 속성에 강해요.
+//   파도가 바위를 깎아요(해식동굴·독립문바위) · 바위가 거센 바람을 막아요 · 바닷바람 때문에 독도의 풀과 나무는 키가 작아요
+//   풀은 햇빛을 받아 양분을 만들어요(광합성) · 햇볕이 바닷물을 데워 증발시켜요(물의 순환)
+export const TYPE_RING={wave:'rock',rock:'wind',wind:'leaf',leaf:'light',light:'wave'};
+export const TYPE_REASON={wave:'파도가 바위를 깎아 독립문바위와 천장굴 같은 모양을 만들었어요.',rock:'바위가 거센 바닷바람을 막아 줘요.',wind:'거센 바닷바람 때문에 독도의 풀과 나무는 키가 작아요.',leaf:'풀은 햇빛을 받아 양분을 만들어요(광합성).',light:'햇볕이 바닷물을 데워 수증기로 날려 보내요(물의 순환).'};
+export function advantage(a,b){return TYPE_RING[a]===b?1.5:TYPE_RING[b]===a?.75:1;}
 export function damage(attacker,defender,power=1,rng=Math.random){const mult=advantage(getSpecies(attacker.id).type,getSpecies(defender.id).type);return {amount:Math.max(3,Math.round((attacker.attack*power-defender.defense*.45)*mult*(.9+rng()*.2))),mult};}
 // v0.42 결투 규칙
 //  막기: 상대의 문제 공격은 늘 들어오지만, 정답을 맞히면 충격이 40% 줄어요(60%만 받아요).
@@ -27,7 +32,7 @@ export function attackHit(attacker,defender,correct,power=QUESTION_POWER,rng=Mat
 // 배열 순서(0 손길, 1 파동, 2 숨 고르기, 3 보호)는 저장 파일의 기술 횟수(pp) 순서와 같습니다.
 export const PP_MAX=[25,8,8,10];
 export const LEARN_LEVEL=[1,12,8,1];
-const SKILL_NAMES={wave:['물결 손길','너울 파동','숨 고르기','파도 보호'],wind:['바람 손길','돌풍 파동','숨 고르기','순풍 보호'],rock:['바위 손길','묵직한 파동','숨 고르기','바위 보호'],leaf:['잎새 손길','꽃잎 파동','잎새 회복','초록 보호'],light:['빛줄기','반짝 파동','숨 고르기','별빛 보호'],echo:['울림 손길','메아리 파동','숨 고르기','기억 보호']};
+const SKILL_NAMES={wave:['물결 손길','너울 파동','숨 고르기','파도 보호'],wind:['바람 손길','돌풍 파동','숨 고르기','순풍 보호'],rock:['바위 손길','묵직한 파동','숨 고르기','바위 보호'],leaf:['잎새 손길','꽃잎 파동','잎새 회복','초록 보호'],light:['빛줄기','반짝 파동','숨 고르기','별빛 보호']};
 export function skills(m){const t=getSpecies(m.id).type;return SKILL_NAMES[t].map((name,i)=>({index:i,name,kind:i<2?'attack':i===2?'heal':'guard',power:i===1?1.74:1.2,max:PP_MAX[i],learn:LEARN_LEVEL[i]}));}
 // The skills this 우산몬 can use now, in the order they were learned.
 export function knownSkills(m){return skills(m).filter(s=>m.level>=s.learn).sort((a,b)=>a.learn-b.learn||a.index-b.index);}
@@ -49,7 +54,9 @@ export function newState(){return {schema:1,rosterVersion:ROSTER_VERSION,started
 export function validateSave(value){
   const fail=()=>{throw new Error('저장 파일의 정보가 올바르지 않아요.');};
   if(!value||value.schema!==1||!Array.isArray(value.party)||value.party.length>6||!Array.isArray(value.progress)||value.progress.length!==8||!Number.isInteger(value.zone)||value.zone<0||value.zone>7)fail();
-  if(value.started&&value.party.length===0)fail();
+  // v0.47: 나리분지 초원에서 첫 동료를 고르는 동안만 동료 없이 저장할 수 있어요(초원 우산몬 목록 starterField와 함께).
+  const choosing=value.map==='meadow0'&&Array.isArray(value.starterField)&&value.starterField.length>0&&value.starterField.length<=30&&value.starterField.every(n=>Number.isInteger(n)&&n>=1&&n<=100);
+  if(value.started&&value.party.length===0&&!choosing)fail();
   const v={...newState(),...JSON.parse(JSON.stringify(value))};
   const legacy=(value.rosterVersion??1)===1;
   if(!legacy&&value.rosterVersion!==ROSTER_VERSION)fail();
@@ -75,6 +82,7 @@ export function validateSave(value){
   // v0.22: which map (town or route), towns reached on foot, and one-time map objects.
   const def=MAP_BY_ID[value.map];
   v.map=def&&def.zone===v.zone?def.id:`town${v.zone}`;
+  if(v.party.length){delete v.starterField;if(v.map==='meadow0')v.map='town0';}
   const reached=Array.isArray(value.visited)?value.visited:[0,...v.badges.map(b=>Math.min(7,b+1)),v.zone];
   if(reached.some(n=>!Number.isInteger(n)||n<0||n>7))fail();
   v.visited=[...new Set([0,v.zone,...reached])].sort((a,b)=>a-b);

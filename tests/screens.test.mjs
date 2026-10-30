@@ -82,6 +82,7 @@ async function runDevice(d) {
   }
   const tap = sel => page.locator(sel).first().click({ timeout: 8000 });
   try {
+  await page.addInitScript(() => { window.__dokdoStarterField = () => { const ids = [1, 67, 66]; for (let i = 2; ids.length < 30; i++) if (![66, 67, 18, 68, 70, 71, 72, 75, 76, 100].includes(i)) ids.push(i); return ids; }; });
   await page.goto(url); await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForTimeout(600);
   await check('01-title');
   await tap('#startBtn'); await check('02-avatar', 700);
@@ -89,11 +90,13 @@ async function runDevice(d) {
   await until(() => window.__dokdo.cutscene() === 'opening');
   await check('03-cutscene', 900);
   await page.evaluate(() => window.__dokdo.cutscene()); await tap('.cs-skip');
-  await until(() => window.__dokdo.cutscene() === 'starters'); await page.waitForTimeout(500);
-  for (let i = 0; i < 5; i++) { await tap('.cs-box').catch(() => {}); await page.waitForTimeout(250); }
-  await check('04-starter-scene', 1200);
-  await tap('.cs-skip'); await page.waitForSelector('[data-start]'); await check('05-starter-choice', 600);
-  await tap('[data-start="1"]'); await until(() => window.__dokdo.cutscene() === 'guide'); await tap('.cs-skip');
+  await until(() => !window.__dokdo.cutscene() && window.__dokdo.map?.id === 'meadow0'); await page.waitForSelector('#dialogue:not(.hidden)');
+  await check('04-starter-scene', 900);
+  for (let i = 0; i < 8 && await page.$('#dialogue:not(.hidden) #nextTalk'); i++) await tap('#nextTalk');
+  await page.evaluate(() => window.__dokdo.interact(window.__dokdo.people().find(p => p.kind === 'friend' && p.species === 1)));
+  await page.waitForSelector('#takeFriend'); await check('05-starter-choice', 600);
+  await tap('#takeFriend');
+  await until(() => window.__dokdo.cutscene() === 'guide'); await tap('.cs-skip');
   // the practice duel: command menu, skills, quiz, result
   await until(() => !!window.__dokdo.battle, 20000);
   const state = () => G(() => document.querySelector('.dq-answer:not(.locked)') ? 'quiz' : document.querySelector('#dqCommand:not([hidden]) .dq-option') ? 'cmd' : 'msg');

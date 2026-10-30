@@ -2,7 +2,7 @@
 // 컷신 대본 (v0.37: 울릉도에서 시작, 우산몬) — 대사와 장면을 여기에서 고치면 게임에 바로 반영됩니다.
 //
 // 장면(scene)
-//   bg       배경 이름: stage(시상식) sea(배 위) dock(선착장) field(풀밭) crisis(위기: panel:dig 울릉도 공사·sea·rock·grass) title(지역 소개) summit(대한봉 정상) camp(김박사 연구 기지)
+//   bg       배경 이름: stage(시상식) sea(배 위) dock(선착장) field(풀밭) crisis(위기: panel:dig 울릉도 공사·sea·rock·grass) title(지역 소개) summit(대한봉 정상) camp(김박사 연구 기지 · 지금은 쓰지 않음)
 //   island   'ulleung'이면 뒤쪽 풍경이 독도 바위 대신 울릉도의 초록 산이에요(1장은 울릉도 도동항).
 //   caption  화면 왼쪽 위에 잠깐 보이는 장면 제목
 //   cast     등장인물. who: 'player'(주인공) | 'actor:professor' 같은 인물 그림 | 'monster:67' 같은 우산몬
@@ -69,14 +69,13 @@ export const OPENING = {
     },
     {
       bg: 'field', caption: '도동항 옆 풀밭', island: 'ulleung',
-      start: ['rustle'],
       cast: [
         { id: 'player', who: 'player', x: 104, y: 140, dir: 'right' },
         { id: 'kim', who: 'actor:professor', x: 176, y: 140, dir: 'left' },
-        { id: 'mon', who: 'monster:67', x: 252, y: 134, size: 46, hidden: true }
+        { id: 'mon', who: 'monster:67', x: 252, y: 134, size: 46 }
       ],
       lines: [
-        { who: '@player', text: '으악! 저건 뭐예요?!', cue: 'pop' },
+        { who: '@player', text: '어? 박사님, 저기 저건 뭐예요?!', cue: 'surprise' },
         { who: '김박사', text: '놀라지 마세요. 이 친구는 우산몬입니다.', cue: 'kim-turn' },
         { who: '김박사', text: '얼마 전부터 울릉도와 독도 곳곳에서 두 섬의 생물을 닮은 신비한 생명체들이 나타나고 있어요.' },
         { who: '김박사', text: '옛날 울릉도와 독도를 아우르던 나라, 우산국의 이름을 따서 우산몬이라고 부르기로 했답니다.' },
@@ -129,43 +128,12 @@ export const OPENING = {
   ]
 };
 
-// 오프닝 바로 뒤, 스타팅 우산몬 세 친구를 만나는 장면. 끝나면 고르는 창이 열립니다.
-export const STARTER_MEET = {
-  id: 'starters',
-  scenes: [
-    {
-      bg: 'camp', caption: '김박사의 우산몬 연구 기지 · 울릉도', island: 'ulleung',
-      cast: [
-        { id: 'player', who: 'player', x: 52, y: 152, dir: 'right' },
-        { id: 'kim', who: 'actor:professor', x: 108, y: 152, dir: 'right' },
-        { id: 's1', who: 'monster:1', x: 196, y: 144, size: 42, hidden: true },
-        { id: 's2', who: 'monster:67', x: 244, y: 144, size: 42, hidden: true },
-        { id: 's3', who: 'monster:66', x: 292, y: 144, size: 42, hidden: true }
-      ],
-      lines: [
-        { who: '김박사', text: '여기는 제 연구 기지예요. 우산몬을 돌보며 관찰하는 곳이죠.' },
-        { who: '@player', text: '받침대 세 개가 반짝이고 있어요!' },
-        { who: '김박사', text: '이곳의 세 친구는 검은 기운에 물들지 않았어요. 한 친구씩 불러 볼게요!', cue: 'device' },
-        { who: '김박사', text: '첫 번째, 해국! 바닷가 바위틈에서 보랏빛 꽃을 피우는 해국을 닮았어요.', cue: 'show:s1' },
-        { who: null, text: '해국이 꽃잎을 활짝 펴며 인사했다.', cue: 'hop:s1' },
-        { who: '김박사', text: '두 번째, 괭이갈매기! 울릉도와 독도 하늘을 누비는 바닷새를 닮았지요.', cue: 'show:s2' },
-        { who: '@player', text: '고양이처럼 우는 그 새요? 날개가 정말 멋져요!', cue: 'hop:s2' },
-        { who: '김박사', text: '세 번째, 독도새우! 울릉도와 독도 둘레의 깊고 차가운 바다에 사는 새우를 닮았어요.', cue: 'show:s3' },
-        { who: '@player', text: '긴 더듬이가 쫑긋쫑긋해요. 다들 너무 귀엽다!', cue: 'hop:s3' },
-        { who: '김박사', text: '세 친구 모두 두 섬을 지키고 싶어 해요. 하지만 모험은 한 친구와 먼저 떠나야 해요.', cue: 'glow' },
-        { who: '김박사', text: '마음이 가는 친구를 골라 주세요. 다른 친구들은 기지에서 응원할 거예요!' }
-      ]
-    }
-  ]
-};
-
 // 우산몬을 고른 뒤: 고른 친구가 다가오고, 김박사가 조작을 안내합니다. {starter}는 고른 우산몬 이름입니다.
 export const GUIDE = {
   id: 'guide',
   scenes: [
     {
-      bg: 'camp', caption: '첫 번째 동료', island: 'ulleung',
-      start: ['glow'],
+      bg: 'field', caption: '첫 번째 동료', island: 'ulleung',
       cast: [
         { id: 'player', who: 'player', x: 52, y: 152, dir: 'right' },
         { id: 'kim', who: 'actor:professor', x: 132, y: 152, dir: 'left' },
@@ -189,7 +157,9 @@ export const GUIDE = {
         { who: '김박사', text: '사람들에게 말을 걸면 새로운 정보를 얻거나 임무를 받을 수 있어요.' },
         { who: '김박사', text: '사나워진 우산몬을 만나면 ‘문제 풀기’를 눌러 독도 문제를 풀어요.' },
         { who: '김박사', text: '정답이 검은 기운을 걷어 내 줘요. 속성 상성이 좋은 상대라면 1.5배로 걷어 낼 수 있어요!' },
+        { who: '김박사', text: '속성은 독도의 자연을 닮은 다섯 가지예요. 파도는 바위를, 바위는 바람을, 바람은 풀을, 풀은 빛을, 빛은 파도를 이겨요!' },
         { who: '김박사', text: '검은 기운이 모두 사라지면 우산몬은 원래대로 돌아온답니다.' },
+        { who: '김박사', text: '‘동료 만들기’로 새 친구를 사귈 수도 있어요. 다만 그 차례에는 문제를 풀 수 없으니 잘 생각해서 눌러요!' },
         { who: '김박사', text: '…어라? 방금 제가 누구한테 방향키 이야기를 한 거죠? 우리 앞에는 아무도 없는데.', cue: 'surprise' },
         { who: '@player', text: '박사님, 연구를 너무 오래 하셨나 봐요.' },
         { who: '김박사', text: '하하, 그런가 봐요. 아무튼! 도동항을 둘러보며 몽땅랜드에 관한 단서부터 찾아봅시다!' }

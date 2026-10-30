@@ -57,4 +57,25 @@ test('they pause during talks and battles, and glide between tiles', () => {
   assert.ok(STEP_MS > 0);
 });
 
-console.log(`PASS: no wild 우산몬 in towns; ${ROAMER_COUNT} walking on every route over grass/fields only, no overlaps, never on the player or objects, area species only, respawn after a battle, pause and smooth steps.`);
+
+test('v0.47 나리분지 초원: the 30 friends 김박사 brought walk on the grass, never fight, never respawn', async () => {
+  const { pickStarterField, starterPool } = await import('../dist/data.js');
+  const { MAP_BY_ID } = await import('../dist/maps.js');
+  const def = MAP_BY_ID.meadow0; assert.equal(def.kind, 'meadow'); assert.equal(def.island, '울릉도');
+  assert.ok(!MAPS.includes(def), 'not part of the town → route chain');
+  const map = createMap('meadow0'), people = npcs(map), r = createRoamers(seeded(5)), field = pickStarterField(seeded(9));
+  assert.equal(map.exits.size, 0, 'no way out until you pick a friend');
+  assert.ok(people.some(n => n.name === '김박사' && n.actor === 'professor') && people.some(n => n.kind === 'sign'), '김박사 and the 나리분지 sign');
+  r.setFriends(field); r.sync(map, people, map.spawns.a, 0);
+  assert.equal(r.count, 30); assert.deepEqual(r.list.map(w => w.species).sort((a, b) => a - b), [...field].sort((a, b) => a - b), 'exactly the field list, once each');
+  assert.ok(r.list.every(w => w.kind === 'friend' && !w.name.startsWith('사나워진') && starterPool().includes(w.species)));
+  const start = r.list.map(w => `${w.x},${w.y}`).join('|');
+  for (let t = 0; t < 30000; t += 100) {
+    r.update(map, people, map.spawns.a, t, false);
+    for (const w of r.list) assert.ok(FIELD_TILES.has(map[w.y][w.x]), 'on the grass');
+  }
+  assert.notEqual(r.list.map(w => `${w.x},${w.y}`).join('|'), start, 'they wander around');
+  r.remove(r.list[0].uid, 30000); for (let t = 30000; t < 60000; t += 100) r.update(map, people, map.spawns.a, t, false);
+  assert.equal(r.count, 29, 'the one you take along does not come back');
+});
+console.log(`PASS: no wild 우산몬 in towns; ${ROAMER_COUNT} walking on every route over grass/fields only, no overlaps, never on the player or objects, area species only, respawn after a battle, pause and smooth steps; 나리분지 초원 holds the 30 friends.`);

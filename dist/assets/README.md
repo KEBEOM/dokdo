@@ -23,5 +23,5 @@
 - `npc/`, `player/`: 새 그림을 불러오지 못했을 때만 쓰는 예비 그림이에요.
 
 ## 배경
-- `scenery/terrain-bw-v39.png`(지형 타일), `scenery/props-bw-v39.png`(지도 소품), `scenery/island-art-v36.png`(건물·나무), `scenery/cutscene-art-v38.png`(컷신 배경) 등.
+- `scenery/terrain-bw-v39.png`(지형 타일), `scenery/props-bw-v39.png`(지도 소품), `scenery/island-art-v36.png`(건물·나무), `scenery/cutscene-art-v47.png`(컷신 배경) 등.
 - 각 그림은 `scripts/draw-*.py`로 다시 만들 수 있고, 자리 좌표는 `dist/*-atlas.js`에 있어요.

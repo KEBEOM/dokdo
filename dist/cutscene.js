@@ -253,13 +253,6 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
       R(0, 44, SW, 10, '#2f7f95');
       tiles('grass', 0, 54, SW, SH);
       tiles('path', 60, 128, 220, 160);
-      const shake = s.cues.rustle && !s.cues.pop ? Math.sin(t / 50) * 1.5 : s.cues.pop && t - s.cues.pop < 400 ? Math.sin(t / 30) * 2.5 : 0;
-      ctx.save(); ctx.translate(shake, 0); tiles('tall', 232, 108, 296, 146); ctx.restore();
-    },
-    fieldFront(t, s) {
-      // grass blades in front of the monster so it pops out of the bush
-      const sheet = assetImage(TERRAIN_ATLAS.key);
-      if (sheet && !(s.cues.pop && t - s.cues.pop > 300)) { ctx.save(); ctx.globalAlpha = .95; tiles('tall', 236, 124, 292, 146); ctx.restore(); }
     },
     crisis(t, s) {
       const panel = s.panel || 'sea';
@@ -414,8 +407,6 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
     field(t, s) {
       if (!hasArt()) return LEGACY.field(t, s);
       skyDay(t, 48, false); seaStrip(44, 10, t); backdrop(s, 180, 52, 120); art('meadow', 0, 54);
-      const shake = s.cues.rustle && !s.cues.pop ? Math.sin(t / 50) * 1.5 : s.cues.pop && t - s.cues.pop < 400 ? Math.sin(t / 30) * 2.5 : 0;
-      ctx.save(); ctx.translate(shake, 0); tiles('tall', 232, 108, 296, 146); ctx.restore();
     }
   };
 
@@ -440,7 +431,6 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
       person(c, t);
     }
     if (s.def.bg === 'stage') PAINT.stageFront(t, s);
-    if (s.def.bg === 'field') PAINT.fieldFront(t, s);
     if (s.def.bg === 'summit') PAINT.summitFront(t, s);
     if (s.def.bg === 'sea' && s.cast.get('gangchi') && !s.cast.get('gangchi').hidden) { R(170, 128, 90, 6, '#2f7f95'); }
     picture(t, s);
