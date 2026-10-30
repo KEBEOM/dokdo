@@ -180,6 +180,12 @@ function darkWisps(ctx, x, y, time) {
   for (let i = 0; i < 6; i++) { const age = (time / 30 + i * 23) % 60; ctx.globalAlpha = Math.max(0, .55 - age / 110); ctx.fillStyle = i % 2 ? '#4a1f7a' : '#1a0f2e'; ctx.fillRect(Math.round(cx - 14 + i * 5 + Math.sin(time / 400 + i) * 3), Math.round(cy + 8 - age * .7), 3, 3); }
   ctx.restore();
 }
+// v0.51 걸어 다니는 우산몬의 발밑 그림자(뛰어오르면 작고 옅어져요)
+function groundShadow(ctx, cx, cy, rx, hop = 0) {
+  const k = 1 - Math.min(.35, hop / 10);
+  ctx.save(); ctx.globalAlpha = .26 * k; ctx.fillStyle = '#1b2a1c';
+  ctx.beginPath(); ctx.ellipse(cx, cy, rx * k, rx * .32 * k, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+}
 // 전설의 기운: 발밑의 금빛 원과 위로 떠오르는 반짝이
 function legendGlow(ctx, x, y, time) {
   const cx = x * 32 + 16, cy = y * 32 + 26;
@@ -205,6 +211,7 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
     else if (n.kind === 'wild' || n.kind === 'friend') { // 걸어 다니는 우산몬: 가는 쪽을 보고, 걸을 때 통통 튀어요 (사나워진 우산몬만 검은 기운)
       if (n.kind === 'wild') darkWisps(ctx, n.x, n.y, time);
       const f = facing(n.species), flip = (n.dir === 'right' && f === 'left') || (n.dir === 'left' && f === 'right'), hop = n.walking ? Math.abs(Math.sin(time / 70)) * 3 : 0;
+      groundShadow(ctx, n.x * 32 + 16, n.y * 32 + 29, 13, hop); // 발밑 그림자: 통통 튈 때는 조금 작아져요
       ctx.save(); if (flip) { ctx.translate(n.x * 32 * 2 + 32, 0); ctx.scale(-1, 1); }
       drawMonster(ctx, n.species, n.x * 32 - 6, n.y * 32 - 12 - hop, 44, time / 1000); ctx.restore();
     }

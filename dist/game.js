@@ -27,7 +27,7 @@ import { OPENING, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.50';
+const VERSION = '0.51';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -1207,7 +1207,7 @@ function showEnding() {
 // ── start-up ───────────────────────────────────────────────────────────────────
 try { const raw = localStorage.getItem(KEY); if (raw) saved = validateSave(JSON.parse(raw)); } catch (e) { console.warn('Save recovery:', e.message); }
 // 타이틀 그림(v0.47): 동도 정상에서 서도를 바라보는 두 탐험대원 — 생성형 AI로 만든 그림을 고증에 맞게 다듬어 썼어요.
-$('#titleScreen').style.backgroundImage = `url("${assetURL('scenery/title-dokdo.jpg')}")`;
+$('#titleScreen').style.backgroundImage = `url("${assetURL('scenery/title-dokdo-v51.jpg')}")`;
 if (saved?.started) $('#continueBtn').classList.remove('hidden');
 $('#startBtn').onclick = startNew; $('#continueBtn').onclick = continueGame;
 $('#saveBtn').onclick = () => state.started ? save(true) : toast('모험을 시작하면 저장할 수 있어요.');
