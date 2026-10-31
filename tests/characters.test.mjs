@@ -1,10 +1,16 @@
 import assert from 'node:assert/strict';
-import {explorerFrame,drawExplorer,EXPLORERS,CHARACTER_SIZE} from '../dist/characters.js';
-import {EXPLORER_ATLAS} from '../dist/explorer-atlas.js';
+import fs from 'node:fs';
+import {explorerFrame,drawExplorer,EXPLORERS,EXPLORER_ATLASES,NPC_ATLASES,PROFESSOR_PICTURE,CHARACTER_SIZE} from '../dist/characters.js';
+import {SHEET,SHEET_KEYS,PICTURE_KEYS,PICTURE_SIZE} from '../dist/character-sheets.js';
 import {MOVE_DURATION,moveView,strideFrame,stepProgress} from '../dist/movement.js';
 import {ACTOR_IDS,MAP_PALETTE,createActorFrame,cleanSourceFrame} from '../dist/pixel-art.js';
 assert.equal(CHARACTER_SIZE,48);
-assert.equal(EXPLORER_ATLAS.frames.flat().length,30);
+assert.equal(Object.values(EXPLORER_ATLASES).flatMap(a=>a.frames.flat()).length,30);
+// v0.54 Aseprite 시트: 파일 크기가 칸 규칙(32×40 × 5칸 × 3줄, 큰 그림 128×128)과 맞아야 해요.
+const pngSize=key=>{const b=fs.readFileSync(new URL('../dist/assets/'+key+'.png',import.meta.url));assert.equal(b.subarray(1,4).toString(),'PNG',key);return [b.readUInt32BE(16),b.readUInt32BE(20)];};
+for(const [id,key] of Object.entries(SHEET_KEYS))assert.deepEqual(pngSize(key),[SHEET.cell[0]*SHEET.cols,SHEET.cell[1]*SHEET.rows.length],`${id}: 시트는 160×120`);
+for(const [id,key] of Object.entries(PICTURE_KEYS))assert.deepEqual(pngSize(key),[PICTURE_SIZE,PICTURE_SIZE],`${id}: 큰 그림은 128×128`);
+assert.deepEqual(EXPLORERS.map(e=>e.sheet).sort(),[SHEET_KEYS.boy,SHEET_KEYS.girl].sort());assert.equal(NPC_ATLASES.professor.key,SHEET_KEYS.professor);assert.equal(PROFESSOR_PICTURE,PICTURE_KEYS.professor);
 assert.equal(stepProgress(473.638213,693.6382129999999),1);
 for(const id of ['girl','boy'])for(const dir of ['down','left','right','up']){
  const poses=[0,16,32,48].map(d=>explorerFrame(id,dir,true,d));
@@ -14,13 +20,13 @@ for(const id of ['girl','boy'])for(const dir of ['down','left','right','up']){
  assert.equal(poses[0].flip,dir==='left');
  for(const f of [...poses,explorerFrame(id,dir,false)]){
   const [x,y,w,h]=f.rect,[ax,ay]=f.anchor;
-  assert.ok(w>0&&h>0&&x>=0&&y>=0&&x+w<=EXPLORER_ATLAS.width&&y+h<=EXPLORER_ATLAS.height);
+  const A=EXPLORER_ATLASES[id];assert.ok(w>0&&h>0&&x>=0&&y>=0&&x+w<=A.width&&y+h<=A.height);
   assert.ok(ax>=x&&ax<=x+w&&ay>=y&&ay<=y+h,'anchor belongs to its own frame');
  }
 }
-for(const dir of ['down','right','up'])assert.notEqual(explorerFrame('boy',dir,false).row,explorerFrame('girl',dir,false).row);
+assert.notEqual(EXPLORER_ATLASES.boy.key,EXPLORER_ATLASES.girl.key,'남학생과 여학생은 각자 시트');
 // The actual renderer samples one complete artwork frame; there is no procedural arm/leg patching.
-globalThis.Image=class {set src(v){this.naturalWidth=1024;this.naturalHeight=1536;this.onload();}};
+globalThis.Image=class {set src(v){this.naturalWidth=160;this.naturalHeight=120;this.onload();}};
 const calls=[];const ctx=new Proxy({},{get:(o,k)=>o[k]||((...args)=>calls.push([k,...args])),set:(o,k,v)=>(o[k]=v,true)});
 for(const dir of ['left','right','up','down']){
  calls.length=0;assert.equal(drawExplorer(ctx,'girl',0,0,256,dir,true,32),true);

@@ -1,4 +1,5 @@
 """김박사 걷기 시트 색 맞추기 (v0.33)
+※ v0.54부터 게임은 dist/assets/characters/sheets/professor.png를 써요. 김박사 걷기 그림은 Aseprite로 그 파일을 고치세요(art/ASEPRITE-가이드.md).
 
     python scripts/recolor-professor.py        # Pillow, numpy 필요
 

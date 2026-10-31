@@ -15,8 +15,8 @@
 - 출처와 이용 조건은 `dist/photo-credits.js`에 있고, 도감에서 사진 아래에 보여요. 공공누리 제3·4유형 사진은 고치면 안 돼요(변경금지).
 
 ## 사람
-- 주인공: `characters/explorers-atlas-v17.png`(걷기 시트), 캐릭터 선택 그림 `characters/explorer-{girl,boy}-portrait-v33.png`.
-- 김박사: `characters/professor-atlas-v33.png`, 큰 그림 `characters/professor-portrait-v33.png`.
+- 주인공·김박사(v0.54~): `characters/sheets/{boy,girl,professor}.png`(걷기 시트 160×120) · `characters/sheets/{boy,girl,professor}-portrait.png`(큰 그림 128×128). Aseprite로 고치는 법: `art/ASEPRITE-가이드.md`.
+- 옛 그림(시트를 만든 원본, 게임에서는 쓰지 않음): `characters/explorers-atlas-v17.png`, `characters/professor-atlas-v33.png`, `characters/*-portrait-v33.png`.
 - 마을 사람: `characters/{child-boy,child-girl,child-girl-ribbon,man,woman}-atlas-v18.png` (좌표: `dist/npc-atlases.js`).
 - 몽땅랜드: `characters/villain-*-v25.png` (좌표: `dist/villain-atlases.js`), 결투 등장 그림 `characters/baekmudan-{grunt,exec,boss}-portrait.png`.
 - `characters/*-sheet.png`, `*-original.jpg`, `*-game.png`: `scripts/bake-characters.mjs`가 쓰는 원본과 결과물이에요.

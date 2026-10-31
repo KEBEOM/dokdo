@@ -62,11 +62,12 @@ test('meeting scenes, 변환폼 pictures, facing and real photos', () => {
     if (q.id === 18) { assert.ok(sc.lines.some(l => l.text.includes('지정된 나무')), '사철나무 is a tree'); continue; }
     assert.equal(monsterAssetKey(`${q.id}-2`), `monsters/${String(q.id).padStart(3, '0')}-2`);
     assert.ok(fs.existsSync(`dist/assets/${monsterAssetKey(`${q.id}-2`)}.png`), `${q.name} 변환폼 picture`);
-    assert.equal(facing(`${q.id}-2`), 'left', '변환폼 looks left, so my side flips it to look right');
+    assert.equal(facing(`${q.id}-2`), q.id === 75 ? 'left' : 'front', '변환폼: 사람 모습은 정면, 고니만 왼쪽(내 쪽에서는 뒤집어 오른쪽)');
   }
   assert.equal(look({ id: 70, form: 2 }), '70-2'); assert.equal(look({ id: 70 }), 70);
   assert.equal(monsterAssetKey(5), 'monsters/005'); assert.equal(monsterAssetKey('68-1'), 'monsters/068');
   assert.equal(facing(22), 'right'); assert.equal(facing(1), 'front'); assert.equal(facing(34), 'left');
+  for (const id of [5, 14, 17, 55, 58, 63, 64, 73]) assert.equal(facing(id), 'left', `${id} looks left, so my side flips it to look right`);
   for (let id = 1; id <= 100; id++) {
     assert.ok(PHOTO_CREDITS[id]?.by && PHOTO_CREDITS[id]?.license, `photo credit ${id}`);
     assert.ok(fs.existsSync(`dist/assets/photos/${String(id).padStart(3, '0')}.jpg`), `photo ${id}`);

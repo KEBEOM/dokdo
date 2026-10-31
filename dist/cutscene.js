@@ -134,6 +134,14 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
     }
     ctx.globalAlpha = 1;
   }
+  // 128×128 도트 그림(Aseprite 시트)은 먼저 4배로 또렷하게 키운 뒤 줄여 그려요(그대로 늘이면 흐려져요).
+  function crisp(img) {
+    if ((img.naturalWidth || img.width) >= 512 || typeof document === 'undefined') return img;
+    if (crisp.src === img) return crisp.canvas;
+    const c = document.createElement('canvas'), k = Math.ceil(512 / (img.naturalWidth || img.width)); c.width = (img.naturalWidth || img.width) * k; c.height = (img.naturalHeight || img.height) * k;
+    const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(img, 0, 0, c.width, c.height);
+    crisp.src = img; crisp.canvas = c; return c;
+  }
   function picture(t, s) {
     const p = s.picture, info = p && PICTURES[p.id], img = info && assetImage(info.key); if (!img) return;
     const inP = Math.min(1, (t - p.at) / 450), outP = p.offAt ? Math.min(1, (t - p.offAt) / 350) : 0, a = inP * (1 - outP);
@@ -142,7 +150,7 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
     ctx.save(); ctx.globalAlpha = a * .42; R(0, 0, SW, SH, '#08121c');
     ctx.globalAlpha = a; ctx.fillStyle = '#1f5f6e'; ctx.beginPath(); ctx.moveTo(204 + dx, 0); ctx.lineTo(SW, 0); ctx.lineTo(SW, SH); ctx.lineTo(160 + dx, SH); ctx.fill();
     ctx.fillStyle = '#7fe3ea'; ctx.beginPath(); ctx.moveTo(200 + dx, 0); ctx.lineTo(204 + dx, 0); ctx.lineTo(160 + dx, SH); ctx.lineTo(156 + dx, SH); ctx.fill();
-    const h = 178; ctx.imageSmoothingEnabled = true; ctx.drawImage(img, 248 - h / 2 + dx, SH - h + 4, h, h); ctx.imageSmoothingEnabled = false;
+    const h = 178; ctx.imageSmoothingEnabled = true; ctx.drawImage(crisp(img), 248 - h / 2 + dx, SH - h + 4, h, h); ctx.imageSmoothingEnabled = false;
     R(14 + dx / 2, 30, 104, 30, '#10202b'); R(15 + dx / 2, 31, 102, 28, '#fff8e1'); R(15 + dx / 2, 31, 4, 28, '#e07a3a');
     ctx.fillStyle = '#10202b'; ctx.textBaseline = 'alphabetic'; ctx.font = 'bold 12px sans-serif'; ctx.fillText(info.name, 25 + dx / 2, 46);
     ctx.fillStyle = '#3d6b63'; ctx.font = '7px sans-serif'; ctx.fillText(info.role, 25 + dx / 2, 55);

@@ -4,6 +4,7 @@ import { TERRAIN_ATLAS } from './terrain-atlas.js';
 import { CUTSCENE_ATLAS } from './cutscene-atlas.js';
 import { worldScale } from './layout.js';
 import { createJoystick } from './joystick.js';
+import { createDirectionInput, KEY_VECTORS } from './input.js';
 import { roomId, parseRoomId } from './interiors.js';
 import { MONSTERS, ZONES, TYPES, getSpecies, isUnique, pickStarterField, STARTER_LEVEL, keeperName } from './data.js';
 import { CONCEPTS, QUESTIONS, SOURCES } from './learning.js';
@@ -27,7 +28,7 @@ import { OPENING, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.51';
+const VERSION = '0.54';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -39,7 +40,7 @@ let walks = 0, lastEncounter = 0, walkDistance = 0, battle = null, dialogueState
 let lastTick = performance.now(), audioCtx = null, transition = false;
 const npcMotion = createNPCMotion(); let npcFocus = null;
 const roamers = createRoamers(); // 길 위를 걸어 다니는 야생 우산몬 (roamers.js)
-const keys = new Set();
+const keys = createDirectionInput(); // 방향키: 나중에 누른 방향 우선 · 짧게 친 방향 기억 (input.js)
 
 const canvas = $('#world'), ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
 const actorCanvas = $('#actors'), actorCtx = actorCanvas.getContext('2d');
@@ -511,7 +512,7 @@ canvas.addEventListener('pointerdown', e => {
   if (next.length) { path = next; pathAction = null; }
   canvas.focus({ preventScroll: true });
 });
-const vectors = { ArrowUp: [0, -1], w: [0, -1], W: [0, -1], ArrowDown: [0, 1], s: [0, 1], S: [0, 1], ArrowLeft: [-1, 0], a: [-1, 0], A: [-1, 0], ArrowRight: [1, 0], d: [1, 0], D: [1, 0] };
+const vectors = KEY_VECTORS;
 window.addEventListener('keydown', e => {
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
   if (cutscenes.active()) { cutscenes.handleKey(e); return; }
@@ -522,20 +523,21 @@ window.addEventListener('keydown', e => {
     return;
   }
   if (battle) { battleUI.handleKey(e); return; }
-  if (vectors[e.key]) { e.preventDefault(); keys.add(e.key); path = []; pathAction = null; }
+  if (vectors[e.key]) { e.preventDefault(); if (!e.repeat) keys.press(e.key, performance.now()); path = []; pathAction = null; }
   if (['e', 'E', ' ', 'Enter'].includes(e.key) && !e.repeat) {
     if (!$('#modal').classList.contains('hidden')) return;
     if (document.activeElement?.tagName === 'BUTTON' && !dialogueState) return;
     e.preventDefault(); if (dialogueState) nextTalk(); else interact();
   }
 });
-window.addEventListener('keyup', e => keys.delete(e.key)); window.addEventListener('blur', () => keys.clear());
+window.addEventListener('keyup', e => keys.release(e.key)); window.addEventListener('blur', () => keys.clear());
 // 가상 조이스틱: 누른 채로 밀면 그쪽으로 한 칸씩 걸어요. 대각선으로 밀면 막힌 쪽 대신 다른 쪽으로 미끄러지듯 걸어요.
 const joystick = createJoystick($('#joystick'), dir => { if (dir) { path = []; pathAction = null; } });
 window.addEventListener('blur', () => joystick.reset());
 $('#interactBtn').onclick = () => dialogueState ? nextTalk() : interact();
 
 function frame(now) {
+  let keyDir = null;
   const dt = Math.max(0, Math.min(now - lastTick, 100)); lastTick = now;
   if (state.started && !document.hidden) state.playMs += dt;
   if (!pathAction && !dialogueState && !busy()) npcFocus = null;
@@ -549,7 +551,7 @@ function frame(now) {
     if (stairHold && !joystick.direction && !keys.size) stairHold = false;
     if (stairHold) { /* let go first */ }
     else if (stick) { if (!move(...stick.primary, nextStart) && stick.secondary) move(...stick.secondary, nextStart); }
-    else if (keys.size) { const k = [...keys].find(k => vectors[k]); if (k) move(...vectors[k], nextStart); }
+    else if ((keyDir = keys.next(now))) move(...keyDir, nextStart);
     else if (path.length) { const [x, y] = path.shift(); if (!move(x - state.x, y - state.y, nextStart)) { path = []; pathAction = null; } }
     else if (pathAction) { const fn = pathAction; pathAction = null; fn(); }
   }
