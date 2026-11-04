@@ -802,3 +802,12 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
 #gameApp .question-title,#gameApp .question-tag,#gameApp .feedback,#gameApp .answer-option,#gameApp .battle-answer{text-align:left}
 #gameApp .answer-option,#gameApp .battle-answer{justify-content:flex-start}
 #gameApp .modal .feedback p,#gameApp .modal .question-title+p{text-align:left}
+/* v0.55 소리 설정 (모험 메뉴) */
+#gameApp .sound-settings{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,1fr) auto;gap:10px 16px;align-items:center;margin:0 0 14px;padding:12px 14px;border:1px solid #d5c6a4;border-radius:8px;background:#fbf4e2}
+#gameApp .sound-settings strong{font-size:13px;color:var(--px-line,#4a2e1a)}
+#gameApp .sound-settings label{display:flex;align-items:center;gap:8px;font-size:12px;white-space:nowrap;min-width:0}
+#gameApp .sound-settings input[type=range]{flex:1;min-width:0;accent-color:#b5452f}
+@media (max-width:640px){#gameApp .sound-settings{grid-template-columns:1fr 1fr}#gameApp .sound-settings strong{grid-column:1/-1}#gameApp .sound-settings label{grid-column:1/-1}#gameApp .sound-settings button{grid-column:1/-1}}
+#gameApp .sound-settings .music-pick{grid-column:1/-1}
+#gameApp .sound-settings select{flex:1;min-width:0;padding:6px 8px;border:1px solid #cdbb94;border-radius:6px;background:#fffaf0;font:inherit;font-size:12px}
+#gameApp .sound-settings label>span{flex:0 0 5.2em}

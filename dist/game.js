@@ -16,6 +16,8 @@ import { LEGENDS, ALL_LEGEND_IDS, legendProgress, legendScene, openFlag, metFlag
 import { PHOTO_CREDITS, LICENSE_TEXT, photoKey } from './photo-credits.js';
 import { onAssetReady, preloadMonsters, assetImage, assetURL } from './assets.js';
 import { VILLAIN_ATLASES } from './villain-atlases.js';
+import { music, sfx, jingle, setOn, setVolume, isOn, audioPrefs, currentMusic, wantedMusic } from './audio.js';
+import { TRACKS } from './music-data.js';
 import { EXPLORERS, PROFESSOR_PICTURE, paintExplorerCard, paintExplorerPortrait, drawResident } from './characters.js';
 import { createNPCMotion } from './npc-motion.js';
 import { createRoamers } from './roamers.js';
@@ -28,7 +30,7 @@ import { OPENING, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.54';
+const VERSION = '0.55';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -37,7 +39,7 @@ const KEY = 'dokdomon-save-v1';
 let state = newState(), saved = null, map = createMap('town0');
 let camera = { x: 0, y: 0 }, view = { x: state.x, y: state.y }, moving = null, path = [], pathAction = null;
 let walks = 0, lastEncounter = 0, walkDistance = 0, battle = null, dialogueState = null, modalReturn = null, avatarChoice = null;
-let lastTick = performance.now(), audioCtx = null, transition = false;
+let lastTick = performance.now(), transition = false;
 const npcMotion = createNPCMotion(); let npcFocus = null;
 const roamers = createRoamers(); // 길 위를 걸어 다니는 야생 우산몬 (roamers.js)
 const keys = createDirectionInput(); // 방향키: 나중에 누른 방향 우선 · 짧게 친 방향 기억 (input.js)
@@ -47,8 +49,9 @@ const actorCanvas = $('#actors'), actorCtx = actorCanvas.getContext('2d');
 const scene = $('#gameApp');
 let actorPixelRatio = 1, sceneScale = 1, sceneWidth = 768, sceneHeight = 480, labelKey = '', labelNodes = [], activePanel = null;
 
-const cutscenes = createCutscenePlayer($('#cutscene'), { onBlip: () => beep(880, .015) });
-const battleUI = createBattleUI($('#battleScreen'), { onBlip: () => beep(760, .012), onSelect: () => beep(620, .03) });
+const titleEl = $('#titleScreen');
+const cutscenes = createCutscenePlayer($('#cutscene'), { onBlip: () => sfx('blip') });
+const battleUI = createBattleUI($('#battleScreen'), { onBlip: () => sfx('blip'), onSelect: () => sfx('select') });
 
 // ── basics ───────────────────────────────────────────────────────────────────
 const z = () => ZONES[state.zone];
@@ -118,18 +121,21 @@ function paintWorldLabels(people = liveNPCs()) {
 
 function save(manual = false) {
   if (!state.started) return; state.savedAt = Date.now();
-  try { localStorage.setItem(KEY, JSON.stringify(state)); $('#saveStatus').textContent = `${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} 저장됨`; if (manual) toast('모험을 이 기기에 저장했어요.'); }
+  try { localStorage.setItem(KEY, JSON.stringify(state)); $('#saveStatus').textContent = `${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} 저장됨`; if (manual) { toast('모험을 이 기기에 저장했어요.'); sfx('save'); } }
   catch { $('#saveStatus').textContent = '기기 저장 공간을 확인하세요'; toast('자동 저장이 어려워요. 메뉴에서 저장 파일을 내려받아 주세요.'); }
 }
 function toast(message) { $('#toast').textContent = message; $('#toast').classList.remove('hidden'); clearTimeout(toast.timer); toast.timer = setTimeout(() => $('#toast').classList.add('hidden'), 3100); }
-function beep(freq = 440, length = .06) {
-  if (!state.sound) return;
-  try {
-    audioCtx ??= new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume();
-    const o = audioCtx.createOscillator(), g = audioCtx.createGain(); o.type = 'triangle'; o.frequency.value = freq;
-    g.gain.setValueAtTime(.035, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime + length);
-    o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + length);
-  } catch { }
+// ── 배경음악 고르기 (v0.55, audio.js · music-data.js) ─────────────────────────
+// 결투 > 컷신 > 타이틀 > 지금 있는 곳 순서로 정해요. 매 화면마다 불러도 같은 곡이면 그대로 이어요.
+const CUTSCENE_MUSIC = { opening: 'town', guide: 'meadow', ferry: 'dokdo', legend: 'legend', 'boss-reveal': 'villain', 'boss-fall': 'dokdo', 'tree-joins': 'legend', epilogue: 'title' };
+function mapMusic() { const d = map.def; return d.kind === 'route' ? 'route' : d.kind === 'room' ? 'room' : d.kind === 'meadow' ? 'meadow' : d.island === '울릉도' ? 'town' : 'dokdo'; }
+let musicPreview = null; // 모험 메뉴의 ‘배경음악 듣기’로 고른 곡(메뉴를 닫으면 원래대로)
+function musicFor() {
+  if (musicPreview) return musicPreview;
+  if (battle) return battle.won ? null : BOSS_KINDS.includes(battle.kind) || battle.kind === 'legend' || (battle.kind === 'enemy' && state.zone === 7) ? 'boss' : battle.kind === 'enemy' || battle.kind === 'trainer' ? 'villain' : 'battle';
+  const cs = cutscenes.current; if (cs) return CUTSCENE_MUSIC[cs] ?? mapMusic();
+  if (!titleEl.classList.contains('hidden')) return 'title';
+  return state.started ? mapMusic() : 'title';
 }
 function settleMovement() { if (moving) { state.x = moving.toX; state.y = moving.toY; view = { x: state.x, y: state.y }; moving = null; } }
 function resetTransient() {
@@ -156,7 +162,7 @@ function openModal(html, mount) {
 }
 function closeModal() {
   if ($('#modal').classList.contains('hidden')) return;
-  restorePanel(); $('#modal').classList.add('hidden'); $('#modalContent').innerHTML = ''; avatarChoice = null; canvas.focus({ preventScroll: true });
+  restorePanel(); $('#modal').classList.add('hidden'); $('#modalContent').innerHTML = ''; avatarChoice = null; musicPreview = null; canvas.focus({ preventScroll: true });
   if (modalReturn) { const fn = modalReturn; modalReturn = null; fn(); }
 }
 function head(title, kicker = '탐험 수첩', close = true) { return `<div class="modal-head"><div><span class="eyebrow">${kicker}</span><h2 id="modalTitle">${title}</h2></div>${close ? '<button class="modal-close" aria-label="닫기">✕</button>' : ''}</div>`; }
@@ -167,7 +173,7 @@ function talk(speakerName, lines, done, note = '게임용 재구성 대화', act
   const speaker = liveNPCs().find(n => n.name === speakerName); actor = actor || speaker?.actor || null;
   if (speaker) { npcFocus = speaker.uid; npcMotion.face(npcFocus, state); }
   settleMovement(); keys.clear(); path = []; pathAction = null;
-  dialogueState = { name: speakerName, lines, index: 0, done, note, actor }; renderTalk(); beep(500);
+  dialogueState = { name: speakerName, lines, index: 0, done, note, actor }; renderTalk(); sfx('talk');
 }
 function renderTalk() {
   const d = dialogueState; scene.classList.add('talking'); $('#dialogue').classList.remove('hidden');
@@ -176,7 +182,7 @@ function renderTalk() {
 }
 function paintResidentPortrait() { const p = $('.resident-portrait'); if (p && dialogueState?.actor) { const c = p.getContext('2d'); c.clearRect(0, 0, 64, 64); drawResident(c, dialogueState.actor, 0, 0, 64); } }
 function nextTalk() {
-  if (!dialogueState) return; beep(620, .035);
+  if (!dialogueState) return; sfx('next');
   if (++dialogueState.index < dialogueState.lines.length) renderTalk();
   else { const fn = dialogueState.done, who = dialogueState.note; dialogueState = null; scene.classList.remove('talking'); $('#dialogue').classList.add('hidden'); fn?.(); if (who !== '튜토리얼') tutorialEvent('talk'); updateUI(); save(); }
 }
@@ -245,7 +251,7 @@ function meetFriend(n) {
     $('#takeFriend').onclick = () => { closeModal(); chooseFriend(m.id, n.uid); };
     $('#keepLooking').onclick = () => { closeModal(); toast('천천히 둘러보세요. 다른 친구에게도 말을 걸어 봐요!'); };
   });
-  beep(700, .08); updateUI();
+  sfx('talk'); updateUI();
 }
 async function chooseFriend(id, uid) {
   addMonster(state, createMonster(id, STARTER_LEVEL)); state.active = 0; roamers.remove(uid, performance.now());
@@ -295,7 +301,7 @@ function updateUI() {
   $('#badges').innerHTML = stampsHTML();
   $('#badgeCount').textContent = `${state.badges.length} / 8`; $('#partyCount').textContent = `${state.party.length} / 6`;
   $('#dexProgress').textContent = `${state.caught.length} / 100`; $('#learningProgress').textContent = `${studyRead()} / ${STUDY_PAGES.length}`; $('#dailyNote').textContent = z().fact;
-  $('#soundBtn').setAttribute('aria-label', state.sound ? '소리 끄기' : '소리 켜기'); $('#soundBtn').title = state.sound ? '소리 끄기' : '소리 켜기'; $('#soundBtn').innerHTML = `♪ <span>소리 ${state.sound ? '켜짐' : '꺼짐'}</span>`;
+  $('#soundBtn').setAttribute('aria-label', isOn() ? '소리 끄기' : '소리 켜기'); $('#soundBtn').title = isOn() ? '소리 끄기' : '소리 켜기'; $('#soundBtn').innerHTML = `♪ <span>소리 ${isOn() ? '켜짐' : '꺼짐'}</span>`;
   $('#partyCards').innerHTML = state.party.length ? state.party.map((m, i) => `<button class="party-card ${i === state.active ? 'active' : ''}" data-party="${i}"><canvas data-portrait="${m.id}" width="64" height="64"></canvas><strong>${name(m)}</strong><small>Lv.${m.level} · ${m.hp}/${m.maxHp}</small><div class="hp-track"><i style="width:${m.hp / m.maxHp * 100}%"></i></div></button>`).join('') + Array.from({ length: 6 - state.party.length }, () => '<div class="party-slot">+</div>').join('') : '<p class="empty-party">첫 번째 동료가 당신을 기다리고 있어요.</p>';
   $$('[data-party]').forEach(b => b.onclick = () => partyDetail(Number(b.dataset.party)));
   $('#quickQuestText').textContent = $('#questTitle').textContent; $('#dockPartyCount').textContent = `${state.party.length} / 6`;
@@ -367,7 +373,7 @@ function giveItems(give = {}) {
   const heal = (give.heal || 0) + (give.orb || 0);
   if (heal) { state.items.heal += heal; parts.push(`회복젤 ${heal}개`); }
   if (give.coins) { state.coins += give.coins; parts.push(`조사 코인 ${give.coins}개`); }
-  if (parts.length) { toast(`${parts.join(', ')}를 받았어요!`); beep(860, .15); }
+  if (parts.length) { toast(`${parts.join(', ')}를 받았어요!`); jingle('item'); }
 }
 function setFlag(flag) { if (flag) state.flags[flag] = true; labelKey = ''; }
 // The person or object right in front of you (not just beside you).
@@ -400,7 +406,7 @@ function interact(n) {
     case 'shopkeeper': return talk(n.name, n.lines, () => showShop(), '쉼터 · 회복과 준비', n.actor);
     case 'storage': return showStorage(); // (예전 저장 지도 호환) 지금은 동료 메뉴에서 열어요
     case 'dex': return showDex();
-    case 'rest': return talk(n.name, ['포근한 자리에서 잠깐 쉬었어요.', '동료들이 모두 기운을 되찾았어요!'], () => { healAll(state); beep(660, .15); updateUI(); save(); }, '쉬어 가기');
+    case 'rest': return talk(n.name, ['포근한 자리에서 잠깐 쉬었어요.', '동료들이 모두 기운을 되찾았어요!'], () => { healAll(state); jingle('heal'); updateUI(); save(); }, '쉬어 가기');
     case 'badges': {
       const got = state.badges.slice().sort((a, b) => a - b).map(i => `${ZONES[i].badge}(${ZONES[i].name})`);
       return talk(n.name, got.length ? [`지금까지 받은 인증 ${got.length}개: ${got.join(', ')}`, '인증을 받을 때마다 진열장에 이름이 새겨져요.'] : ['아직 받은 인증이 없어요.', `${keeperName(z())}의 시험을 통과하면 여기에 ‘${z().badge}’ 인증이 새겨져요.`], null, '수호관 · 인증 진열장');
@@ -441,16 +447,16 @@ function buildingDoorAt(x, y) { return map.kind === 'town' ? map.buildings.find(
 function doorAhead() { return map.kind === 'town' && state.dir === 'up' ? buildingDoorAt(state.x, state.y - 1) : null; }
 function doorFront(b, people = liveNPCs()) { return doorCols(b).map(x => ({ x, y: b.y + b.h })).find(p => !blocked(map, p.x, p.y, people)) || { x: doorCols(b)[0], y: b.y + b.h }; }
 let stairHold = false; // after stairs, wait until the stick / keys are let go (no bouncing between floors)
-function enterBuilding(b) { beep(520, .05); changeMap(roomId(state.zone, b.kind, 1), 'a', { dir: 'up' }); }
+function enterBuilding(b) { sfx('door'); changeMap(roomId(state.zone, b.kind, 1), 'a', { dir: 'up' }); }
 function leaveBuilding() {
   const def = map.def, town = createMap(def.town), b = town.buildings.find(b => b.kind === def.building);
   const front = b ? doorCols(b).map(x => ({ x, y: b.y + b.h })).find(p => !blocked(town, p.x, p.y)) : null;
-  changeMap(def.town, front ? { ...front, dir: 'down' } : 'a');
+  sfx('door'); changeMap(def.town, front ? { ...front, dir: 'down' } : 'a');
 }
 function useStairs(s) {
   const def = map.def, floor = def.floor + (s.dir === 'up' ? 1 : -1), target = createMap(roomId(def.zone, def.building, floor));
   const land = target.stairs.find(t => t.dir === (s.dir === 'up' ? 'down' : 'up'))?.land || target.spawns.a;
-  stairHold = true; beep(s.dir === 'up' ? 700 : 500, .06); changeMap(target.id, { ...land, dir: 'down' });
+  stairHold = true; sfx('stairs', s.dir === 'up'); changeMap(target.id, { ...land, dir: 'down' });
 }
 
 // ── walking, exits and encounters ──────────────────────────────────────────────
@@ -462,7 +468,7 @@ function move(dx, dy, now) {
   if (exitLocked(nx, ny)) { if (!move.warned || now - move.warned > 1500) { toast(lockedMessage()); move.warned = now; } return false; }
   if (dy === -1) { const b = buildingDoorAt(nx, ny); if (b) { enterBuilding(b); return true; } } // walking up into a door
   const wild = roamers.at(nx, ny); if (wild?.kind === 'friend') return false; if (wild) { path = []; pathAction = null; startBattle('wild', wild.species, { roamer: wild.uid }); return false; } // 걸어 다니는 우산몬과 부딪히면 결투
-  if (blocked(map, nx, ny, liveNPCs())) return false;
+  if (blocked(map, nx, ny, liveNPCs())) { if (!move.bumped || now - move.bumped > 380) { sfx('bump'); move.bumped = now; } return false; }
   moving = { fromX: state.x, fromY: state.y, toX: nx, toY: ny, start: now }; return true;
 }
 function arrive() {
@@ -564,6 +570,7 @@ function frame(now) {
     actorCtx.scale(sceneScale * actorPixelRatio, sceneScale * actorPixelRatio); actorCtx.translate(-camera.x, -camera.y);
     drawActors(actorCtx, state, view, now, { walking, distance: walkDistance }, people, map); actorCtx.restore(); paintWorldLabels(people);
   }
+  music(musicFor());
   if (state.started && !document.hidden && now - (frame.legendAt || 0) > 700) { frame.legendAt = now; checkLegends(); }
   if (avatarChoice) $$('canvas[data-explorer-sprite]').forEach(c => paintExplorerCard(c, c.dataset.explorerSprite, now, avatarChoice.selected === c.dataset.explorerSprite));
   const door = !busy() && !facingNPC() && doorAhead(), n = !door && !busy() && nearestNPC(); $('#interactionPrompt').classList.toggle('hidden', !n && !door);
@@ -594,7 +601,7 @@ function beginStudy(kind = 'review', concept = null, opts = {}) {
         const answer = Number(b.dataset.answer), correct = answer === q.answer;
         recordAnswer(state, q, correct, assisted);
         $$('[data-answer]').forEach(btn => { btn.disabled = true; if (Number(btn.dataset.answer) === q.answer) btn.classList.add('correct'); });
-        if (!correct) b.classList.add('wrong'); beep(correct ? 720 : 290, .12);
+        if (!correct) b.classList.add('wrong'); sfx(correct ? 'correct' : 'wrong');
         $('#feedbackArea').innerHTML = `<div class="feedback"><strong>${correct ? '잘 연결했어요!' : '근거를 다시 살펴볼까요?'}</strong><br>${esc(q.explanation)}<br><a class="source-link" href="${q.source}" target="_blank" rel="noopener">실제 자료 살펴보기 ↗</a></div><div class="modal-actions"><button id="nextQuestion" class="primary">${!correct ? '근거를 읽고 다시 풀기' : index < questions.length - 1 ? '다음 기록' : '조사 마치기'} →</button></div>`;
         $('#nextQuestion').onclick = () => {
           if (!correct) { assisted = true; show(); return; }
@@ -647,7 +654,7 @@ function tutorialEvent(kind) {
   const t = state.tutorial; if (!state.started || !t?.battle || t.walk >= 4) return;
   const want = ['walk', 'talk', 'quest', 'guide'][t.walk]; if (kind !== want) return;
   if (kind === 'walk' && ++tutorialSteps < 3) return;
-  t.walk++; tutorialSteps = 0; beep(880, .08); save();
+  t.walk++; tutorialSteps = 0; sfx('toggle'); save();
   if (t.walk >= 4) { renderCoachPanel(); toast('튜토리얼 끝! 이제 마음껏 독도를 탐험해요.'); }
   else renderCoachPanel();
 }
@@ -697,7 +704,7 @@ function startBattle(kind, id, opts = {}) {
   const foeTrainer = kind === 'enemy' ? VILLAIN_BY_ZONE[state.zone] : kind === 'trainer' ? opts.npc.actor : null;
   const foePortrait = villainPortrait(foeTrainer);
   battleUI.mount({ backdrop: backdropKind(), sky: z().color, aura: berserk(battle), island: map.def?.island || '', label: kind === 'tutorial' ? '연습 대결 · 김박사와 함께' : kind === 'wild' ? `사나워진 우산몬 · ${map.name}` : kind === 'legend' ? `전설의 우산몬 · ${map.name}` : kind === 'boss' || kind === 'rematch' ? `${opponentName(battle)} · 인증 결투` : opponentName(battle), foeTrainer, foePortrait });
-  refreshBattle(); if (!(foePortrait && battleUI.portraitIn())) battleUI.enemyEnter(); beep(320, .12); setTimeout(() => beep(480, .12), 120); updateUI();
+  refreshBattle(); if (!(foePortrait && battleUI.portraitIn())) battleUI.enemyEnter(); sfx('encounter'); updateUI();
   runBattle(battle).catch(err => { console.error(err); if (battle) finishBattle(false, true); });
 }
 function refreshBattle() {
@@ -729,7 +736,7 @@ async function askQuiz(b, phase, header, chosen = null) {
   const correct = res.choice === q.answer;
   Object.assign(b.quiz, { answered: true, assisted: res.assisted, correct, choice: res.choice });
   recordAnswer(state, q, correct, res.assisted, { mode: 'battle', phase, opponent: enemy().id });
-  battleUI.reveal(q, res.choice); beep(correct ? 720 : 200, .12); save();
+  battleUI.reveal(q, res.choice); sfx(correct ? 'correct' : 'wrong'); save();
   return { q, correct };
 }
 async function attackWithQuiz(b, q = null) {
@@ -739,7 +746,7 @@ async function attackWithQuiz(b, q = null) {
   const r = await askQuiz(b, 'attack', `${name(a)}의 문제 풀기!`, q); if (!r) return;
   tip(b, r.correct ? '잘했어요! 오른쪽 위 보라색 막대가 줄어든 게 보이죠?' : '괜찮아요! 틀려도 내 우산몬은 다치지 않아요. 다시 해 봐요.');
   const d = attackHit(a, e, r.correct);
-  if (d.amount > 0) { e.hp = Math.max(0, e.hp - d.amount); battleUI.damage(d.amount, 'enemy'); refreshBattle(); }
+  if (d.amount > 0) { e.hp = Math.max(0, e.hp - d.amount); sfx(d.mult > 1 ? 'hitStrong' : d.mult < 1 ? 'hitWeak' : 'hit'); battleUI.damage(d.amount, 'enemy'); refreshBattle(); }
   if (r.correct) {
     const eff = d.mult > 1 ? ' 상성이 좋아 마음이 크게 닿았다!' : d.mult < 1 ? ' 상성이 나빠 잘 닿지 않은 것 같다…' : '';
     await battleUI.explain(dark ? `정답! ${name(e)}의 검은 기운을 ${d.amount}만큼 걷어 냈다!${eff}` : `정답! ${name(e)}의 기운이 ${d.amount} 줄었다!${eff}`, explanationHTML(r.q), 'good');
@@ -756,7 +763,7 @@ function setForm(m, form) {
   else if (form !== 2 && m.form === 2) { if (m.formBase) { m.attack = m.formBase.attack; m.defense = m.formBase.defense; } delete m.form; delete m.formBase; }
 }
 async function morph(b, m, side) {
-  const to = m.form === 2 ? 1 : 2; setForm(m, to); battleUI.morph(side); beep(to === 2 ? 900 : 520, .2); refreshBattle(); updateUI();
+  const to = m.form === 2 ? 1 : 2; setForm(m, to); battleUI.morph(side); sfx('morph'); refreshBattle(); updateUI();
   if (side === 'ally') await battleUI.say(to === 2 ? `${name(m)}의 형태변환! 눈부신 빛에 휩싸여 모습이 바뀌었다! 정화의 힘이 강해졌다!` : `${josa(name(m), '이/가')} 원래 모습으로 돌아왔다.`, { tone: 'good' });
   else await battleUI.say(`전설의 우산몬 ${josa(name(m), '이/가')} 형태를 바꿨다! 더 강한 모습이 되었다!`, { tone: 'dark' });
 }
@@ -767,7 +774,7 @@ async function befriend(b) {
   if (battle !== b) return 'end';
   const sure = !sp.legendary && state.caught.length < 2; // 첫 동료 한 마리는 꼭 함께해요
   if (sure || Math.random() < chance) {
-    addMonster(state, createMonster(e.id, e.level)); beep(850, .2);
+    addMonster(state, createMonster(e.id, e.level)); jingle('join');
     await battleUI.say(`검은 기운이 걷히고, ${josa(name(e), '이/가')} 마음을 열어 동료가 되었다!`, { tone: 'good' });
     await awardXP(b, e); if (battle !== b) return 'end';
     finishBattle(false, false, { captured: e, legend: b.kind === 'legend' ? b : null }); return 'end';
@@ -796,7 +803,7 @@ async function playerTurn(b) {
       { label: `회복젤 ×${state.items.heal}`, value: 'heal', sub: '체력 45% 회복', disabled: state.items.heal <= 0 || a.hp === a.maxHp }
     ], { title: '도구', prompt: '어떤 도구를 쓸까?', cancel: true });
     if (pick === null) return 'free';
-    state.items.heal--; const before = a.hp; a.hp = Math.min(a.maxHp, a.hp + Math.ceil(a.maxHp * .45)); refreshBattle(); updateUI(); save();
+    state.items.heal--; jingle('heal'); const before = a.hp; a.hp = Math.min(a.maxHp, a.hp + Math.ceil(a.maxHp * .45)); refreshBattle(); updateUI(); save();
     await battleUI.say(`회복젤을 썼다! ${name(a)}의 체력이 ${a.hp - before} 회복됐다!`); return 'turn';
   }
   if (cmd === 'party') {
@@ -808,7 +815,7 @@ async function playerTurn(b) {
   }
   if (tut(b)) { await battleUI.say('연습 대결은 끝까지 해 봐요! 그만하려면 위쪽 ‘연습 건너뛰기’를 눌러요.'); return 'free'; }
   if (!wild) { await battleUI.say('이 결투에서는 물러날 수 없다!'); return 'free'; }
-  if (Math.random() < runChance(a, enemy())) { await battleUI.say('무사히 물러났다!'); finishBattle(false, true); return 'end'; }
+  if (Math.random() < runChance(a, enemy())) { sfx('run'); await battleUI.say('무사히 물러났다!'); finishBattle(false, true); return 'end'; }
   await battleUI.say('물러나지 못했다!'); return 'turn';
 }
 async function enemyTurn(b) {
@@ -819,13 +826,13 @@ async function enemyTurn(b) {
   const pierce = r.correct && isBoss(b) && Math.random() < PIERCE_CHANCE;
   const d = enemyHit(e, a, { correct: r.correct, pierce });
   a.hp = Math.max(tut(b) ? 1 : 0, a.hp - d);
-  tip(b, '내 체력(HP)은 왼쪽 위에서 볼 수 있어요. 줄어들면 쉼터나 회복젤로 채워요.'); battleUI.damage(d, 'player'); refreshBattle(); updateUI();
+  tip(b, '내 체력(HP)은 왼쪽 위에서 볼 수 있어요. 줄어들면 쉼터나 회복젤로 채워요.'); if (d > 0) sfx('hurt'); battleUI.damage(d, 'player'); refreshBattle(); updateUI();
   if (pierce) await battleUI.explain(`정답! 그런데 ${name(e)}의 힘이 너무 세서 그대로 뚫고 들어왔다! (관통) ${josa(name(a), '은/는')} ${d}의 충격을 받았다!`, explanationHTML(r.q), 'bad');
   else if (r.correct) await battleUI.explain(`정답! ${josa(name(a), '이/가')} 잘 막아 내서 충격이 40% 줄었다. ${d}의 충격만 받았다!`, explanationHTML(r.q), 'good');
   else await battleUI.explain(`${dark ? `${josa(name(e), '이/가')} 날뛰었다!` : `${name(e)}의 도전!`} ${josa(name(a), '은/는')} ${d}의 충격을 받았다!`, explanationHTML(r.q), 'bad');
 }
 async function allyFainted(b) {
-  battleUI.allyAct?.('tired');
+  battleUI.allyAct?.('tired'); sfx('faint');
   await battleUI.say(`${josa(name(active()), '이/가')} 지쳐서 더 이상 겨룰 수 없다!`, { tone: 'bad' });
   const next = state.party.findIndex(m => m.hp > 0);
   if (next < 0) { await battleUI.say('동료들이 모두 지쳐 버렸다… 쉼터로 돌아가 쉬자.', { tone: 'bad' }); finishBattle(false); return false; }
@@ -844,10 +851,10 @@ async function awardXP(b, foe) {
   });
   if (state.party.length > 1) lines.splice(1, 0, '함께한 다른 동료들도 경험치를 절반씩 얻었다.');
   refreshBattle(); updateUI(); save();
-  for (const line of lines.slice(0, 7)) { if (battle !== b) return; beep(line.includes('레벨이') ? 980 : 760, .1); await battleUI.say(line, { tone: 'good' }); }
+  for (const line of lines.slice(0, 7)) { if (battle !== b) return; if (line.includes('레벨이')) jingle('levelup'); else sfx('xp'); await battleUI.say(line, { tone: 'good' }); }
 }
 async function enemyFainted(b) {
-  const e = enemy(); battleUI.enemyCalmed?.(); battleUI.setAura(0);
+  const e = enemy(); battleUI.enemyCalmed?.(); battleUI.setAura(0); sfx('purify');
   tip(b, '검은 기운이 모두 걷혔어요! 이렇게 우산몬을 원래대로 돌려 주면 돼요.');
   if (berserk(b)) await battleUI.say(`${name(e)}의 검은 기운이 모두 사라졌다! ${josa(name(e), '이/가')} 원래대로 돌아왔다.`, { tone: 'good' });
   else await battleUI.say(`${josa(name(e), '이/가')} 기운을 다 써서 물러났다!`);
@@ -866,6 +873,7 @@ async function enemyFainted(b) {
 }
 async function victory(b) {
   const kind = b.kind, coins = { wild: 12, enemy: 45, trainer: 30, tutorial: 10 }[kind] ?? 80;
+  b.won = true; jingle('victory'); // 결투 음악을 멈추고 승리 노래
   state.coins += coins;
   for (const m of state.party) { if (!state.caught.includes(m.id)) state.caught.push(m.id); if (!state.seen.includes(m.id)) state.seen.push(m.id); }
   refreshBattle(); updateUI(); save();
@@ -959,7 +967,7 @@ function checkLegends() {
   if (!q) return;
   setFlag(openFlag(q.id)); save();
   const intro = state.flags['legend-intro'] ? [] : ['탐험대, 들리나요? 김박사예요. 중요한 소식이 있어요!', '천연기념물은 나라가 법으로 정해 보호하는 자연유산이에요. 천연기념물 생물의 기록은 아주 오래되고 단단해서, 지우개 기계 속에서 ‘전설의 우산몬’이 되었대요.', '전설의 우산몬은 자연을 아끼는 탐험대 앞에만 나타나요. 모험 수첩에 조건을 적어 둘게요.'];
-  setFlag('legend-intro'); beep(980, .1); setTimeout(() => beep(1180, .1), 140);
+  setFlag('legend-intro'); jingle('legend');
   talk('김박사(무전)', [...intro, ...q.radio, `전설의 우산몬 ‘${q.name}’ · ${q.place}`], () => { toast(`${q.place}에 전설의 기운이 나타났어요!`); labelKey = ''; updateUI(); }, '전설의 우산몬 소식', 'professor');
 }
 // 전설의 우산몬이 ‘동료 만들기’(10%)로 동료가 됐을 때 (동료로 넣는 일은 befriend가 이미 했어요)
@@ -993,7 +1001,7 @@ function paintLegendList() {
 // ── shop, party, dex, world map, notebook, menu ────────────────────────────────
 function showShop() {
   openModal(head('쉼터', '회복 · 준비') + `<p>잠깐 쉬어 가요. 동료 회복은 언제나 무료예요.</p><div class="fact-box">조사 코인 <strong>${state.coins}</strong> · 회복젤 ${state.items.heal}</div><div class="modal-actions"><button id="healAll" class="primary">모두 회복하기</button><button id="buyHeal" class="neutral" ${state.coins < 20 ? 'disabled' : ''}>회복젤 +3 · 20코인</button></div>`, () => {
-    $('#healAll').onclick = () => { healAll(state); save(); updateUI(); closeModal(); toast('모든 동료의 체력을 회복했어요.'); beep(660, .15); };
+    $('#healAll').onclick = () => { healAll(state); save(); updateUI(); closeModal(); toast('모든 동료의 체력을 회복했어요.'); jingle('heal'); };
     $('#buyHeal').onclick = () => { state.coins -= 20; state.items.heal += 3; save(); showShop(); };
   });
 }
@@ -1149,7 +1157,7 @@ function stampCeremony(zone, then) {
   const z0 = ZONES[zone];
   modalReturn = then || null;
   openModal(head('도장을 받았어요!', `${keeperName(z0)} · 도장 ${state.badges.length} / 8`) + `<p class="stamp-line">쾅! <b>${esc(keeperName(z0))}</b>의 ‘${esc(z0.badge)}’ 도장이 찍혔어요.</p><div class="badge-grid stamp-book">${stampsHTML(zone)}</div><div class="modal-actions"><button id="stampClose" class="primary">수첩 덮기</button></div>`, () => {
-    $('#stampClose').onclick = closeModal; setTimeout(() => beep(150, .18), 380);
+    $('#stampClose').onclick = closeModal; setTimeout(() => { sfx('stampThud'); jingle('stamp'); }, 380);
   });
 }
 // ── 공부 수첩 (v0.47): [독도 공부] 쪽 읽기 · [배움의 기록] 학습 기록 ──
@@ -1181,7 +1189,7 @@ function showNotebook() {
   });
 }
 function showSources() {
-  openModal(head('사실과 창작을 구분해요') + `<p>지역 이름은 실제 독도의 지명이에요. 우산몬·마을·건물·NPC 대사·기억의 세계는 창작입니다. 시간을 건너온 조상님 이서부·이규운·안응복·심흥탁·홍순팔도 창작 인물이고, 그들이 들려주는 이사부·이규원·안용복·심흥택·홍순칠의 활동은 실제 기록이에요. 실제 역사와 자연은 아래 자료를 바탕으로 살펴봐요. 타이틀 그림은 생성형 AI로 만든 그림을 실제 독도(동도의 등대·경비대 건물·태극기, 맞은편 서도, 괭이갈매기)에 맞게 다듬어 썼어요.</p><div class="resource-list">${SOURCES.map(s => `<a href="${s.url}" target="_blank" rel="noopener">${esc(s.title)} ↗</a>`).join('')}<a href="https://www.moe.go.kr/boardCnts/viewRenew.do?boardID=141&boardSeq=93458&lev=0&m=040401" target="_blank" rel="noopener">교육부 · 2022 개정 교육과정 고시 ↗</a></div><div class="fact-box">중심 성취기준: 사회 [6사01-02]<br>자료 신뢰성: 국어 [6국06-02]<br>생태계 보전: 과학 [4과14-01~03]의 선수학습 복습</div><p class="footer-note">개별 생물 모티브는 도감의 자료 링크에서 확인할 수 있어요. 수업 효과는 아직 검증하지 않았어요.</p>`);
+  openModal(head('사실과 창작을 구분해요') + `<p>지역 이름은 실제 독도의 지명이에요. 우산몬·마을·건물·NPC 대사·기억의 세계는 창작입니다. 배경음악과 효과음도 이 게임을 위해 새로 지은 곡으로, 녹음한 소리 파일 없이 브라우저가 그 자리에서 만들어요(우리 5음 음계와 세마치·굿거리·자진모리·휘모리 장단을 본떴어요). 시간을 건너온 조상님 이서부·이규운·안응복·심흥탁·홍순팔도 창작 인물이고, 그들이 들려주는 이사부·이규원·안용복·심흥택·홍순칠의 활동은 실제 기록이에요. 실제 역사와 자연은 아래 자료를 바탕으로 살펴봐요. 타이틀 그림은 생성형 AI로 만든 그림을 실제 독도(동도의 등대·경비대 건물·태극기, 맞은편 서도, 괭이갈매기)에 맞게 다듬어 썼어요.</p><div class="resource-list">${SOURCES.map(s => `<a href="${s.url}" target="_blank" rel="noopener">${esc(s.title)} ↗</a>`).join('')}<a href="https://www.moe.go.kr/boardCnts/viewRenew.do?boardID=141&boardSeq=93458&lev=0&m=040401" target="_blank" rel="noopener">교육부 · 2022 개정 교육과정 고시 ↗</a></div><div class="fact-box">중심 성취기준: 사회 [6사01-02]<br>자료 신뢰성: 국어 [6국06-02]<br>생태계 보전: 과학 [4과14-01~03]의 선수학습 복습</div><p class="footer-note">개별 생물 모티브는 도감의 자료 링크에서 확인할 수 있어요. 수업 효과는 아직 검증하지 않았어요.</p>`);
 }
 function exportLearning() {
   const quote = v => '"' + String(v).replace(/"/g, '""') + '"';
@@ -1191,7 +1199,11 @@ function exportLearning() {
 function download(fileName, content, type = 'application/json') { const blob = new Blob([content], { type }), url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = fileName; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 function showMenu() {
   if (battle) { toast('결투를 마친 뒤 메뉴를 열어 주세요.'); return; }
-  openModal(head('모험 메뉴', `DOKDO EXPLORERS · BUILD ${VERSION}`) + `<div class="settings-grid"><button id="menuSave" class="neutral" ${!state.started ? 'disabled' : ''}>▣ 지금 저장하기</button><button id="exportSave" class="neutral" ${!state.started ? 'disabled' : ''}>↓ 저장 파일 내려받기</button><label class="neutral">↑ 저장 파일 불러오기 <input id="importSave" type="file" accept="application/json,.json"></label><button id="menuLearn" class="neutral">✎ 공부 수첩 · 배움의 기록 내보내기</button><button id="menuSources" class="neutral">학습 자료와 출처</button><button id="menuHelp" class="neutral">조작 방법</button><button id="menuOpening" class="neutral" ${!state.started ? 'disabled' : ''}>오프닝 다시 보기</button><button id="menuTutorial" class="neutral" ${!state.started ? 'disabled' : ''}>튜토리얼 다시 하기</button><button id="menuAvatar" class="neutral" ${!state.started ? 'disabled' : ''}>탐험대원 바꾸기</button><button id="restartBtn" class="neutral danger">새로운 모험</button></div><p class="footer-note">진행은 현재 브라우저에 저장돼요. 다른 기기에서는 저장 파일을 불러와 이어갈 수 있어요. 서버에 학생 이름이나 기록을 전송하지 않아요.</p>`, () => {
+  openModal(head('모험 메뉴', `DOKDO EXPLORERS · BUILD ${VERSION}`) + `<div class="sound-settings" aria-label="소리 설정"><strong>소리</strong><label><span>배경음악</span><input id="musicVol" type="range" min="0" max="100" step="5" value="${Math.round(audioPrefs().music * 100)}"></label><label><span>효과음</span><input id="sfxVol" type="range" min="0" max="100" step="5" value="${Math.round(audioPrefs().sfx * 100)}"></label><button id="soundToggle" class="neutral">${isOn() ? '소리 끄기' : '소리 켜기'}</button><label class="music-pick"><span>배경음악 듣기</span><select id="musicPick"><option value="">지금 있는 곳의 음악</option>${Object.entries(TRACKS).map(([id, t]) => `<option value="${id}">${t.name}</option>`).join('')}</select></label></div><div class="settings-grid"><button id="menuSave" class="neutral" ${!state.started ? 'disabled' : ''}>▣ 지금 저장하기</button><button id="exportSave" class="neutral" ${!state.started ? 'disabled' : ''}>↓ 저장 파일 내려받기</button><label class="neutral">↑ 저장 파일 불러오기 <input id="importSave" type="file" accept="application/json,.json"></label><button id="menuLearn" class="neutral">✎ 공부 수첩 · 배움의 기록 내보내기</button><button id="menuSources" class="neutral">학습 자료와 출처</button><button id="menuHelp" class="neutral">조작 방법</button><button id="menuOpening" class="neutral" ${!state.started ? 'disabled' : ''}>오프닝 다시 보기</button><button id="menuTutorial" class="neutral" ${!state.started ? 'disabled' : ''}>튜토리얼 다시 하기</button><button id="menuAvatar" class="neutral" ${!state.started ? 'disabled' : ''}>탐험대원 바꾸기</button><button id="restartBtn" class="neutral danger">새로운 모험</button></div><p class="footer-note">진행은 현재 브라우저에 저장돼요. 다른 기기에서는 저장 파일을 불러와 이어갈 수 있어요. 서버에 학생 이름이나 기록을 전송하지 않아요.</p>`, () => {
+    $('#musicVol').oninput = e => setVolume('music', e.target.value / 100);
+    $('#musicPick').onchange = e => { musicPreview = e.target.value || null; if (musicPreview && !isOn()) { setOn(true); $('#soundToggle').textContent = '소리 끄기'; updateUI(); } };
+    $('#sfxVol').oninput = e => setVolume('sfx', e.target.value / 100); $('#sfxVol').onchange = () => sfx('correct');
+    $('#soundToggle').onclick = e => { setOn(!isOn()); e.target.textContent = isOn() ? '소리 끄기' : '소리 켜기'; updateUI(); };
     $('#menuSave').onclick = () => save(true); $('#exportSave').onclick = () => download('dokdomon-save.json', JSON.stringify(state, null, 2));
     $('#menuLearn').onclick = () => showStudy(); $('#menuSources').onclick = showSources;
     $('#menuOpening').onclick = async () => { closeModal(); await playStory({ id: 'opening', scenes: OPENING.scenes }); };
@@ -1211,15 +1223,17 @@ try { const raw = localStorage.getItem(KEY); if (raw) saved = validateSave(JSON.
 // 타이틀 그림(v0.47): 동도 정상에서 서도를 바라보는 두 탐험대원 — 생성형 AI로 만든 그림을 고증에 맞게 다듬어 썼어요.
 $('#titleScreen').style.backgroundImage = `url("${assetURL('scenery/title-dokdo-v51.jpg')}")`;
 if (saved?.started) $('#continueBtn').classList.remove('hidden');
-$('#startBtn').onclick = startNew; $('#continueBtn').onclick = continueGame;
+$('#startBtn').onclick = () => { jingle('start'); startNew(); }; $('#continueBtn').onclick = () => { jingle('start'); continueGame(); };
 $('#saveBtn').onclick = () => state.started ? save(true) : toast('모험을 시작하면 저장할 수 있어요.');
 $('#menuBtn').onclick = showMenu; $('#mapBtn').onclick = () => { if (!battle) showMap(); }; $('#dexBtn').onclick = () => { if (!battle) showDex(); };
 $('#notebookBtn').onclick = () => { if (!battle) showStudy(); }; $('#guideBtn').onclick = () => { closeModal(); guide(); };
 $('#questBtn').onclick = $('#questPeek').onclick = showQuest; $('#partyBtn').onclick = $('#buddyPeek').onclick = showParty;
 $('#pocketBtn').onclick = () => showStorage();
 $('#fullscreenBtn').onclick = toggleFullscreen;
-$('#soundBtn').onclick = () => { state.sound = !state.sound; if (state.sound) beep(660, .15); updateUI(); save(); };
+$('#soundBtn').onclick = () => { setOn(!isOn()); if (isOn()) sfx('toggle'); updateUI(); };
 window.addEventListener('beforeunload', () => save());
+// 단추를 누를 때 작은 소리(결투 창은 battle-ui가 따로 내요)
+document.addEventListener('click', e => { const b = e.target.closest?.('button, .party-card'); if (!b || b.disabled || b.closest('#battleScreen') || b.matches('#nextTalk, #soundBtn, #soundToggle, #startBtn, #continueBtn, #stampClose')) return; sfx('tap'); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) { keys.clear(); joystick.reset(); save(); } });
 setInterval(() => { if (state.started && !battle && !document.hidden) save(); }, 30000);
 onAssetReady(() => { paintResidentPortrait(); paintPortraits(); paintExplorerChoices(performance.now()); if (battle) refreshBattle(); });
@@ -1231,6 +1245,7 @@ updateUI(); paintPortraits(); requestAnimationFrame(frame);
 if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('test')) {
   window.__dokdo = {
     get state() { return state; }, get battle() { return battle; }, get busy() { return busy(); }, get transition() { return transition; }, get talk() { return dialogueState; }, get map() { return map; },
+    audio: () => ({ wanted: wantedMusic(), playing: currentMusic(), on: isOn() }),
     cutscene: () => cutscenes.current, people: liveNPCs, guide, interact, nextTalk, startBattle, closeModal, stampCeremony, showStudy, travel, changeMap, save, continueGame,
     motion: () => ({ view: { ...view }, walkDistance, moving }), npcs: () => npcs(map, progress(), state.flags),
     playStory, stories: { OPENING, GUIDE, BOSS_REVEAL, BOSS_FALL, TREE_JOINS },
