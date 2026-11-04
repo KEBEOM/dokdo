@@ -9,7 +9,7 @@ test('every page is well formed, with sources and questions to check yourself', 
   for (const p of STUDY_PAGES) {
     assert.ok(p.title && p.icon && p.points.length >= 2, p.id);
     assert.ok(p.sources.length >= 1, `${p.id} names its sources`);
-    for (const r of p.sources) { const s = typeof r === 'number' ? SOURCES[r] : r; assert.ok(s?.title && /^https:\/\//.test(s.url), `${p.id} source ${JSON.stringify(r)}`); }
+    for (const r of p.sources) { const s = typeof r === 'string' ? SOURCES.find(x => x.url === r) : typeof r === 'number' ? SOURCES[r] : r; assert.ok(s?.license, `${p.id}: 이용 조건이 밝혀진 자료`); assert.ok(s?.title && /^https:\/\//.test(s.url), `${p.id} source ${JSON.stringify(r)}`); }
     for (const c of p.concepts) { assert.ok(CONCEPTS.some(x => x.id === c), `${p.id}: ${c}`); assert.ok(QUESTIONS.some(q => q.concept === c), `${p.id}: questions for ${c}`); }
     for (const [y, t] of p.timeline || []) assert.ok(y && t);
   }

@@ -811,3 +811,6 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
 #gameApp .sound-settings .music-pick{grid-column:1/-1}
 #gameApp .sound-settings select{flex:1;min-width:0;padding:6px 8px;border:1px solid #cdbb94;border-radius:6px;background:#fffaf0;font:inherit;font-size:12px}
 #gameApp .sound-settings label>span{flex:0 0 5.2em}
+/* v0.56 학습 자료 목록: 이용 조건 표시 */
+#gameApp .resource-list a small{display:block;margin-top:2px;font-size:10px;color:#8a7a5c;text-decoration:none}
+#gameApp .source-head{font-size:14px;margin:16px 0 4px;text-align:center}

@@ -30,7 +30,7 @@ import { OPENING, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.55';
+const VERSION = '0.57';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -602,7 +602,7 @@ function beginStudy(kind = 'review', concept = null, opts = {}) {
         recordAnswer(state, q, correct, assisted);
         $$('[data-answer]').forEach(btn => { btn.disabled = true; if (Number(btn.dataset.answer) === q.answer) btn.classList.add('correct'); });
         if (!correct) b.classList.add('wrong'); sfx(correct ? 'correct' : 'wrong');
-        $('#feedbackArea').innerHTML = `<div class="feedback"><strong>${correct ? '잘 연결했어요!' : '근거를 다시 살펴볼까요?'}</strong><br>${esc(q.explanation)}<br><a class="source-link" href="${q.source}" target="_blank" rel="noopener">실제 자료 살펴보기 ↗</a></div><div class="modal-actions"><button id="nextQuestion" class="primary">${!correct ? '근거를 읽고 다시 풀기' : index < questions.length - 1 ? '다음 기록' : '조사 마치기'} →</button></div>`;
+        $('#feedbackArea').innerHTML = `<div class="feedback"><strong>${correct ? '잘 연결했어요!' : '근거를 다시 살펴볼까요?'}</strong><br>${esc(q.explanation)}<br><a class="source-link" href="${q.source}" target="_blank" rel="noopener">출처: ${esc(sourceCite(q.source))} ↗</a></div><div class="modal-actions"><button id="nextQuestion" class="primary">${!correct ? '근거를 읽고 다시 풀기' : index < questions.length - 1 ? '다음 기록' : '조사 마치기'} →</button></div>`;
         $('#nextQuestion').onclick = () => {
           if (!correct) { assisted = true; show(); return; }
           assisted = false; index++;
@@ -714,7 +714,9 @@ function refreshBattle() {
   battleUI.setFoe(e, { name: sp.name, type: TYPES[sp.type].name, gauge: dark ? '검은 기운' : '기운', dark }, battle.enemies.length > 1 ? `${battle.index + 1} / ${battle.enemies.length}번째 우산몬` : '');
   if (dark) battleUI.setAura(e.hp > 0 ? Math.max(.25, e.hp / e.maxHp) : 0);
 }
-function explanationHTML(q) { return `<p class="dq-explain">${esc(q.explanation)}</p><a class="source-link" href="${q.source}" target="_blank" rel="noopener">자료 확인 ↗</a>`; }
+// 출처 표시: 공공누리·자유이용 조건에 따라 문제마다 근거 자료의 이름을 밝혀요
+const sourceCite = url => SOURCES.find(s => s.url === url)?.cite || '학습 자료';
+function explanationHTML(q) { return `<p class="dq-explain">${esc(q.explanation)}</p><a class="source-link" href="${q.source}" target="_blank" rel="noopener">출처: ${esc(sourceCite(q.source))} ↗</a>`; }
 // ── 문제 결투 (v0.42) ───────────────────────────────────────────────────────────
 // 내 차례: ‘문제 풀기’를 누르면 바로 독도 문제가 나와요. 상성은 내 우산몬과 상대 우산몬의 속성으로 정해요.
 const conceptTitle = q => CONCEPTS.find(c => c.id === q.concept)?.title || '기억 확인';
@@ -1164,7 +1166,7 @@ function stampCeremony(zone, then) {
 const studyRead = () => STUDY_PAGES.filter(p => state.flags[`study:${p.id}`]).length;
 function noteTabs(active) { return `<div class="note-tabs" role="tablist">${[['study', '독도 공부'], ['record', '배움의 기록']].map(([k, l]) => `<button role="tab" data-tab="${k}" class="${active === k ? 'selected' : ''}" aria-selected="${active === k}">${l}</button>`).join('')}</div>`; }
 function bindTabs() { $$('[data-tab]').forEach(b => b.onclick = () => b.dataset.tab === 'study' ? showStudy() : showNotebook()); }
-const sourceOf = r => typeof r === 'number' ? SOURCES[r] : r;
+const sourceOf = r => typeof r === 'number' ? SOURCES[r] : typeof r === 'string' ? SOURCES.find(s => s.url === r) : r;
 function showStudy(pageId = null) {
   const at = STUDY_PAGES.findIndex(p => p.id === pageId), p = STUDY_PAGES[at];
   if (!p) {
@@ -1189,7 +1191,7 @@ function showNotebook() {
   });
 }
 function showSources() {
-  openModal(head('사실과 창작을 구분해요') + `<p>지역 이름은 실제 독도의 지명이에요. 우산몬·마을·건물·NPC 대사·기억의 세계는 창작입니다. 배경음악과 효과음도 이 게임을 위해 새로 지은 곡으로, 녹음한 소리 파일 없이 브라우저가 그 자리에서 만들어요(우리 5음 음계와 세마치·굿거리·자진모리·휘모리 장단을 본떴어요). 시간을 건너온 조상님 이서부·이규운·안응복·심흥탁·홍순팔도 창작 인물이고, 그들이 들려주는 이사부·이규원·안용복·심흥택·홍순칠의 활동은 실제 기록이에요. 실제 역사와 자연은 아래 자료를 바탕으로 살펴봐요. 타이틀 그림은 생성형 AI로 만든 그림을 실제 독도(동도의 등대·경비대 건물·태극기, 맞은편 서도, 괭이갈매기)에 맞게 다듬어 썼어요.</p><div class="resource-list">${SOURCES.map(s => `<a href="${s.url}" target="_blank" rel="noopener">${esc(s.title)} ↗</a>`).join('')}<a href="https://www.moe.go.kr/boardCnts/viewRenew.do?boardID=141&boardSeq=93458&lev=0&m=040401" target="_blank" rel="noopener">교육부 · 2022 개정 교육과정 고시 ↗</a></div><div class="fact-box">중심 성취기준: 사회 [6사01-02]<br>자료 신뢰성: 국어 [6국06-02]<br>생태계 보전: 과학 [4과14-01~03]의 선수학습 복습</div><p class="footer-note">개별 생물 모티브는 도감의 자료 링크에서 확인할 수 있어요. 수업 효과는 아직 검증하지 않았어요.</p>`);
+  openModal(head('사실과 창작을 구분해요') + `<p>지역 이름은 실제 독도의 지명이에요. 우산몬·마을·건물·NPC 대사·기억의 세계는 창작입니다. 배경음악과 효과음도 이 게임을 위해 새로 지은 곡으로, 녹음한 소리 파일 없이 브라우저가 그 자리에서 만들어요(우리 5음 음계와 세마치·굿거리·자진모리·휘모리 장단을 본떴어요). 시간을 건너온 조상님 이서부·이규운·안응복·심흥탁·홍순팔도 창작 인물이고, 그들이 들려주는 이사부·이규원·안용복·심흥택·홍순칠의 활동은 실제 기록이에요. 실제 역사와 자연은 아래 자료를 바탕으로 살펴봐요. 타이틀 그림은 생성형 AI로 만든 그림을 실제 독도(동도의 등대·경비대 건물·태극기, 맞은편 서도, 괭이갈매기)에 맞게 다듬어 썼어요.</p><h3 class="source-head">문제와 공부 수첩의 자료</h3><p>문제 ${QUESTIONS.length}개는 모두 아래 공공 자료 가운데 하나에 근거해요. 이용 조건이 분명한 곳만 골랐어요. 한국민족문화대백과사전 본문은 저작권법 제24조의2(공공저작물의 자유이용)에 따라, 정책브리핑 글은 공공누리 제1유형(출처표시)에 따라 출처를 밝히고 썼어요. 문제와 해설은 자료의 사실을 초등학생 눈높이로 새로 쓴 글이에요.</p><div class="resource-list">${SOURCES.map(s => `<a href="${s.url}" target="_blank" rel="noopener">${esc(s.title)} ↗<small>${esc(s.license)} · 문제 ${QUESTIONS.filter(q => q.source === s.url).length}개</small></a>`).join('')}<a href="https://www.moe.go.kr/boardCnts/viewRenew.do?boardID=141&boardSeq=93458&lev=0&m=040401" target="_blank" rel="noopener">교육부 · 2022 개정 교육과정 고시 ↗</a></div><div class="fact-box">중심 성취기준: 사회 [6사01-02]<br>자료 신뢰성: 국어 [6국06-02]<br>생태계 보전: 과학 [4과14-01~03]의 선수학습 복습</div><p class="footer-note">개별 생물 모티브는 도감의 자료 링크에서 확인할 수 있어요. 수업 효과는 아직 검증하지 않았어요.</p>`);
 }
 function exportLearning() {
   const quote = v => '"' + String(v).replace(/"/g, '""') + '"';

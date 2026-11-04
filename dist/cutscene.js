@@ -9,7 +9,7 @@ import { SCENERY_ATLAS } from './scenery-atlas.js';
 import { CUTSCENE_ATLAS } from './cutscene-atlas.js';
 import { islandFrame } from './island-pictures.js';
 import { terrainSample } from './terrain.js';
-import { drawExplorer, drawResident, PROFESSOR_PICTURE } from './characters.js';
+import { drawExplorer, drawResident, PROFESSOR_PICTURE, pictureKey } from './characters.js';
 import { drawMonster } from './sprites.js';
 import { preloadMonsters } from './assets.js';
 
@@ -143,7 +143,7 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
     crisp.src = img; crisp.canvas = c; return c;
   }
   function picture(t, s) {
-    const p = s.picture, info = p && PICTURES[p.id], img = info && assetImage(info.key); if (!img) return;
+    const p = s.picture, info = p && PICTURES[p.id], img = info && assetImage(pictureKey(info.key)); if (!img) return;
     const inP = Math.min(1, (t - p.at) / 450), outP = p.offAt ? Math.min(1, (t - p.offAt) / 350) : 0, a = inP * (1 - outP);
     if (a <= 0) return;
     const e = 1 - Math.pow(1 - inP, 3), dx = (1 - e) * 46;
@@ -469,7 +469,7 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
     if (verb === 'come' && who?.comeTo) who.walk = { fx: who.x, fy: who.y, tx: who.comeTo[0], ty: who.comeTo[1], start: t, ms: who.walkMs || 900 };
     if (verb === 'calm' && who) who.calmAt = t;
     if (verb === 'morph' && who?.morphTo) { who.who = who.morphTo; who.showAt = t; who.hidden = false; } // 전설의 우산몬 형태변환: 빛기둥 속에서 변환폼으로
-    if (verb === 'picture' && PICTURES[arg]) { s.picture = { id: arg, at: t }; assetImage(PICTURES[arg].key); }
+    if (verb === 'picture' && PICTURES[arg]) { s.picture = { id: arg, at: t }; assetImage(pictureKey(PICTURES[arg].key)); }
     if (name === 'picture-off' && s.picture) s.picture.offAt = t;
     if (name === 'machine-quiet') { s.cues.machine = t - 1e4; s.cues['machine-off'] = t - 1e4; } // already stopped, no sparks
     if (name === 'rise') { const m = s.cast.get('gangchi'); if (m) { m.hidden = false; m.baseY = m.y; m.riseAt = t; } }
@@ -488,7 +488,7 @@ export function createCutscenePlayer(root, { onBlip = null, onAdvance = null } =
     titleEl.innerHTML = def.title ? `<small>${esc(def.title.kicker)}</small><strong>${esc(def.title.name)}</strong><span>${esc(def.title.sub || '')}</span>` : '';
     titleEl.classList.toggle('show', !!def.title);
     for (const c of def.start || []) cue(c, t);
-    for (const line of def.lines || []) { const m = /^picture:(\w+)/.exec(line.cue || ''); if (m && PICTURES[m[1]]) assetImage(PICTURES[m[1]].key); }
+    for (const line of def.lines || []) { const m = /^picture:(\w+)/.exec(line.cue || ''); if (m && PICTURES[m[1]]) { assetImage(PICTURES[m[1]].key); assetImage(pictureKey(PICTURES[m[1]].key)); } }
     const ids = [...cast.values()].map(c => c.who).filter(w => w.startsWith('monster:')).map(w => w.slice(8)); // '68-2' = 변환폼
     if (ids.length) preloadMonsters(ids);
   }
