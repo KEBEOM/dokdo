@@ -14,9 +14,9 @@ test('100 collectible species and real-name roster',()=>{
   for(const m of MONSTERS){assert.ok(m.zone>=0&&m.zone<8);if(m.source)assert.match(m.source,/^https:/);assert.equal(m.evolvesTo,null);if(m.evolvesTo){const to=getSpecies(m.evolvesTo);assert.equal(to.family,m.family);assert.equal(to.stage,m.stage+1);}}
   const obtainable=new Set(MONSTERS.filter(m=>m.stage===1).map(m=>m.id));for(const m of MONSTERS)if(m.evolvesTo&&obtainable.has(m.id))obtainable.add(m.evolvesTo);assert.equal(obtainable.size,100);
 });
-test('300 sourced learning questions across 12 concepts',()=>{
-  assert.equal(CONCEPTS.length,12);assert.equal(QUESTIONS.length,300);assert.equal(new Set(QUESTIONS.map(q=>q.id)).size,300);assert.equal(new Set(QUESTIONS.map(q=>q.prompt)).size,300);
-  for(const c of CONCEPTS){const cq=QUESTIONS.filter(q=>q.concept===c.id);assert.equal(cq.length,25);assert.ok(new Set(cq.map(q=>q.zone)).size>=4,'questions spread over the journey');}
+test('308 sourced learning questions across 12 concepts',()=>{
+  assert.equal(CONCEPTS.length,12);assert.equal(QUESTIONS.length,308);assert.equal(new Set(QUESTIONS.map(q=>q.id)).size,308);assert.equal(new Set(QUESTIONS.map(q=>q.prompt)).size,308);
+  for(const c of CONCEPTS){const cq=QUESTIONS.filter(q=>q.concept===c.id);assert.ok(cq.length>=25&&cq.length<=27);assert.ok(new Set(cq.map(q=>q.zone)).size>=4,'questions spread over the journey');}
   for(const q of QUESTIONS){assert.equal(q.options.length,4,'four choices: one answer and three tempting wrong answers');assert.ok(q.answer>=0&&q.answer<4);assert.equal(new Set(q.options).size,4);assert.ok(CONCEPTS.some(c=>c.id===q.concept));assert.match(q.source,/^https:/);assert.ok(SOURCES.some(s=>s.url===q.source&&/저작권법 제24조의2|공공누리 제1유형/.test(s.license)),`${q.id}: 이용 조건이 분명한 자료`);assert.ok(q.zone>=0&&q.zone<8);}
 });
 test('every map: people on land, arrivals free, everyone and every exit reachable',()=>{

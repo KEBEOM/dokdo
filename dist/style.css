@@ -814,3 +814,111 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
 /* v0.56 학습 자료 목록: 이용 조건 표시 */
 #gameApp .resource-list a small{display:block;margin-top:2px;font-size:10px;color:#8a7a5c;text-decoration:none}
 #gameApp .source-head{font-size:14px;margin:16px 0 4px;text-align:center}
+/* ───────── v0.58 기록 되찾기 결투 ─────────
+   · 옆모습 구도: 탐험대원과 내 우산몬이 왼쪽, 사나워진 우산몬이 오른쪽에서 같은 땅 위에 마주 서요(둥근 받침대 없음)
+   · 상대 정보는 두루마리: 검은 기운이 지운 기록의 빈칸이 문제를 맞힐 때마다 채워져요
+   · 문제 형식: 나침반 · 순서 놓기 · 근거 카드 · ○× 빠른 판단 */
+.battle-screen.dq .dq-stage{container-type:size;justify-content:flex-start;padding:0}
+.battle-screen.dq .dq-pad{display:none}
+.battle-screen.dq .dq-stage .dq-enemy{position:absolute;right:10%;bottom:8%;margin:0;height:58%;height:min(58cqh,27cqw);max-height:230px}
+.battle-screen.dq .dq-mine{left:19%;bottom:8%;height:58%;height:min(58cqh,27cqw);max-height:230px}
+.battle-screen.dq .dq-mine .dq-shadow{bottom:2%}
+.battle-screen.dq .dq-explorer{position:absolute;left:4%;bottom:9%;height:52%;height:min(52cqh,22cqw);max-height:200px;aspect-ratio:96/120;image-rendering:pixelated;z-index:2;filter:drop-shadow(0 3px 0 #0003)}
+.battle-screen.dq .dq-stage.has-trainer .dq-enemy{right:24%}
+.battle-screen.dq .dq-stage.has-trainer .dq-trainer{right:3%;bottom:9%;height:50%;height:min(50cqh,22cqw)}
+.battle-screen.dq.quiz-open .dq-stage .dq-enemy,.battle-screen.dq.quiz-open .dq-mine{bottom:4%;height:84%;height:min(84cqh,24cqw)}
+.battle-screen.dq.quiz-open .dq-explorer{bottom:5%;height:76%;height:min(76cqh,20cqw)}
+.battle-screen.dq.quiz-open .dq-stage.has-trainer .dq-trainer{bottom:5%;height:72%;height:min(72cqh,20cqw)}
+/* 두루마리 */
+.battle-screen.dq .dq-top{align-items:flex-start}
+.battle-screen.dq .dq-foe.dq-scroll{position:relative;flex:1 1 300px;max-width:600px;min-width:0;margin:0 8px;padding:6px 18px 6px;text-align:center;align-items:stretch;border-radius:3px}
+.battle-screen.dq .dq-scroll::before,.battle-screen.dq .dq-scroll::after{content:'';position:absolute;top:-5px;bottom:-5px;width:11px;border-radius:6px;background:linear-gradient(90deg,#4a2e1a,#9a6a3c 45%,#4a2e1a);box-shadow:0 0 0 2px #2a170b,0 3px 0 #0005}
+.battle-screen.dq .dq-scroll::before{left:-8px}.battle-screen.dq .dq-scroll::after{right:-8px}
+.dq-scroll .scroll-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.dq-scroll .scroll-head strong{font-size:17px}
+.dq-scroll .scroll-paper{margin:4px 0 3px;padding:4px 4px 6px;border-top:1px dashed #b89b6a;border-bottom:1px dashed #b89b6a}
+.dq-scroll .scroll-title{display:block;font-size:11px;letter-spacing:.3em;color:#8a6a3c;font-weight:700}
+.dq-scroll.dark .scroll-title{color:#6b3f8f}
+.dq-scroll .scroll-record{margin:4px 0 0;display:flex;flex-wrap:wrap;justify-content:center;gap:3px;line-height:1}
+.dq-scroll .scroll-record i{font-style:normal;display:grid;place-items:center;width:1.4em;height:1.55em;font-family:var(--serif,serif);font-weight:900;font-size:18px;border-radius:3px;color:transparent;background:#d8c9a6;box-shadow:inset 0 0 0 1px #b89b6a}
+.dq-scroll.dark .scroll-record i{background:radial-gradient(circle at 40% 35%,#5a3684,#2a173f 70%);box-shadow:inset 0 0 0 1px #1a0d29}
+.dq-scroll .scroll-record i.on{background:#fffaea;color:#3a2412;box-shadow:inset 0 0 0 1px #c9a86a;animation:record-in .6s ease-out}
+.dq-scroll .scroll-record i.sp{width:.45em;background:none;box-shadow:none}
+.dq-scroll .dq-gauge-label{font-size:11px;color:#7a6442;margin:0}
+@keyframes record-in{0%{transform:scale(1.5);background:#ffe9a8}100%{transform:scale(1)}}
+/* 문제 형식 */
+.battle-screen.dq .dq-cards{grid-template-columns:1fr 1fr;gap:10px}
+.battle-screen.dq .dq-cards .dq-answer{flex-direction:column;align-items:flex-start;gap:6px;min-height:92px;padding:10px 12px 12px;border-radius:6px;box-shadow:0 3px 0 #0006;background:var(--fiber,none),linear-gradient(180deg,var(--hj-hi),#f1e4c6)}
+.battle-screen.dq .dq-cards .dq-answer .dq-cursor{display:none}
+.battle-screen.dq .dq-cards .dq-answer strong{margin-left:0}
+.dq-claim{margin:4px 0 10px;padding:10px 14px;border-radius:6px;background:linear-gradient(180deg,var(--hj-hi,#fffaea),#f1e4c6);color:var(--meok,#2b1d12);border:2px solid #9c7f52;text-align:center}
+.dq-claim small{display:block;font-size:12px;color:#8a6a3c;margin-bottom:2px}
+.dq-claim b{font-size:clamp(17px,2.2vw,22px);word-break:keep-all}
+.battle-screen.dq .dq-ox{grid-template-columns:1fr 1fr;gap:10px}
+.battle-screen.dq .dq-ox .dq-answer{justify-content:center;gap:10px;min-height:64px;font-size:19px}
+.battle-screen.dq .dq-ox .dq-answer i{font-style:normal;font-size:30px;font-weight:900;line-height:1}
+.battle-screen.dq .dq-ox .ox-o i{color:#2d877f}.battle-screen.dq .dq-ox .ox-x i{color:#b5452f}
+.battle-screen.dq .dq-ox .dq-answer.correct i,.battle-screen.dq .dq-ox .dq-answer.wrong i{color:inherit}
+.dq-right{margin:8px 0 0;padding:6px 10px;border-left:4px solid #7bd88f;background:#ffffff12;color:#fdf6e3;font-size:15px;border-radius:0 4px 4px 0}
+.dq-right b{color:#b8f5c5;margin-right:6px;font-size:12px}
+.dq-compass{position:relative;width:min(100%,420px);height:clamp(170px,30cqh,230px);height:200px;margin:4px auto 2px}
+.compass-rose{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;display:grid;place-items:center;font-size:28px;color:#b5452f;background:#fffaea;box-shadow:0 0 0 2px #4a2e1a,0 0 0 6px #e8d5a8,0 0 0 8px #4a2e1a}
+.compass-rose small{position:absolute;top:-30px;left:50%;transform:translateX(-50%);font-size:12px;color:#f4e6bf;font-weight:700}
+.battle-screen.dq .dq-compass .compass-pt{position:absolute;left:calc(50% + var(--cx) * 36%);top:calc(50% + var(--cy) * 36%);transform:translate(-50%,-50%);width:auto;min-width:92px;justify-content:center;padding:8px 12px}
+.battle-screen.dq .dq-compass .compass-pt strong{margin-left:6px}
+.dq-slots{list-style:none;margin:6px 0 8px;padding:0;display:flex;gap:8px;flex-wrap:wrap;counter-reset:none}
+.dq-slots li{flex:1 1 150px;min-width:0;position:relative}
+.dq-slots li + li::before{content:'→';position:absolute;left:-10px;top:50%;transform:translate(-50%,-50%);color:#d6c7a6;font-size:13px}
+.battle-screen.dq .dq-slot{width:100%;min-height:46px;gap:8px;padding:6px 10px;border:2px dashed #b89b6a;border-radius:6px;background:#ffffff0d;color:#bfae8a;font-size:16px;opacity:1}
+.battle-screen.dq .dq-slot b{display:grid;place-items:center;width:22px;height:22px;flex:0 0 22px;border-radius:50%;background:#c48a22;color:#2a170b;font-size:12px}
+.battle-screen.dq .dq-slot span{white-space:normal;word-break:keep-all}
+.battle-screen.dq .dq-slot.filled{border-style:solid;background:linear-gradient(180deg,var(--hj-hi,#fffaea),#f1e4c6);color:var(--meok,#2b1d12);cursor:pointer}
+.dq-slots.correct .dq-slot{border-color:#7bd88f;background:linear-gradient(180deg,#3f9a7d,#2d6f5c);color:#fffaf0}
+.dq-slots.wrong .dq-slot{border-color:#e07a5f;background:linear-gradient(180deg,#cc5a43,#a53d2a);color:#fffaf0}
+.dq-chips{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 8px}
+.battle-screen.dq .dq-chip{width:auto;flex:1 1 150px;justify-content:center;padding:9px 12px;font-size:16px;border:2px solid #9c7f52;border-radius:6px;background:linear-gradient(180deg,var(--hj-hi,#fffaea),#f1e4c6);color:var(--meok,#2b1d12);box-shadow:0 3px 0 #0006;white-space:normal;word-break:keep-all;text-align:center}
+.battle-screen.dq .dq-chip:disabled{opacity:.28;box-shadow:none}
+.battle-screen.dq .dq-chip.current,.battle-screen.dq .dq-order-ok.current{outline:2.5px solid var(--hwang,#f0c45a);outline-offset:1px}
+.battle-screen.dq .dq-order-ok{width:auto;margin:0 auto;justify-content:center;padding:9px 22px;font-size:16px;border:3px solid #4a1d12;border-radius:6px;background:linear-gradient(180deg,#cf5d45,#b5452f 55%,#9a3523);color:#fff6e0;box-shadow:0 3px 0 #2a0f08}
+.battle-screen.dq .dq-order-ok:disabled{opacity:.4}
+@media (max-width:600px){
+  .battle-screen.dq .dq-foe.dq-scroll{margin:0 6px 0 4px;padding:4px 12px}
+  .dq-scroll .scroll-head strong{font-size:14px}.dq-scroll .scroll-record i{font-size:14px}.dq-scroll .scroll-title{font-size:10px;letter-spacing:.15em}
+  .dq-scroll .dq-gauge-label{display:block;font-size:10px}
+  .battle-screen.dq .dq-cards{grid-template-columns:1fr;gap:6px}.battle-screen.dq .dq-cards .dq-answer{min-height:0;flex-direction:row;align-items:center}
+  .dq-slots li{flex-basis:100%}.dq-slots li + li::before{display:none}.battle-screen.dq .dq-chip{flex-basis:100%}
+  .dq-compass{height:180px}.battle-screen.dq .dq-compass .compass-pt{min-width:78px;font-size:15px}
+}
+@media (max-height:460px){
+  .dq-scroll .scroll-paper{margin:2px 0;padding:2px}.dq-scroll .scroll-record i{font-size:13px}.dq-scroll .scroll-title{display:none}
+  .dq-claim{margin:2px 0 6px;padding:5px 10px}.battle-screen.dq .dq-ox .dq-answer{min-height:44px!important}
+  .dq-compass{height:150px}.compass-rose{width:44px;height:44px;font-size:20px}.compass-rose small{display:none}
+  .battle-screen.dq .dq-cards .dq-answer{min-height:0;flex-direction:row;align-items:center}
+  .battle-screen.dq .dq-slot{min-height:34px;font-size:13px}.battle-screen.dq .dq-chip{padding:5px 8px;font-size:13px}.battle-screen.dq .dq-order-ok{padding:5px 14px;font-size:13px}
+}
+.battle-screen.dq .dq-pad{display:none!important}
+.battle-screen.dq .dq-compass .compass-pt>span{white-space:nowrap}
+.battle-screen.dq .dq-cards .dq-answer.correct{background:linear-gradient(180deg,#3f9a7d,var(--chung,#2d6f5c))}
+.battle-screen.dq .dq-cards .dq-answer.wrong{background:linear-gradient(180deg,#cc5a43,var(--hong,#b5452f))}
+@media (max-width:600px){
+  .battle-screen.dq .dq-top{flex-wrap:wrap;gap:6px}
+  .battle-screen.dq .dq-status{flex:1 1 100%;min-width:0;padding:3px 10px}
+  .battle-screen.dq .dq-status .dq-party{display:none}
+  .battle-screen.dq .dq-foe.dq-scroll{flex:1 1 100%;margin:0 8px}
+  .dq-scroll .scroll-paper{margin:2px 0;padding:3px 2px 4px}
+  .battle-screen.dq .dq-chip{flex:1 1 auto;padding:7px 10px;font-size:15px}
+  .battle-screen.dq .dq-slot{min-height:38px;font-size:15px;padding:4px 10px}
+  .dq-slots{gap:5px;margin:4px 0 6px}.dq-chips{gap:6px;margin-bottom:6px}
+}
+/* 세로 휴대폰: 위쪽 창을 납작하게(내 상태 한 줄 + 두루마리 한두 줄) */
+@media (max-width:600px){
+  .battle-screen.dq .dq-status .dq-status-row{justify-content:center}
+  .battle-screen.dq .dq-status .dq-status-row>div{display:flex;align-items:center;gap:6px 8px;flex-wrap:wrap;justify-content:center;width:100%}
+  .battle-screen.dq .dq-status .dq-status-row>canvas{display:none}
+  .battle-screen.dq .dq-status .dq-hp{margin:0}
+  .battle-screen.dq .dq-status .dq-barrow{flex:1 1 90px;margin:0}
+  .dq-scroll .scroll-title,.battle-screen.dq .dq-scroll .dq-gauge-label{display:none}
+  .dq-scroll .scroll-record i{font-size:12.5px}.dq-scroll .scroll-record{gap:2px;margin-top:2px}
+  .dq-scroll .scroll-paper{border-bottom:0;padding-bottom:1px}
+}
+@media (max-height:820px){.battle-screen.dq .dq-cards{gap:6px}.battle-screen.dq .dq-cards .dq-answer{min-height:0;flex-direction:row;align-items:center;padding:8px 12px}}

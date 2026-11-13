@@ -22,7 +22,8 @@ import { EXPLORERS, PROFESSOR_PICTURE, paintExplorerCard, paintExplorerPortrait,
 import { createNPCMotion } from './npc-motion.js';
 import { createRoamers } from './roamers.js';
 import { MOVE_DURATION, moveView } from './movement.js';
-import { selectBattleQuestion, shuffledChoices } from './battle-quiz.js';
+import { selectBattleQuestion, shuffledChoices, quizFormat, oxShown } from './battle-quiz.js';
+import { pickRecord } from './records.js';
 import { createMap, npcs, blocked, pathfind, drawWorld, drawActors, TILE, W, H, wantedRole, VILLAIN_BY_ZONE } from './world.js';
 import { MAPS, getMapDef, townId, nextMapId, prevMapId } from './maps.js';
 import { createCutscenePlayer } from './cutscene.js';
@@ -30,7 +31,7 @@ import { OPENING, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.57';
+const VERSION = '0.58';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -696,6 +697,7 @@ function startBattle(kind, id, opts = {}) {
   else if (kind === 'trainer') enemies = (opts.npc.team?.length ? opts.npc.team : [z().wild[3]]).map(i => createMonster(i, base));
   else enemies = z().bossTeam.slice(0, kind === 'rematch' ? 3 : 2).map(i => createMonster(i, kind === 'rematch' ? base + 1 : Math.max(3, base - 2))); // v0.44 독도 지킴이 약하게: 인증 결투는 이 장 기준 레벨 −2
   for (const m of enemies) if (!state.seen.includes(m.id)) state.seen.push(m.id);
+  for (const m of enemies) m.record = pickRecord(state.zone, Math.random, enemies.map(x => x.record).filter(Boolean)); // 검은 기운이 지운 기록 한 줄씩
   preloadMonsters(enemies.map(m => m.id));
   for (const r of ['grunt', 'exec', 'boss']) assetImage(`characters/baekmudan-${r}-portrait`);
   $('#toast').classList.add('hidden');
@@ -703,7 +705,7 @@ function startBattle(kind, id, opts = {}) {
   $('#battleScreen').classList.remove('hidden'); scene.classList.add('battling');
   const foeTrainer = kind === 'enemy' ? VILLAIN_BY_ZONE[state.zone] : kind === 'trainer' ? opts.npc.actor : null;
   const foePortrait = villainPortrait(foeTrainer);
-  battleUI.mount({ backdrop: backdropKind(), sky: z().color, aura: berserk(battle), island: map.def?.island || '', label: kind === 'tutorial' ? '연습 대결 · 김박사와 함께' : kind === 'wild' ? `사나워진 우산몬 · ${map.name}` : kind === 'legend' ? `전설의 우산몬 · ${map.name}` : kind === 'boss' || kind === 'rematch' ? `${opponentName(battle)} · 인증 결투` : opponentName(battle), foeTrainer, foePortrait });
+  battleUI.mount({ backdrop: backdropKind(), sky: z().color, aura: berserk(battle), island: map.def?.island || '', avatar: state.avatar, label: kind === 'tutorial' ? '연습 · 김박사와 함께' : kind === 'wild' ? `기록 되찾기 · ${map.name}` : kind === 'legend' ? `전설의 우산몬 · ${map.name}` : kind === 'boss' || kind === 'rematch' ? `${opponentName(battle)} · 인증 결투` : opponentName(battle), foeTrainer, foePortrait });
   refreshBattle(); if (!(foePortrait && battleUI.portraitIn())) battleUI.enemyEnter(); sfx('encounter'); updateUI();
   runBattle(battle).catch(err => { console.error(err); if (battle) finishBattle(false, true); });
 }
@@ -711,21 +713,22 @@ function refreshBattle() {
   if (!battle) return;
   const a = active(), e = enemy(), sp = getSpecies(e.id), dark = berserk(battle);
   battleUI.setStatus(a, { name: name(a) }, state.party.map((m, i) => ({ hp: m.hp, name: name(m), active: i === state.active })));
-  battleUI.setFoe(e, { name: sp.name, type: TYPES[sp.type].name, gauge: dark ? '검은 기운' : '기운', dark }, battle.enemies.length > 1 ? `${battle.index + 1} / ${battle.enemies.length}번째 우산몬` : '');
+  battleUI.setFoe(e, { name: sp.name, type: TYPES[sp.type].name, gauge: dark ? '남은 검은 기운' : '남은 기운', dark, record: e.record, title: dark ? '지워진 기록' : '시험 두루마리' }, battle.enemies.length > 1 ? `${battle.index + 1} / ${battle.enemies.length}번째 우산몬` : '');
   if (dark) battleUI.setAura(e.hp > 0 ? Math.max(.25, e.hp / e.maxHp) : 0);
 }
 // 출처 표시: 공공누리·자유이용 조건에 따라 문제마다 근거 자료의 이름을 밝혀요
 const sourceCite = url => SOURCES.find(s => s.url === url)?.cite || '학습 자료';
 function explanationHTML(q) { return `<p class="dq-explain">${esc(q.explanation)}</p><a class="source-link" href="${q.source}" target="_blank" rel="noopener">출처: ${esc(sourceCite(q.source))} ↗</a>`; }
 // ── 문제 결투 (v0.42) ───────────────────────────────────────────────────────────
-// 내 차례: ‘문제 풀기’를 누르면 바로 독도 문제가 나와요. 상성은 내 우산몬과 상대 우산몬의 속성으로 정해요.
+// 기록 되찾기 결투(v0.58): 검은 기운이 지운 기록(두루마리의 빈칸)을 문제를 맞혀 채워요.
+// 내 차례: ‘기록 찾기’를 누르면 바로 독도 문제가 나와요(형식은 battle-quiz.js quizFormat). 상대 차례: ○× 빠른 판단으로 막아요. 상성은 내 우산몬과 상대 우산몬의 속성으로 정해요.
 const conceptTitle = q => CONCEPTS.find(c => c.id === q.concept)?.title || '기억 확인';
 const matchup = (a, e) => advantage(getSpecies(a.id).type, getSpecies(e.id).type);
 const isBoss = b => BOSS_KINDS.includes(b.kind) || (b.kind === 'enemy' && state.zone === 7); // 독도 지킴이 · 백무 사장
 function attackRule(b, mult) {
-  if (mult > 1) return '상성이 좋아요! 맞히면 1.5배로 걷어 내고, 틀려도 절반은 닿아요.';
-  if (mult < 1) return '상성이 나빠요. 맞혀도 0.75배만 닿고, 틀리면 빗나가요.';
-  return berserk(b) ? '맞히면 검은 기운을 걷어 내요. 틀리면 마음이 닿지 않아요.' : '맞히면 상대의 기운이 줄어요. 틀리면 빗나가요.';
+  if (mult > 1) return '상성이 좋아요! 맞히면 1.5배로 채우고, 틀려도 절반은 채워져요.';
+  if (mult < 1) return '상성이 나빠요. 맞혀도 0.75배만 채워지고, 틀리면 채워지지 않아요.';
+  return berserk(b) ? '맞히면 지워진 기록이 채워져요. 틀리면 채워지지 않아요.' : '맞히면 시험 두루마리가 채워져요. 틀리면 채워지지 않아요.';
 }
 async function askQuiz(b, phase, header, chosen = null) {
   const q = chosen || testQuestion || selectBattleQuestion(state), order = shuffledChoices(q);
@@ -733,7 +736,10 @@ async function askQuiz(b, phase, header, chosen = null) {
   const pierce = phase === 'defense' && isBoss(b);
   const rule = phase === 'attack' ? attackRule(b, matchup(active(), enemy()))
     : `맞히면 충격이 40% 줄어요. 틀리면 그대로 받아요.${pierce ? ' 이 상대는 가끔 정답도 뚫고 들어와요(관통)!' : ''}`;
-  const res = await battleUI.quiz({ q, order, phase, header, rule, concept: conceptTitle(q) });
+  const wanted = quizFormat(q, phase), format = wanted === 'order' && TEST_MODE && !window.__dokdoOrder ? 'choice' : wanted; // 자동 검사는 순서 놓기를 따로 켜서 봐요
+  const shown = format === 'ox' ? oxShown(q, Math.random, TEST_MODE) : null;
+  b.quiz.format = format;
+  const res = await battleUI.quiz({ q, order, phase, header, rule, concept: conceptTitle(q), format, shown });
   if (battle !== b) return null;
   const correct = res.choice === q.answer;
   Object.assign(b.quiz, { answered: true, assisted: res.assisted, correct, choice: res.choice });
@@ -744,18 +750,18 @@ async function askQuiz(b, phase, header, chosen = null) {
 async function attackWithQuiz(b, q = null) {
   const a = active(), e = enemy(), dark = berserk(b);
   battleUI.allyAct?.('lunge');
-  tip(b, '알맞은 답을 눌러요. 맞히면 검은 기운이 줄어요. 모르겠으면 ‘기록 힌트 보기’를 눌러도 돼요.');
-  const r = await askQuiz(b, 'attack', `${name(a)}의 문제 풀기!`, q); if (!r) return;
-  tip(b, r.correct ? '잘했어요! 오른쪽 위 보라색 막대가 줄어든 게 보이죠?' : '괜찮아요! 틀려도 내 우산몬은 다치지 않아요. 다시 해 봐요.');
+  tip(b, '알맞은 답을 눌러요. 맞히면 위쪽 두루마리의 빈칸이 채워져요. 모르겠으면 ‘기록 힌트 보기’를 눌러도 돼요.');
+  const r = await askQuiz(b, 'attack', `${josa(name(a), '과/와')} 기록 찾기`, q); if (!r) return;
+  tip(b, r.correct ? '잘했어요! 두루마리에 글자가 돌아온 게 보이죠?' : '괜찮아요! 틀려도 내 우산몬은 다치지 않아요. 다시 해 봐요.');
   const d = attackHit(a, e, r.correct);
   if (d.amount > 0) { e.hp = Math.max(0, e.hp - d.amount); sfx(d.mult > 1 ? 'hitStrong' : d.mult < 1 ? 'hitWeak' : 'hit'); battleUI.damage(d.amount, 'enemy'); refreshBattle(); }
   if (r.correct) {
-    const eff = d.mult > 1 ? ' 상성이 좋아 마음이 크게 닿았다!' : d.mult < 1 ? ' 상성이 나빠 잘 닿지 않은 것 같다…' : '';
-    await battleUI.explain(dark ? `정답! ${name(e)}의 검은 기운을 ${d.amount}만큼 걷어 냈다!${eff}` : `정답! ${name(e)}의 기운이 ${d.amount} 줄었다!${eff}`, explanationHTML(r.q), 'good');
+    const eff = d.mult > 1 ? ' 상성이 좋아 기록이 크게 채워졌다!' : d.mult < 1 ? ' 상성이 나빠 조금만 채워졌다…' : '';
+    await battleUI.explain(dark ? `정답! 지워진 기록이 되살아난다. 검은 기운을 ${d.amount}만큼 걷어 냈다!${eff}` : `정답! 시험 두루마리가 채워진다. ${name(e)}의 기운이 ${d.amount} 줄었다!${eff}`, explanationHTML(r.q), 'good');
   } else if (d.amount > 0) {
-    await battleUI.explain(`아쉬워요! 그래도 상성이 좋아서 ${dark ? `검은 기운을 ${d.amount}만큼 걷어 냈다` : `기운이 ${d.amount} 줄었다`}.`, explanationHTML(r.q), 'bad');
+    await battleUI.explain(`아쉬워요! 그래도 상성이 좋아서 기록이 조금 채워졌다(${dark ? '검은 기운' : '기운'} −${d.amount}).`, explanationHTML(r.q), 'bad');
   } else {
-    await battleUI.explain(dark ? `아쉬워요! ${name(a)}의 마음이 닿지 않았다.` : `아쉬워요! ${name(a)}의 도전이 빗나갔다!`, explanationHTML(r.q), 'bad');
+    await battleUI.explain(dark ? '아쉬워요! 이번에는 기록이 채워지지 않았다.' : '아쉬워요! 시험 두루마리가 채워지지 않았다.', explanationHTML(r.q), 'bad');
   }
 }
 // ── 전설의 우산몬 형태변환 (v0.41): 노멀폼(그림 068) ↔ 변환폼(그림 068-2) ──
@@ -786,10 +792,10 @@ async function befriend(b) {
 async function playerTurn(b) {
   const a = active(), e = enemy(), first = tut(b) && b.turn === 1, wild = b.kind === 'wild' || b.kind === 'legend', mult = matchup(a, e);
   const forms = getSpecies(a.id).forms === 2 && !tut(b);
-  tip(b, first ? '‘문제 풀기’를 눌러 보세요. 독도 문제가 나와요!' : '이번엔 마음대로 골라 봐요! 상성이 좋은 동료로 바꾸면 더 크게 걷어 낼 수 있어요.');
+  tip(b, first ? '‘기록 찾기’를 눌러 보세요. 독도 문제가 나와요!' : '이번엔 마음대로 골라 봐요! 상성이 좋은 동료로 바꾸면 더 크게 걷어 낼 수 있어요.');
   const chance = wild ? Math.round(captureChance(e) * 100) : 0;
   const cmd = await battleUI.menu([
-    { label: '문제 풀기', value: 'quiz', sub: `${TYPES[getSpecies(a.id).type].name} → ${TYPES[getSpecies(e.id).type].name}${mult > 1 ? ' · 유리' : mult < 1 ? ' · 불리' : ''}`, hint: first },
+    { label: '기록 찾기', value: 'quiz', sub: `${TYPES[getSpecies(a.id).type].name} → ${TYPES[getSpecies(e.id).type].name}${mult > 1 ? ' · 유리' : mult < 1 ? ' · 불리' : ''}`, hint: first },
     { label: '동료 만들기', value: 'befriend', sub: wild ? `성공률 ${chance}%` : '야생 우산몬만', disabled: first || !wild },
     { label: '도구', value: 'item', sub: `회복젤 ${state.items.heal}`, disabled: first },
     { label: '동료', value: 'party', sub: '교체', disabled: first || state.party.filter(m => m.hp > 0).length < 2 },
@@ -823,15 +829,15 @@ async function playerTurn(b) {
 async function enemyTurn(b) {
   const a = active(), e = enemy(), dark = berserk(b);
   if (b.kind === 'legend' && getSpecies(e.id).forms === 2 && e.form !== 2 && e.hp > 0 && e.hp <= e.maxHp / 2) { await morph(b, e, 'enemy'); if (battle !== b) return; }
-  tip(b, '이번엔 사나워진 우산몬 차례예요! 문제를 맞히면 충격이 40% 줄어요.');
-  const r = await askQuiz(b, 'defense', dark ? `사나워진 ${josa(name(e), '이/가')} 날뛴다!` : `${name(e)}의 문제 도전!`); if (!r) return;
+  tip(b, '이번엔 검은 기운이 밀려와요! ‘이 답이 맞을까?’를 ○ ×로 빠르게 판단해요. 맞히면 충격이 40% 줄어요.');
+  const r = await askQuiz(b, 'defense', dark ? '검은 기운이 밀려온다!' : `${name(e)}의 시험!`); if (!r) return;
   const pierce = r.correct && isBoss(b) && Math.random() < PIERCE_CHANCE;
   const d = enemyHit(e, a, { correct: r.correct, pierce });
   a.hp = Math.max(tut(b) ? 1 : 0, a.hp - d);
   tip(b, '내 체력(HP)은 왼쪽 위에서 볼 수 있어요. 줄어들면 쉼터나 회복젤로 채워요.'); if (d > 0) sfx('hurt'); battleUI.damage(d, 'player'); refreshBattle(); updateUI();
   if (pierce) await battleUI.explain(`정답! 그런데 ${name(e)}의 힘이 너무 세서 그대로 뚫고 들어왔다! (관통) ${josa(name(a), '은/는')} ${d}의 충격을 받았다!`, explanationHTML(r.q), 'bad');
   else if (r.correct) await battleUI.explain(`정답! ${josa(name(a), '이/가')} 잘 막아 내서 충격이 40% 줄었다. ${d}의 충격만 받았다!`, explanationHTML(r.q), 'good');
-  else await battleUI.explain(`${dark ? `${josa(name(e), '이/가')} 날뛰었다!` : `${name(e)}의 도전!`} ${josa(name(a), '은/는')} ${d}의 충격을 받았다!`, explanationHTML(r.q), 'bad');
+  else await battleUI.explain(`${dark ? '검은 기운이 덮쳤다!' : `${name(e)}의 시험을 막지 못했다!`} ${josa(name(a), '은/는')} ${d}의 충격을 받았다!`, explanationHTML(r.q), 'bad');
 }
 async function allyFainted(b) {
   battleUI.allyAct?.('tired'); sfx('faint');
@@ -859,7 +865,9 @@ async function enemyFainted(b) {
   const e = enemy(); battleUI.enemyCalmed?.(); battleUI.setAura(0); sfx('purify');
   tip(b, '검은 기운이 모두 걷혔어요! 이렇게 우산몬을 원래대로 돌려 주면 돼요.');
   if (berserk(b)) await battleUI.say(`${name(e)}의 검은 기운이 모두 사라졌다! ${josa(name(e), '이/가')} 원래대로 돌아왔다.`, { tone: 'good' });
-  else await battleUI.say(`${josa(name(e), '이/가')} 기운을 다 써서 물러났다!`);
+  else await battleUI.say(`시험 두루마리를 모두 채웠다! ${josa(name(e), '이/가')} 물러났다.`);
+  if (battle !== b) return false;
+  if (e.record) await battleUI.say(`${berserk(b) ? '되찾은 기록' : '채운 기록'}: “${e.record}”`, { tone: 'good' });
   if (battle !== b) return false;
   await awardXP(b, e); if (battle !== b) return false;
   if (b.index + 1 < b.enemies.length) {
@@ -888,19 +896,19 @@ async function runBattle(b) {
   const alive = () => battle === b, e0 = enemy();
   if (tut(b)) {
     tip(b, '연습 대결이에요! 제가 옆에서 하나씩 알려 줄게요.');
-    await battleUI.say(`연습 대결! 사나워진 ${josa(name(e0), '이/가')} 나타났다!`); if (!alive()) return;
-    tip(b, '오른쪽 위 보라색 막대가 ‘검은 기운’이에요. 모두 없애면 우산몬이 원래대로 돌아와요.');
-    await battleUI.say(`${josa(name(e0), '이/가')} 검은 기운에 휩싸여 괴로워하고 있다. 정화해서 도와주자!`, { tone: 'dark' }); if (!alive()) return;
+    await battleUI.say(`연습 대결! 검은 기운에 휩싸인 ${josa(name(e0), '과/와')} 마주쳤다!`); if (!alive()) return;
+    tip(b, '위쪽 두루마리가 검은 기운이 지운 ‘기록’이에요. 빈칸을 모두 채우면 우산몬이 원래대로 돌아와요.');
+    await battleUI.say('검은 기운이 독도의 기록을 지우고 있다. 기록을 되찾아 도와주자!', { tone: 'dark' }); if (!alive()) return;
   }
   else if (b.kind === 'legend') { await battleUI.say(`전설의 우산몬 ${josa(name(e0), '이/가')} 깨어났다!`); if (!alive()) return; await battleUI.say(`오랜 세월을 견딘 ${josa(name(e0), '이/가')} 검은 기운에 괴로워하고 있다. 정화하자!`, { tone: 'dark' }); }
-  else if (b.kind === 'wild') { await battleUI.say(`사나워진 ${josa(name(e0), '이/가')} 나타났다!`); if (!alive()) return; await battleUI.say(`${josa(name(e0), '이/가')} 검은 기운에 휩싸여 괴로워하고 있다. 정화해서 도와주자!`, { tone: 'dark' }); }
+  else if (b.kind === 'wild') { await battleUI.say(`검은 기운에 휩싸인 ${josa(name(e0), '과/와')} 마주쳤다!`); if (!alive()) return; await battleUI.say('검은 기운이 독도의 기록을 지우고 있다. 기록을 되찾아 도와주자!', { tone: 'dark' }); }
   else if (b.kind === 'enemy' || b.kind === 'trainer') {
-    await battleUI.say(`${josa(opponentName(b), '이/가')} 나타났다!`);
+    await battleUI.say(`${josa(opponentName(b), '이/가')} 길을 막아섰다!`);
     if (!alive()) return;
     battleUI.portraitOut(); // the member fades away as the 우산몬 comes out
     await battleUI.say(`${josa(opponentName(b), '이/가')} 사나워진 ${josa(name(e0), '을/를')} 내보냈다!`);
     if (!alive()) return;
-    await battleUI.say(`${josa(name(e0), '이/가')} 검은 기운에 휩싸여 날뛰고 있다. 정화하자!`, { tone: 'dark' });
+    await battleUI.say(`검은 기운이 ${name(e0)}의 기록을 지우고 있다. 기록을 되찾자!`, { tone: 'dark' });
   } else await battleUI.say(`${opponentName(b)}의 인증 결투! ${josa(name(e0), '이/가')} 나왔다!`);
   while (alive()) {
     const outcome = await playerTurn(b);
@@ -1212,7 +1220,7 @@ function showMenu() {
     $('#menuTutorial').onclick = () => { closeModal(); state.tutorial = { battle: false, walk: 0 }; save(); renderCoachPanel(); startTutorial(); };
     $('#menuAvatar').onclick = () => chooseAvatar(id => { state.avatar = id; save(); updateUI(); toast('탐험대원을 바꿨어요.'); });
     $('#restartBtn').onclick = () => { saved = state.started ? state : saved; startNew(); };
-    $('#menuHelp').onclick = () => openModal(head('천천히, 함께 탐험해요') + '<div class="fact-box">이동: 방향키 / WASD / 조이스틱(터치 화면) / 지도 화면 누르기<br>건물: 문 바로 아래에서 위로 걸으면(또는 건물을 누르면) 들어가요. 계단을 밟으면 위아래 층으로, 문 깔개를 밟으면 밖으로 나가요<br>대화·조사: 가까이에서 E·스페이스 / 대화 버튼<br>자동 안내: 수첩의 목적지 안내<br>다음 지역: 독도 지킴이 인증 후 마을 오른쪽 다리 → 길을 따라 걷기<br>세계 지도: 가 본 마을로 바로 이동<br>결투 명령: 문제 풀기 · 동료 만들기 · 도구 · 동료 · 물러나기 (전설의 우산몬은 형태변환도)<br>문제 풀기: 누르면 바로 독도 문제가 나와요<br>상성(화살표 앞이 뒤에 강해요): 잎→빛→메아리→잎, 파도→바위→바람→파도. 상성이 좋으면 맞혔을 때 1.5배, 틀려도 절반은 닿아요. 상성이 나쁘면 0.75배<br>사나워진 우산몬: 문제를 맞히면 검은 기운을 걷어 내요. 모두 걷히면 평온을 되찾아요<br>상대의 문제: 맞히면 충격이 40% 줄고, 틀리면 그대로 받아요. 독도 지킴이·백무 사장은 가끔 정답도 뚫고 들어와요(관통)<br>동료 만들기: 버튼을 누르면 확률로 동료가 돼요(그 차례엔 공격 못 해요). 검은 기운이 적을수록 잘 되고, 전설의 우산몬은 10%<br>동료 주머니: ‘동료’ 메뉴에서 쉬는 동료와 언제든 바꿔요<br>독도 지킴이와는 인증 결투로 겨뤄요<br>힌트: 문제 아래 기록 힌트 · 학습 기록에 도움 표시<br>대화와 컷신: 클릭·엔터·스페이스로 넘기기</div>' + typeRingHTML() + '<p>길에서는 표지판, 관찰 지점, 기억 비석, 조사 상자, 길에서 만난 사람과 몽땅랜드 직원을 찾아봐요. 사나워진 야생 우산몬은 마을과 마을 사이의 길 위를 걸어 다녀요.</p>');
+    $('#menuHelp').onclick = () => openModal(head('천천히, 함께 탐험해요') + '<div class="fact-box">이동: 방향키 / WASD / 조이스틱(터치 화면) / 지도 화면 누르기<br>건물: 문 바로 아래에서 위로 걸으면(또는 건물을 누르면) 들어가요. 계단을 밟으면 위아래 층으로, 문 깔개를 밟으면 밖으로 나가요<br>대화·조사: 가까이에서 E·스페이스 / 대화 버튼<br>자동 안내: 수첩의 목적지 안내<br>다음 지역: 독도 지킴이 인증 후 마을 오른쪽 다리 → 길을 따라 걷기<br>세계 지도: 가 본 마을로 바로 이동<br>결투 명령: 기록 찾기 · 동료 만들기 · 도구 · 동료 · 물러나기 (전설의 우산몬은 형태변환도)<br>기록 찾기: 누르면 독도 문제가 나와요. 맞히면 위쪽 두루마리(검은 기운이 지운 기록)의 빈칸이 채워져요. 문제에 따라 나침반·순서 놓기·근거 카드로 풀고, 검은 기운이 밀려올 때는 ○ ×로 빠르게 판단해요<br>상성(화살표 앞이 뒤에 강해요): 잎→빛→메아리→잎, 파도→바위→바람→파도. 상성이 좋으면 맞혔을 때 1.5배, 틀려도 절반은 닿아요. 상성이 나쁘면 0.75배<br>사나워진 우산몬: 문제를 맞히면 검은 기운을 걷어 내요. 모두 걷히면 평온을 되찾아요<br>상대의 문제: 맞히면 충격이 40% 줄고, 틀리면 그대로 받아요. 독도 지킴이·백무 사장은 가끔 정답도 뚫고 들어와요(관통)<br>동료 만들기: 버튼을 누르면 확률로 동료가 돼요(그 차례엔 공격 못 해요). 검은 기운이 적을수록 잘 되고, 전설의 우산몬은 10%<br>동료 주머니: ‘동료’ 메뉴에서 쉬는 동료와 언제든 바꿔요<br>독도 지킴이와는 인증 결투로 겨뤄요<br>힌트: 문제 아래 기록 힌트 · 학습 기록에 도움 표시<br>대화와 컷신: 클릭·엔터·스페이스로 넘기기</div>' + typeRingHTML() + '<p>길에서는 표지판, 관찰 지점, 기억 비석, 조사 상자, 길에서 만난 사람과 몽땅랜드 직원을 찾아봐요. 사나워진 야생 우산몬은 마을과 마을 사이의 길 위를 걸어 다녀요.</p>');
     $('#importSave').onchange = async e => { const file = e.target.files[0]; if (!file) return; try { if (file.size > 3e6) throw new Error('파일이 너무 커요.'); const parsed = validateSave(JSON.parse(await file.text())); saved = parsed; closeModal(); continueGame(); toast('저장한 모험을 불러왔어요.'); } catch (err) { toast(err.message || '저장 파일을 확인해 주세요.'); } };
   });
 }
@@ -1252,7 +1260,7 @@ if (typeof location !== 'undefined' && new URLSearchParams(location.search).has(
     motion: () => ({ view: { ...view }, walkDistance, moving }), npcs: () => npcs(map, progress(), state.flags),
     playStory, stories: { OPENING, GUIDE, BOSS_REVEAL, BOSS_FALL, TREE_JOINS },
     get longestQuestion() { return QUESTIONS.reduce((m, q) => (q.prompt.length + q.options.join('').length + q.explanation.length > m.prompt.length + m.options.join('').length + m.explanation.length ? q : m)); },
-    set forceQuestion(q) { testQuestion = q; }, closeBattleForTest: () => { if (battle) closeBattle(); },
+    set forceQuestion(q) { testQuestion = q; }, questionById: id => QUESTIONS.find(q => q.id === id), closeBattleForTest: () => { if (battle) closeBattle(); },
     screenOf(x, y) { const r = canvas.getBoundingClientRect(); return { x: r.left + (x * TILE + 16 - camera.x) * sceneScale, y: r.top + (y * TILE + 16 - camera.y) * sceneScale }; },
     standAtDoor(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b); settleMovement(); state.x = f.x; state.y = f.y; view = { x: f.x, y: f.y }; state.dir = 'up'; return f; },
     goInside(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b), p = pathfind(map, state.x, state.y, f.x, f.y, liveNPCs()); if (state.x === f.x && state.y === f.y) enterBuilding(b); else { path = p; pathAction = () => enterBuilding(b); } return p.length; },

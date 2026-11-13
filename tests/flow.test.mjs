@@ -134,7 +134,7 @@ assert.equal(await page.textContent('#locationName'), '도동항', 'chapter 1 is
 
 // ── 1b. Tutorial: a practice duel with 김박사's tips, then the walking guide ──
 await until(() => window.__dokdo.battle?.kind === 'tutorial', 10000);
-assert.equal(await toMenu(), 'cmd'); assert.ok(await page.isVisible('.dq-coach')); assert.match(await page.textContent('.dq-coach p'), /문제 풀기/);
+assert.equal(await toMenu(), 'cmd'); assert.ok(await page.isVisible('.dq-coach')); assert.match(await page.textContent('.dq-coach p'), /기록 찾기/);
 assert.deepEqual(await page.$$eval('#dqCommand .dq-option:not([disabled])', b => b.map(x => x.dataset.cmd)), ['quiz'], 'only 문제 풀기 on the first turn');
 assert.ok(await page.$('#dqCommand .coach-pick[data-cmd="quiz"]'), '문제 풀기 is highlighted');
 await fight(); assert.equal(await G(() => window.__dokdo.state.tutorial.battle), true, 'practice duel done');
@@ -168,7 +168,7 @@ await G(() => { const d = window.__dokdo, s = d.map.spawns.a; d.state.x = s.x; d
 // ── 4. turn-based battle mechanics ──
 await G(() => { Math.random = () => .5; window.__dokdo.startBattle('wild', 21); });
 assert.equal(await page.$('.dq-trainer'), null, 'wild battles show no 백무단 member');
-await page.click('#dqMessage'); assert.match(await page.textContent('.dq-text'), /나타났다/);
+await page.click('#dqMessage'); assert.match(await page.textContent('.dq-text'), /검은 기운/);
 assert.equal(await toMenu(), 'cmd'); assert.deepEqual(await page.$$eval('#dqCommand .dq-option', b => b.map(x => x.dataset.cmd)), ['quiz', 'befriend', 'item', 'party', 'run'], '문제 풀기 · 동료 만들기 · 도구 · 동료 · 물러나기');
 assert.ok(await G(() => { const c = document.querySelector('#allySprite'); return !!c && c.getContext('2d').getImageData(0, 0, c.width, c.height).data.some((v, i) => i % 4 === 3 && v > 0); }), 'my 우산몬 is drawn (from behind)');
 const hp = () => G(() => ({ me: window.__dokdo.state.party[window.__dokdo.state.active].hp, foe: window.__dokdo.battle?.enemies[window.__dokdo.battle.index].hp, log: window.__dokdo.state.answerLog.length, pp: window.__dokdo.state.party[0].pp.slice() }));
@@ -352,5 +352,27 @@ st = await G(() => { const d = window.__dokdo; return { map: d.map.id, visited: 
 assert.deepEqual(st, { map: 'town3', visited: 8, onSpawn: true });
 
 assert.deepEqual(errors, [], 'no browser errors');
+// ── 기록 되찾기 결투의 형식 (v0.58): 두루마리, 순서 놓기, 나침반, ○× ──
+if (await G(() => !!window.__dokdo.battle)) await G(() => window.__dokdo.closeBattleForTest());
+await G(() => { window.__dokdo.closeModal(); window.__dokdoOrder = true; const s = window.__dokdo.state; for (const m of s.party) m.hp = m.maxHp; });
+for (let i = 0; i < 8 && await page.$('#dialogue:not(.hidden) #nextTalk'); i++) await page.click('#nextTalk');
+await G(() => window.__dokdo.startBattle('wild', 39)); await toMenu();
+assert.ok(await page.isVisible('.dq-scroll .scroll-record'), 'the foe shows a record scroll'); assert.ok(await page.isVisible('.dq-explorer'), 'the explorer stands with the 우산몬');
+const blanks = () => page.$$eval('.scroll-record i:not(.sp)', a => ({ all: a.length, on: a.filter(x => x.classList.contains('on')).length }));
+assert.equal((await blanks()).on, 0, 'the record starts blank');
+await G(() => { window.__dokdo.forceQuestion = window.__dokdo.questionById('H1-26'); const e = window.__dokdo.battle.enemies[0]; e.maxHp = e.hp = 9999; });
+await page.click('[data-cmd="quiz"]'); await page.waitForSelector('.dq-chip');
+assert.equal(await G(() => window.__dokdo.battle.quiz.format), 'order'); assert.ok(await page.isDisabled('#orderOk'), 'place every card first');
+for (const t of ['우산국 복속', '세종실록 지리지', '칙령 제41호']) await page.click(`.dq-chip:text-is("${t}")`);
+await page.click('.dq-slot[data-slot="2"]'); assert.ok(await page.isDisabled('#orderOk'), 'a placed card can be taken back'); await page.click('.dq-chip:text-is("칙령 제41호")');
+await page.click('#orderOk'); await until(() => window.__dokdo.battle.quiz.answered); assert.equal(await G(() => window.__dokdo.battle.quiz.correct), true, 'the right order counts as correct');
+assert.ok(await page.isVisible('.dq-slots.correct')); assert.match(await page.textContent('.dq-right'), /우산국 복속 → 세종실록 지리지 → 칙령 제41호/);
+await G(() => { window.__dokdo.forceQuestion = window.__dokdo.questionById('N3-4'); }); await page.click('#dqMessage'); await page.waitForSelector('.dq-ox .dq-answer:not(.locked)');
+assert.equal(await G(() => window.__dokdo.battle.quiz.format), 'ox', 'the foe turn is a quick ○× call'); assert.equal(await page.$$eval('.dq-ox .dq-answer', a => a.length), 2);
+await answer(true); assert.equal(await G(() => window.__dokdo.battle.quiz.correct), true);
+await G(() => { window.__dokdo.forceQuestion = window.__dokdo.questionById('G1-1'); const e = window.__dokdo.battle.enemies[0]; e.maxHp = 40; e.hp = 40; }); await toMenu(); await page.click('[data-cmd="quiz"]'); await page.waitForSelector('.dq-compass .compass-pt');
+assert.equal(await G(() => window.__dokdo.battle.quiz.format), 'compass'); await answer(true);
+assert.ok((await blanks()).on > 0, 'right answers fill the record');
+await G(() => { window.__dokdo.forceQuestion = null; window.__dokdoOrder = false; window.__dokdo.closeBattleForTest(); });
 await browser.close(); server.close();
 console.log(`PASS: wild 우산몬 walk on routes (none in towns, bump to battle, gone afterwards), 문제 풀기 asks right away, type advantage, 형태변환 in the menu for legends, 동료 만들기 button, 동료 주머니 swap, 전설의 우산몬 quest (radio, golden spot, meeting scene, plain win keeps the spot, 10% 동료 만들기, join with 변환폼, dex photo), 백무 사장 reveal/fall/epilogue scenes, 사나워진 우산몬 duels with 검은 기운 gauges, 몽땅랜드 designs in battle, softened hits on correct defence, opening read line by line with the mission choice, starter + guide, key walking, closed bridge, guide, DQ commands (정화하기 with two starting skills, guard skill, item, orb, switch, run), my 우산몬 drawn from behind, 백무단 pictures fading out, explorer drawings in the character choice, 울릉도 도동항 and the ferry to 독도, buildings with floors (door, stairs, dex, books, review desk, rest), 김박사 picture and starter cutscene, 사철나무 purified from 백무 사장 and joining once, practice duel and walking tutorial, clickable picture map, easy words (사나워진 우산몬 · 검은 기운 · 몽땅랜드 컴퍼니), quiz rules (wrong attack = miss, correct defence = light hit), hints, KO recovery, route objects, trainer, memory stone, 8 chapters walked through 7 routes, first-arrival scenes, fast travel, legend, ending, saves and a v0.21 save; ${totalTurns} battle turns.`);
