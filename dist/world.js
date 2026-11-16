@@ -205,18 +205,18 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
   people ||= npcs(map, state.progress[state.zone], state.flags);
   const wanted = map.kind === 'town' ? wantedRole(state.progress[state.zone] || {}) : null;
   const base = project && typeof ctx.getTransform === 'function' ? ctx.getTransform() : null;
+  const seen = d => project?.seen ? project.seen(d) : d; // 3D 보기에서는 카메라에서 보이는 쪽 모습으로
   const order = sceneDrawOrder(people, view, map);
   if (!base) { for (const n of order) drawOne(n); }
   else {
-    // 1인칭 시점(v0.61): 내 캐릭터는 그리지 않고, 먼 것부터 가까운 것 순서로 세워 그려요
+    // 3D 보기(v0.62): 먼 것부터 가까운 것 순서로 세워 그려요. 카메라와 내 캐릭터 사이에 있는 것은 비쳐 보이게 해요.
     const list = [];
     for (const n of order) {
-      if (n.player) continue;
       const fx = n.building ? (n.building.x + n.building.w / 2) * TILE : n.x * TILE + (n.w ? n.w * 16 : 16), fy = n.depth, p = project(fx, fy);
       if (p && p.k > 0) list.push({ n, fx, fy, p });
     }
     list.sort((a, b) => (b.p.z ?? 0) - (a.p.z ?? 0));
-    for (const { n, fx, fy, p } of list) { ctx.save(); ctx.setTransform(base.a * p.k, 0, 0, base.d * p.k, base.a * (p.x - fx * p.k), base.d * (p.y - fy * p.k)); drawOne(n); ctx.restore(); }
+    for (const { n, fx, fy, p } of list) { ctx.save(); if (!n.player && project.fadeZ && p.z < project.fadeZ) ctx.globalAlpha = .22; ctx.setTransform(base.a * p.k, 0, 0, base.d * p.k, base.a * (p.x - fx * p.k), base.d * (p.y - fy * p.k)); drawOne(n); ctx.restore(); }
   }
   function drawOne(n) {
     if (n.scenery) { drawDecor(ctx, n, map, time); return; }
@@ -225,15 +225,15 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
     else if (n.kind === 'board') drawIslandArt(ctx, 'record-board', n.x * 32 - 8, n.y * 32 - 16, 48, 54);
     else if (n.kind === 'wild' || n.kind === 'friend') { // 걸어 다니는 우산몬: 가는 쪽을 보고, 걸을 때 통통 튀어요 (사나워진 우산몬만 검은 기운)
       if (n.kind === 'wild') darkWisps(ctx, n.x, n.y, time);
-      const f = facing(n.species), flip = (n.dir === 'right' && f === 'left') || (n.dir === 'left' && f === 'right'), hop = n.walking ? Math.abs(Math.sin(time / 70)) * 3 : 0;
+      const f = facing(n.species), nd = seen(n.dir), flip = (nd === 'right' && f === 'left') || (nd === 'left' && f === 'right'), hop = n.walking ? Math.abs(Math.sin(time / 70)) * 3 : 0;
       groundShadow(ctx, n.x * 32 + 16, n.y * 32 + 29, 13, hop); // 발밑 그림자: 통통 튈 때는 조금 작아져요
       ctx.save(); if (flip) { ctx.translate(n.x * 32 * 2 + 32, 0); ctx.scale(-1, 1); }
       drawMonster(ctx, n.species, n.x * 32 - 6, n.y * 32 - 12 - hop, 44, time / 1000); ctx.restore();
     }
     else if (n.kind === 'legend') { legendGlow(ctx, n.x, n.y, time); drawMonster(ctx, n.species, n.x * 32 - 10, n.y * 32 - 22 + Math.round(Math.sin(time / 300) * 2), 52, time / 1000); if (!n.used) marker(ctx, n.x, n.y, time, '#ffe9a0'); }
     else if (PROP_KINDS.includes(n.kind)) drawProp(ctx, n.kind, n.x, n.y, { open: n.used, art: n.art, time, water: map[n.y]?.[n.x] === 0 });
-    else if (n.player) { if (!drawExplorer(ctx, state.avatar, fx, fy, CHARACTER_SIZE, state.dir, motion.walking, motion.distance || 0)) drawHuman(ctx, fx, fy, '#418e91', state.dir, 0, 'normal', null, CHARACTER_SIZE); }
-    else if (n.actor && drawResident(ctx, n.actor, fx, fy, CHARACTER_SIZE, time, n.dir || 'down', n.walking || false, n.walkDistance || 0)) { /* drawn */ }
+    else if (n.player) { if (!drawExplorer(ctx, state.avatar, fx, fy, CHARACTER_SIZE, seen(state.dir), motion.walking, motion.distance || 0)) drawHuman(ctx, fx, fy, '#418e91', state.dir, 0, 'normal', null, CHARACTER_SIZE); }
+    else if (n.actor && drawResident(ctx, n.actor, fx, fy, CHARACTER_SIZE, time, seen(n.dir || 'down'), n.walking || false, n.walkDistance || 0)) { /* drawn */ }
     else drawHuman(ctx, fx, fy, n.color || '#a88668', 'down', 0, n.kind, n.sprite, CHARACTER_SIZE);
     if (!n.player && wanted && n.id === wanted) marker(ctx, n.x, n.y, time);
     if (n.kind === 'trainer' && !n.used) marker(ctx, n.x, n.y, time, '#f0a07a');

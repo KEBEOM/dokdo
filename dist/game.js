@@ -3,7 +3,7 @@ import { TERRAIN_ATLAS } from './terrain-atlas.js';
 // 독도 탐험대 v0.36 — screens, movement between maps, story cutscenes and turn-based quiz battles.
 import { CUTSCENE_ATLAS } from './cutscene-atlas.js';
 import { worldScale } from './layout.js';
-import { createJoystick } from './joystick.js';
+import { createJoystick, createLookStick } from './joystick.js';
 import { createDirectionInput, KEY_VECTORS } from './input.js';
 import { roomId, parseRoomId } from './interiors.js';
 import { MONSTERS, ZONES, TYPES, getSpecies, isUnique, pickStarterField, STARTER_LEVEL, keeperName } from './data.js';
@@ -18,7 +18,7 @@ import { onAssetReady, preloadMonsters, assetImage, assetURL } from './assets.js
 import { VILLAIN_ATLASES } from './villain-atlases.js';
 import { music, sfx, jingle, setOn, setVolume, isOn, audioPrefs, currentMusic, wantedMusic } from './audio.js';
 import { TRACKS } from './music-data.js';
-import { makeFirstPerson, turnToward, relativeStep, DIR_ANGLE } from './view3d.js';
+import { makeChase, cameraStep, seenDir, clampPitch, DIR_ANGLE, BACK } from './view3d.js';
 import { TRAITS, TRAIT_KINDS, traitOf } from './traits.js';
 import { pictureKey } from './characters.js';
 import { setPixelSnap } from './characters.js';
@@ -35,7 +35,7 @@ import { OPENING, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.61';
+const VERSION = '0.63';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -46,10 +46,12 @@ let state = newState(), saved = null, map = createMap('town0');
 let rot3d = null, view3d = false; try { view3d = localStorage.getItem('dokdo-view3d') === '1'; } catch { /* 기본 2D */ }
 let proj3d = null, ground3d = null;
 const in3d = () => view3d && map.kind !== 'room';
-function projection() { if (!proj3d || proj3d.W !== sceneWidth || proj3d.H !== sceneHeight) proj3d = makeFirstPerson(sceneWidth, sceneHeight); return proj3d; }
-// 1인칭 카메라(v0.61): 내 자리 조금 뒤, 눈높이에서 바라보는 쪽을 봐요. yaw는 바라보는 쪽으로 부드럽게 돌아요.
-let yaw = null, lastTurn = 0;
-function fpCamera() { if (yaw === null) yaw = DIR_ANGLE[state.dir] ?? Math.PI; return projection().camera(view.x * TILE + 16, view.y * TILE + 16, yaw); }
+function projection() { if (!proj3d || proj3d.W !== sceneWidth || proj3d.H !== sceneHeight) proj3d = makeChase(sceneWidth, sceneHeight); return proj3d; }
+// 3D 카메라(v0.62): 내 캐릭터 뒤·위에서 따라가요. yaw(좌우)·pitch(위아래)는 마우스·오른쪽 조이스틱·방향키로 돌려요.
+let yaw = null, pitch = 0, lookDrag = null; const lookKeys = new Set();
+const LOOK = { mouse: .0035, drag: .006, stick: .0026, keys: .0022 }; // 돌리는 빠르기(픽셀당 · 밀리초당 라디안)
+function fpCamera() { if (yaw === null) { yaw = DIR_ANGLE[state.dir] ?? Math.PI; pitch = 0; } return projection().camera(view.x * TILE + 16, view.y * TILE + 28, yaw, pitch); }
+function lookBy(dx, dy, k) { if (yaw === null) fpCamera(); yaw += dx * k; if (yaw > Math.PI * 2) yaw -= Math.PI * 2; if (yaw < -Math.PI * 2) yaw += Math.PI * 2; pitch = clampPitch(pitch - dy * k * 1.1); }
 // 지도 위의 점(픽셀) → 화면 위의 점(지도 칸 단위 픽셀, sceneScale을 곱하기 전). lift: 땅에서 띄울 높이
 function toScreen(wx, wy, lift = 0) {
   if (!in3d()) return { x: wx - camera.x, y: wy - lift - camera.y, k: 1 };
@@ -493,16 +495,79 @@ function move(dx, dy, now, keepDir = false) {
   if (blocked(map, nx, ny, liveNPCs())) { if (!move.bumped || now - move.bumped > 380) { sfx('bump'); move.bumped = now; } return false; }
   moving = { fromX: state.x, fromY: state.y, toX: nx, toY: ny, start: now }; return true;
 }
-// 방향키·조이스틱 한 번: 2D에서는 누른 쪽으로 걷고, 1인칭에서는 ↑ 앞으로 · ↓ 뒷걸음 · ←→ 제자리에서 돌아요
+// 한 걸음: 2D에서는 누른 쪽으로, 3D 보기에서는 ‘보는 방향’을 기준으로 앞(W)·왼쪽(A)·뒤(S)·오른쪽(D) 칸으로 걸어요
 function step(v, now) {
   if (!in3d()) return move(v[0], v[1], now);
-  const r = relativeStep(state.dir, v);
-  if (r.move) return move(r.move[0], r.move[1], now, !!r.keep);
-  if (now - lastTurn < 280) return false; lastTurn = now; state.dir = r.turn; return true;
+  if (yaw === null) fpCamera(); const [dx, dy] = cameraStep(yaw, v); return move(dx, dy, now);
 }
+// ── 자유 걷기 (v0.63, 3D 보기) ── 칸에 얽매이지 않고 보는 방향으로 부드럽게 걸어요.
+// 내 자리는 freePos(칸 단위 소수)로 두고, 반올림한 칸을 state.x·y 로 삼아요. 칸이 바뀌면 landed()가 나가는 길·문·계단을 살펴요.
+// 몸은 반지름 FREE_R 칸의 네모로 보고, 가로·세로를 따로 움직여서 벽을 따라 미끄러져요.
+let freePos = null, freeWalking = false, freeStuck = 0; const walkKeys = new Set(), FREE_R = .3;
+function freeXY() { if (!freePos || Math.round(freePos.x) !== state.x || Math.round(freePos.y) !== state.y) freePos = { x: state.x, y: state.y }; return freePos; }
+const touchedTiles = (x, y) => { const t = new Set(); for (const ox of [-FREE_R, FREE_R]) for (const oy of [-FREE_R, FREE_R]) t.add(`${Math.round(x + ox)},${Math.round(y + oy)}`); return t; };
+// (ox, oy) → (nx, ny)로 갈 때 새로 닿는 칸이 막혔는지. 닿은 것이 문이면 들어가고, 사나워진 우산몬이면 결투가 시작돼요.
+function freeBlocked(ox, oy, nx, ny, vy, now) {
+  const was = touchedTiles(ox, oy), people = liveNPCs();
+  for (const key of touchedTiles(nx, ny)) {
+    if (was.has(key)) continue; const [tx, ty] = key.split(',').map(Number);
+    if (exitLocked(tx, ty)) { if (!move.warned || now - move.warned > 1500) { toast(lockedMessage()); move.warned = now; } return true; }
+    if (vy < -.3 && tx === Math.round(nx)) { const b = buildingDoorAt(tx, ty); if (b) { enterBuilding(b); return true; } }
+    const wild = roamers.at(tx, ty); if (wild?.kind === 'friend') return true; if (wild) { path = []; pathAction = null; startBattle('wild', wild.species, { roamer: wild.uid }); return true; }
+    if (blocked(map, tx, ty, people)) return true;
+  }
+  return false;
+}
+// (vx, vy): 지도 위에서 갈 방향(길이 1 이하). 움직였으면 true
+function freeWalk(vx, vy, dt, now) {
+  const p = freeXY(), sp = dt / MOVE_DURATION, ox = p.x, oy = p.y, nx = ox + vx * sp, ny = oy + vy * sp;
+  state.dir = Math.abs(vx) > Math.abs(vy) ? (vx > 0 ? 'right' : 'left') : (vy > 0 ? 'down' : 'up');
+  if (vx && !freeBlocked(ox, oy, nx, oy, vy, now)) p.x = nx; if (battle || transition || busy()) return false;
+  if (vy && !freeBlocked(p.x, oy, p.x, ny, vy, now)) p.y = ny; if (battle || transition || busy()) { p.x = ox; p.y = oy; return false; }
+  const d = Math.hypot(p.x - ox, p.y - oy);
+  if (d < 1e-5) { if (!move.bumped || now - move.bumped > 380) { sfx('bump'); move.bumped = now; } return false; }
+  walkDistance += d * 32; freeWalking = true; view = { x: p.x, y: p.y };
+  const tx = Math.round(p.x), ty = Math.round(p.y); if (tx !== state.x || ty !== state.y) { state.x = tx; state.y = ty; landed(); }
+  return true;
+}
+// 걷기의 한 프레임. 2D: 방향키·W A S D·조이스틱이 누른 쪽 그대로. 3D 보기: W A S D·조이스틱이 보는 방향 기준(방향키는 둘러보기).
+// 눌러서 정한 길(path)은 칸 가운데를 따라 걸어요.
+function freeFrame(dt, now) {
+  const jv = joystick.vector, has = (...c) => c.some(k => walkKeys.has(k)) ? 1 : 0, d3 = in3d(); let ix = 0, iy = 0;
+  if (jv) { const m = Math.hypot(jv.x, jv.y), k = Math.max(.55, m) / (m || 1); ix = jv.x * k; iy = jv.y * k; }
+  else if (d3) { ix = has('KeyD') - has('KeyA'); iy = has('KeyS') - has('KeyW'); }
+  else { ix = has('KeyD', 'ArrowRight') - has('KeyA', 'ArrowLeft'); iy = has('KeyS', 'ArrowDown') - has('KeyW', 'ArrowUp'); }
+  if (stairHold) { if (!ix && !iy) stairHold = false; return; } // 계단을 오르내린 뒤에는 손을 한 번 뗐다가 걸어요
+  if (ix || iy) {
+    path = []; pathAction = null;
+    const l = Math.hypot(ix, iy), k = l > 1 ? 1 / l : 1; ix *= k; iy *= k;
+    if (!d3) { freeWalk(ix, iy, dt, now); return; }
+    if (yaw === null) fpCamera(); const sn = Math.sin(yaw), cs = Math.cos(yaw);
+    freeWalk(cs * ix - sn * iy, sn * ix + cs * iy, dt, now); return;
+  }
+  if (path.length) {
+    const [tx, ty] = path[0], p = freeXY(), dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy);
+    if (d <= Math.max(.04, dt / MOVE_DURATION)) {
+      if (blocked(map, tx, ty, liveNPCs()) && (tx !== state.x || ty !== state.y)) { path = []; pathAction = null; return; }
+      walkDistance += d * 32; freeWalking = d > 1e-4; p.x = tx; p.y = ty; view = { x: tx, y: ty }; path.shift(); freeStuck = 0;
+      if (tx !== state.x || ty !== state.y) { state.x = tx; state.y = ty; landed(); }
+    } else if (freeWalk(dx / d, dy / d, dt, now)) freeStuck = 0;
+    else if ((freeStuck += dt) > 500) { path = []; pathAction = null; freeStuck = 0; }
+    return;
+  }
+  if (pathAction) { const fn = pathAction; pathAction = null; fn(); }
+}
+window.addEventListener('keydown', e => { if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code) && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) { walkKeys.add(e.code); liftedKeys.delete(e.code); } });
+// 아주 짧게 톡 친 키도 한 프레임은 눌린 것으로 쳐요: 뗀 키는 다음 프레임이 지난 뒤에 지워요
+const liftedKeys = new Set(); window.addEventListener('keyup', e => liftedKeys.add(e.code)); window.addEventListener('blur', () => { walkKeys.clear(); liftedKeys.clear(); });
+function flushLiftedKeys() { for (const k of liftedKeys) walkKeys.delete(k); liftedKeys.clear(); }
 function arrive() {
   if (!moving) return;
-  state.x = moving.toX; state.y = moving.toY; view = { x: state.x, y: state.y }; moving = null; walks++; tutorialEvent('walk');
+  state.x = moving.toX; state.y = moving.toY; view = { x: state.x, y: state.y }; moving = null; landed();
+}
+// 새 칸에 닿았을 때: 나가는 길·문·계단을 살펴요(한 칸 걷기와 자유 걷기가 함께 써요)
+function landed() {
+  walks++; tutorialEvent('walk');
   if (walks % 10 === 0) save();
   const exit = map.exits.get(`${state.x},${state.y}`);
   if (exit) { const to = exit === 'next' ? nextMapId(map.id) : prevMapId(map.id), key = exit === 'next' ? 'a' : 'z'; if (crossesSea(map.id, to)) takeFerry(to, key); else changeMap(to, key); return; }
@@ -526,12 +591,31 @@ async function changeMap(id, spawnKey = 'a', { heal = false, instant = false, di
   if (first) state.visited = [...state.visited, def.zone].sort((a, b) => a - b);
   updateUI(); save();
   if (!instant) { await wait(80); scene.classList.remove('map-fading'); }
-  transition = false; showPlaceBanner(def);
+  transition = false; yaw = null; showPlaceBanner(def);
   if (first && def.zone > 0) { await playStory(arrivalScene(def.zone, ZONES[def.zone], def)); updateUI(); }
 }
 
+// 3D 보기에서 둘러보기: 마우스는 화면을 한 번 누르면 잠겨서 움직이는 대로 둘러봐요(Esc로 풀기, 잠긴 동안 누르면 말 걸기).
+// 손가락은 화면을 끌면 둘러보고, 톡 누르면 그곳으로 걸어가요.
 canvas.addEventListener('pointerdown', e => {
   if (busy()) return;
+  if (!in3d()) { tapAt(e); return; }
+  if (e.pointerType === 'mouse') { if (document.pointerLockElement === canvas) { interact(); return; } try { canvas.requestPointerLock?.()?.catch?.(() => {}); } catch { /* 잠그지 못하면 끌어서 둘러봐요 */ } }
+  lookDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, mouse: e.pointerType === 'mouse' }; try { canvas.setPointerCapture?.(e.pointerId); } catch { /* 괜찮아요 */ }
+  canvas.focus({ preventScroll: true });
+});
+canvas.addEventListener('pointermove', e => {
+  if (!in3d() || busy()) return;
+  if (document.pointerLockElement === canvas) { const lim = v => Math.max(-120, Math.min(120, v || 0)); lookBy(lim(e.movementX), lim(e.movementY), LOOK.mouse); return; } // 가끔 튀는 값은 잘라 내요
+  if (!lookDrag || e.pointerId !== lookDrag.id) return;
+  const dx = e.clientX - lookDrag.x, dy = e.clientY - lookDrag.y; lookDrag.x = e.clientX; lookDrag.y = e.clientY; lookDrag.moved += Math.abs(dx) + Math.abs(dy);
+  if (lookDrag.moved > 8) lookBy(dx, dy, LOOK.drag);
+});
+for (const type of ['pointerup', 'pointercancel']) canvas.addEventListener(type, e => {
+  if (!lookDrag || e.pointerId !== lookDrag.id) return;
+  const tap = type === 'pointerup' && lookDrag.moved <= 8 && !lookDrag.mouse; lookDrag = null; if (tap && in3d() && !busy()) tapAt(e);
+});
+function tapAt(e) {
   const bounds = canvas.getBoundingClientRect();
   const hit = fromScreen((e.clientX - bounds.left) * sceneWidth / bounds.width, (e.clientY - bounds.top) * sceneHeight / bounds.height); if (!hit) return;
   const tx = Math.floor(hit.x / 32), ty = Math.floor(hit.y / 32);
@@ -547,7 +631,7 @@ canvas.addEventListener('pointerdown', e => {
   const next = pathfind(map, moving?.toX ?? state.x, moving?.toY ?? state.y, tx, ty, people);
   if (next.length) { path = next; pathAction = null; }
   canvas.focus({ preventScroll: true });
-});
+}
 const vectors = KEY_VECTORS;
 window.addEventListener('keydown', e => {
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
@@ -559,6 +643,7 @@ window.addEventListener('keydown', e => {
     return;
   }
   if (battle) { battleUI.handleKey(e); return; }
+  if (in3d() && e.key.startsWith('Arrow')) { e.preventDefault(); lookKeys.add(e.key); return; } // 3D 보기: 방향키는 둘러보기, 걷기는 W A S D
   if (vectors[e.key]) { e.preventDefault(); if (!e.repeat) keys.press(e.key, performance.now()); path = []; pathAction = null; }
   if (['e', 'E', ' ', 'Enter'].includes(e.key) && !e.repeat) {
     if (!$('#modal').classList.contains('hidden')) return;
@@ -566,10 +651,11 @@ window.addEventListener('keydown', e => {
     e.preventDefault(); if (dialogueState) nextTalk(); else interact();
   }
 });
-window.addEventListener('keyup', e => keys.release(e.key)); window.addEventListener('blur', () => keys.clear());
+window.addEventListener('keyup', e => { keys.release(e.key); lookKeys.delete(e.key); }); window.addEventListener('blur', () => { keys.clear(); lookKeys.clear(); });
 // 가상 조이스틱: 누른 채로 밀면 그쪽으로 한 칸씩 걸어요. 대각선으로 밀면 막힌 쪽 대신 다른 쪽으로 미끄러지듯 걸어요.
 const joystick = createJoystick($('#joystick'), dir => { if (dir) { path = []; pathAction = null; } });
-window.addEventListener('blur', () => joystick.reset());
+const lookStick = createLookStick($('#lookStick'));
+window.addEventListener('blur', () => { joystick.reset(); lookStick.reset(); });
 $('#interactBtn').onclick = () => dialogueState ? nextTalk() : interact();
 
 function frame(now) {
@@ -582,25 +668,23 @@ function frame(now) {
   if (state.started) { const people = npcMotion.snapshot(baseNPCs), me = { x: state.x, y: state.y, toX: moving?.toX, toY: moving?.toY }; roamers.sync(map, people, me, now); roamers.update(map, people, me, now, busy() || document.hidden); }
   let nextStart = now;
   if (moving) { const result = moveView(view, moving, now); walkDistance += result.distance; if (result.complete) { nextStart = Math.max(moving.start + MOVE_DURATION, now - MOVE_DURATION); arrive(); } }
-  if (!moving && !busy()) {
-    const stick = stairHold ? null : joystick.direction;
-    if (stairHold && !joystick.direction && !keys.size) stairHold = false;
-    if (stairHold) { /* let go first */ }
-    else if (stick) { if (!step(stick.primary, nextStart) && stick.secondary && !in3d()) step(stick.secondary, nextStart); }
-    else if ((keyDir = keys.next(now))) step(keyDir, nextStart);
-    else if (path.length) { const [x, y] = path.shift(); if (!move(x - state.x, y - state.y, nextStart)) { path = []; pathAction = null; } }
-    else if (pathAction) { const fn = pathAction; pathAction = null; fn(); }
-  }
+  freeWalking = false;
+  if (!moving && !busy()) freeFrame(dt, now); // v0.63: 2D·3D 모두 칸에 얽매이지 않고 걸어요
+  flushLiftedKeys();
   // Render any residual part of the next tile in the same frame, avoiding a pause at tile edges.
   if (moving) { const result = moveView(view, moving, now); walkDistance += result.distance; if (result.complete) arrive(); }
   if (!cutscenes.active() && !battle) {
-    const walking = !!moving && !busy(), people = liveNPCs();
+    const walking = (!!moving || freeWalking) && !busy(), people = liveNPCs();
     const target = path.length ? { x: path.at(-1)[0], y: path.at(-1)[1] } : null, motion = { walking, distance: walkDistance }, K = sceneScale * actorPixelRatio;
     actorCtx.setTransform(1, 0, 0, 1, 0, 0); actorCtx.clearRect(0, 0, actorCanvas.width, actorCanvas.height); actorCtx.save();
     if (in3d()) {
-      // 1인칭 시점(v0.61): 내 둘레의 땅을 따로 그리고 → 바라보는 쪽이 위로 가게 돌린 뒤 → 가로줄마다 원근을 주어 눕히고 → 서 있는 것들을 먼 것부터 세워 그려요
-      const P = projection(); yaw = turnToward(yaw ?? DIR_ANGLE[state.dir], DIR_ANGLE[state.dir] ?? Math.PI, dt * .011);
-      const cam = fpCamera(), side = P.radius * 2 + 64, gw = Math.min(side, W * TILE), gh = Math.min(side, H * TILE);
+      // 3D 보기(v0.62): 카메라 둘레의 땅을 따로 그리고 → 보는 쪽이 위로 가게 돌린 뒤 → 가로줄마다 원근을 주어 눕히고 → 서 있는 것들을 먼 것부터 세워 그려요
+      const P = projection(), lk = lookStick.vector;
+      if (!busy()) {
+        if (lk) lookBy(lk.x * Math.abs(lk.x) * dt, lk.y * Math.abs(lk.y) * dt * .7, LOOK.stick);
+        if (lookKeys.size) lookBy(((lookKeys.has('ArrowRight') ? 1 : 0) - (lookKeys.has('ArrowLeft') ? 1 : 0)) * dt, ((lookKeys.has('ArrowDown') ? 1 : 0) - (lookKeys.has('ArrowUp') ? 1 : 0)) * dt * .6, LOOK.keys);
+      } else if (document.pointerLockElement === canvas) document.exitPointerLock?.();
+      const cam = fpCamera(), side = P.radius * 2 + 64, gw = Math.min(side, W * TILE), gh = Math.min(side, H * TILE), hz = cam.hz;
       ground3d ||= document.createElement('canvas'); if (ground3d.width !== gw || ground3d.height !== gh) { ground3d.width = gw; ground3d.height = gh; }
       const g = ground3d.getContext('2d'); g.imageSmoothingEnabled = false;
       camera = drawWorld(g, map, state, { x: (cam.x - 16) / TILE, y: (cam.y - 16) / TILE }, now, target, motion, { width: gw, height: gh, labels: false, actors: false }, people);
@@ -608,19 +692,27 @@ function frame(now) {
       const r = rot3d.getContext('2d'), sn = Math.sin(yaw), cs = Math.cos(yaw), ux = cam.x - camera.x, uy = cam.y - camera.y;
       r.setTransform(1, 0, 0, 1, 0, 0); r.fillStyle = z().color; r.fillRect(0, 0, P.RW, P.RH); r.imageSmoothingEnabled = false;
       r.setTransform(cs, -sn, sn, cs, P.RW / 2 - (cs * ux + sn * uy), P.RH - (-sn * ux + cs * uy)); r.drawImage(ground3d, 0, 0);
-      const sky = ctx.createLinearGradient(0, 0, 0, P.hz); sky.addColorStop(0, '#8fcbe6'); sky.addColorStop(1, '#e4f4f6'); ctx.fillStyle = sky; ctx.fillRect(0, 0, sceneWidth, P.hz);
-      ctx.fillStyle = z().color; ctx.fillRect(0, P.hz, sceneWidth, sceneHeight - P.hz);
+      // 하늘: 위로 볼수록 짙은 파랑, 지평선 쪽은 옅게. 구름은 보는 방향에 따라 흘러가요.
+      const sky = ctx.createLinearGradient(0, hz - sceneHeight * 1.4, 0, hz); sky.addColorStop(0, '#4f9fd6'); sky.addColorStop(.55, '#8fcbe6'); sky.addColorStop(1, '#e4f4f6'); ctx.fillStyle = sky; ctx.fillRect(0, 0, sceneWidth, sceneHeight);
+      const u = sceneHeight / 100; ctx.fillStyle = '#ffffffd9';
+      for (let i = 0; i < 9; i++) {
+        let a = (i * .7 + .35 - yaw) % (Math.PI * 2); if (a > Math.PI) a -= Math.PI * 2; if (a < -Math.PI) a += Math.PI * 2; if (Math.abs(a) > 1.3) continue;
+        const x = sceneWidth / 2 + Math.tan(a) * P.f, y = hz - (14 + (i * 37 % 60)) * u, w = (16 + i % 3 * 7) * u;
+        ctx.fillRect(Math.round(x - w / 2), Math.round(y), Math.round(w), Math.round(3 * u)); ctx.fillRect(Math.round(x - w * .3), Math.round(y - 2 * u), Math.round(w * .55), Math.round(2 * u)); ctx.fillRect(Math.round(x - w * .1), Math.round(y - 3.4 * u), Math.round(w * .3), Math.round(1.5 * u));
+      }
+      if (hz < sceneHeight) { ctx.fillStyle = z().color; ctx.fillRect(0, Math.max(0, hz), sceneWidth, sceneHeight - Math.max(0, hz)); }
       actorCtx.scale(K, K); actorCtx.imageSmoothingEnabled = false;
-      for (let y = P.hz + 1; y < sceneHeight; y++) {
-        const d0 = Math.min(P.rowDepth(y), P.RH), d1 = P.rowDepth(y + 1); if (d1 >= P.RH) continue;
+      for (let y = Math.max(0, Math.floor(hz) + 1); y < sceneHeight; y++) {
+        const d0 = Math.min(P.rowDepth(cam, y), P.RH), d1 = P.rowDepth(cam, y + 1); if (d1 >= P.RH) continue;
         const k = P.f / ((d0 + d1) / 2), hw = sceneWidth / 2 / k, sx = Math.max(0, P.RW / 2 - hw), sw = Math.min(P.RW, P.RW / 2 + hw) - sx;
         actorCtx.drawImage(rot3d, sx, P.RH - d0, sw, Math.max(.5, d0 - d1), sceneWidth / 2 + (sx - P.RW / 2) * k, y, sw * k, 1.03);
       }
-      const haze = actorCtx.createLinearGradient(0, P.hz, 0, P.hz + sceneHeight * .14); haze.addColorStop(0, '#e4f4f6'); haze.addColorStop(1, '#e4f4f600'); actorCtx.fillStyle = haze; actorCtx.fillRect(0, P.hz, sceneWidth, sceneHeight * .14);
-      drawActors(actorCtx, state, view, now, motion, people, map, (wx, wy) => P.project(cam, wx, wy));
-      paintMiniMap(now, people);
+      const haze = actorCtx.createLinearGradient(0, hz, 0, hz + sceneHeight * .14); haze.addColorStop(0, '#e4f4f6'); haze.addColorStop(1, '#e4f4f600'); actorCtx.fillStyle = haze; actorCtx.fillRect(0, hz, sceneWidth, sceneHeight * .14);
+      const project = (wx, wy) => P.project(cam, wx, wy); project.fadeZ = BACK - 6; project.seen = d => seenDir(yaw, d);
+      drawActors(actorCtx, state, view, now, motion, people, map, project);
+      paintMiniMap(now, people); if (!scene.classList.contains('look-on')) scene.classList.add('look-on');
     } else {
-      if (miniMap) miniMap.hidden = true;
+      if (miniMap) miniMap.hidden = true; if (scene.classList.contains('look-on')) scene.classList.remove('look-on');
       camera = drawWorld(ctx, map, state, view, now, target, motion, { width: sceneWidth, height: sceneHeight, labels: false, actors: false }, people);
       actorCtx.scale(K, K); actorCtx.translate(-camera.x, -camera.y);
       drawActors(actorCtx, state, view, now, motion, people, map);
@@ -1311,10 +1403,11 @@ function exportLearning() {
 function download(fileName, content, type = 'application/json') { const blob = new Blob([content], { type }), url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = fileName; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 function showMenu() {
   if (battle) { toast('결투를 마친 뒤 메뉴를 열어 주세요.'); return; }
-  openModal(head('모험 메뉴', `DOKDO EXPLORERS · BUILD ${VERSION}`) + `<div class="sound-settings" aria-label="소리 설정"><strong>소리</strong><label><span>배경음악</span><input id="musicVol" type="range" min="0" max="100" step="5" value="${Math.round(audioPrefs().music * 100)}"></label><label><span>효과음</span><input id="sfxVol" type="range" min="0" max="100" step="5" value="${Math.round(audioPrefs().sfx * 100)}"></label><button id="soundToggle" class="neutral">${isOn() ? '소리 끄기' : '소리 켜기'}</button><label class="music-pick"><span>배경음악 듣기</span><select id="musicPick"><option value="">지금 있는 곳의 음악</option>${Object.entries(TRACKS).map(([id, t]) => `<option value="${id}">${t.name}</option>`).join('')}</select></label></div><div class="settings-grid"><button id="menuSave" class="neutral" ${!state.started ? 'disabled' : ''}>▣ 지금 저장하기</button><button id="exportSave" class="neutral" ${!state.started ? 'disabled' : ''}>↓ 저장 파일 내려받기</button><label class="neutral">↑ 저장 파일 불러오기 <input id="importSave" type="file" accept="application/json,.json"></label><button id="menuLearn" class="neutral">✎ 공부 수첩 · 배움의 기록 내보내기</button><button id="menuSources" class="neutral">학습 자료와 출처</button><button id="menuHelp" class="neutral">조작 방법</button><button id="menuOpening" class="neutral" ${!state.started ? 'disabled' : ''}>오프닝 다시 보기</button><button id="menuTutorial" class="neutral" ${!state.started ? 'disabled' : ''}>튜토리얼 다시 하기</button><button id="menuAvatar" class="neutral" ${!state.started ? 'disabled' : ''}>탐험대원 바꾸기</button><button id="restartBtn" class="neutral danger">새로운 모험</button></div><p class="footer-note">진행은 현재 브라우저에 저장돼요. 다른 기기에서는 저장 파일을 불러와 이어갈 수 있어요. 서버에 학생 이름이나 기록을 전송하지 않아요.</p>`, () => {
+  openModal(head('모험 메뉴', `DOKDO EXPLORERS · BUILD ${VERSION}`) + `<div class="sound-settings" aria-label="소리 설정"><strong>소리</strong><label><span>배경음악</span><input id="musicVol" type="range" min="0" max="100" step="5" value="${Math.round(audioPrefs().music * 100)}"></label><label><span>효과음</span><input id="sfxVol" type="range" min="0" max="100" step="5" value="${Math.round(audioPrefs().sfx * 100)}"></label><button id="soundToggle" class="neutral">${isOn() ? '소리 끄기' : '소리 켜기'}</button><label class="music-pick"><span>배경음악 듣기</span><select id="musicPick"><option value="">지금 있는 곳의 음악</option>${Object.entries(TRACKS).map(([id, t]) => `<option value="${id}">${t.name}</option>`).join('')}</select></label></div><div class="sound-settings hand-settings" aria-label="조작 설정"><strong>조작 손</strong><button id="handToggle" class="neutral">${handLabel()}</button></div><div class="settings-grid"><button id="menuSave" class="neutral" ${!state.started ? 'disabled' : ''}>▣ 지금 저장하기</button><button id="exportSave" class="neutral" ${!state.started ? 'disabled' : ''}>↓ 저장 파일 내려받기</button><label class="neutral">↑ 저장 파일 불러오기 <input id="importSave" type="file" accept="application/json,.json"></label><button id="menuLearn" class="neutral">✎ 공부 수첩 · 배움의 기록 내보내기</button><button id="menuSources" class="neutral">학습 자료와 출처</button><button id="menuHelp" class="neutral">조작 방법</button><button id="menuOpening" class="neutral" ${!state.started ? 'disabled' : ''}>오프닝 다시 보기</button><button id="menuTutorial" class="neutral" ${!state.started ? 'disabled' : ''}>튜토리얼 다시 하기</button><button id="menuAvatar" class="neutral" ${!state.started ? 'disabled' : ''}>탐험대원 바꾸기</button><button id="restartBtn" class="neutral danger">새로운 모험</button></div><p class="footer-note">진행은 현재 브라우저에 저장돼요. 다른 기기에서는 저장 파일을 불러와 이어갈 수 있어요. 서버에 학생 이름이나 기록을 전송하지 않아요.</p>`, () => {
     $('#musicVol').oninput = e => setVolume('music', e.target.value / 100);
     $('#musicPick').onchange = e => { musicPreview = e.target.value || null; if (musicPreview && !isOn()) { setOn(true); $('#soundToggle').textContent = '소리 끄기'; updateUI(); } };
     $('#sfxVol').oninput = e => setVolume('sfx', e.target.value / 100); $('#sfxVol').onchange = () => sfx('correct');
+    $('#handToggle').onclick = e => { setHand(!leftHanded); e.target.textContent = handLabel(); };
     $('#soundToggle').onclick = e => { setOn(!isOn()); e.target.textContent = isOn() ? '소리 끄기' : '소리 켜기'; updateUI(); };
     $('#menuSave').onclick = () => save(true); $('#exportSave').onclick = () => download('dokdomon-save.json', JSON.stringify(state, null, 2));
     $('#menuLearn').onclick = () => showStudy(); $('#menuSources').onclick = showSources;
@@ -1322,7 +1415,7 @@ function showMenu() {
     $('#menuTutorial').onclick = () => { closeModal(); state.tutorial = { battle: false, walk: 0 }; save(); renderCoachPanel(); startTutorial(); };
     $('#menuAvatar').onclick = () => chooseAvatar(id => { state.avatar = id; save(); updateUI(); toast('탐험대원을 바꿨어요.'); });
     $('#restartBtn').onclick = () => { saved = state.started ? state : saved; startNew(); };
-    $('#menuHelp').onclick = () => openModal(head('천천히, 함께 탐험해요') + '<div class="fact-box">이동: 방향키 / WASD / 조이스틱(터치 화면) / 지도 화면 누르기<br>건물: 문 바로 아래에서 위로 걸으면(또는 건물을 누르면) 들어가요. 계단을 밟으면 위아래 층으로, 문 깔개를 밟으면 밖으로 나가요<br>대화·조사: 가까이에서 E·스페이스 / 대화 버튼<br>자동 안내: 수첩의 목적지 안내<br>다음 지역: 독도 지킴이 인증 후 마을 오른쪽 다리 → 길을 따라 걷기<br>세계 지도: 가 본 마을로 바로 이동<br>결투 명령: 기록 찾기 · 동료 만들기 · 도구 · 동료 · 물러나기 (전설의 우산몬은 형태변환도)<br>기록 찾기: 누르면 독도 문제가 나와요. 맞히면 위쪽 두루마리(검은 기운이 지운 기록)의 빈칸이 채워져요. 문제에 따라 나침반·순서 놓기·근거 카드로 풀고, 검은 기운이 밀려올 때는 ○ ×로 빠르게 판단해요<br>상성(화살표 앞이 뒤에 강해요): 잎→빛→메아리→잎, 파도→바위→바람→파도. 상성이 좋으면 맞혔을 때 1.5배, 틀려도 절반은 닿아요. 상성이 나쁘면 0.75배<br>사나워진 우산몬: 문제를 맞히면 검은 기운을 걷어 내요. 모두 걷히면 평온을 되찾아요<br>상대의 문제: 맞히면 충격이 40% 줄고, 틀리면 그대로 받아요. 독도 지킴이·백무 사장은 가끔 정답도 뚫고 들어와요(관통)<br>동료 만들기: 버튼을 누르면 확률로 동료가 돼요(그 차례엔 공격 못 해요). 검은 기운이 적을수록 잘 되고, 전설의 우산몬은 10%<br>동료 보관함: 함께 다니는 동료는 4마리예요. 화면 아래 ‘동료’ 단추를 누르면 보관함이 열리고, 쉬는 동료와 언제든 바로 바꿔요<br>특성: 우산몬마다 결투에서 저절로 쓰이는 특별한 능력이 하나씩 있어요(30가지). 동료 보관함과 도감에서 볼 수 있어요<br>독도 지킴이와는 인증 결투로 겨뤄요<br>힌트: 문제 아래 기록 힌트 · 학습 기록에 도움 표시<br>대화와 컷신: 클릭·엔터·스페이스로 넘기기</div>' + typeRingHTML() + '<p>길에서는 표지판, 관찰 지점, 기억 비석, 조사 상자, 길에서 만난 사람과 몽땅랜드 직원을 찾아봐요. 사나워진 야생 우산몬은 마을과 마을 사이의 길 위를 걸어 다녀요.</p>');
+    $('#menuHelp').onclick = () => openModal(head('천천히, 함께 탐험해요') + '<div class="fact-box">이동: 방향키 / WASD / 조이스틱(터치 화면) / 지도 화면 누르기<br>3D 보기(◈): 내 캐릭터를 뒤에서 따라가며 봐요. W A S D로 보는 방향으로 칸에 얽매이지 않고 자유롭게 걷고, 마우스(화면을 한 번 눌러요 · Esc로 풀기)·방향키·둘러보기 조이스틱으로 하늘과 땅까지 둘러봐요. 왼손잡이는 메뉴의 ‘조작 손’에서 조이스틱 자리를 바꿔요<br>건물: 문 바로 아래에서 위로 걸으면(또는 건물을 누르면) 들어가요. 계단을 밟으면 위아래 층으로, 문 깔개를 밟으면 밖으로 나가요<br>대화·조사: 가까이에서 E·스페이스 / 대화 버튼<br>자동 안내: 수첩의 목적지 안내<br>다음 지역: 독도 지킴이 인증 후 마을 오른쪽 다리 → 길을 따라 걷기<br>세계 지도: 가 본 마을로 바로 이동<br>결투 명령: 기록 찾기 · 동료 만들기 · 도구 · 동료 · 물러나기 (전설의 우산몬은 형태변환도)<br>기록 찾기: 누르면 독도 문제가 나와요. 맞히면 위쪽 두루마리(검은 기운이 지운 기록)의 빈칸이 채워져요. 문제에 따라 나침반·순서 놓기·근거 카드로 풀고, 검은 기운이 밀려올 때는 ○ ×로 빠르게 판단해요<br>상성(화살표 앞이 뒤에 강해요): 잎→빛→메아리→잎, 파도→바위→바람→파도. 상성이 좋으면 맞혔을 때 1.5배, 틀려도 절반은 닿아요. 상성이 나쁘면 0.75배<br>사나워진 우산몬: 문제를 맞히면 검은 기운을 걷어 내요. 모두 걷히면 평온을 되찾아요<br>상대의 문제: 맞히면 충격이 40% 줄고, 틀리면 그대로 받아요. 독도 지킴이·백무 사장은 가끔 정답도 뚫고 들어와요(관통)<br>동료 만들기: 버튼을 누르면 확률로 동료가 돼요(그 차례엔 공격 못 해요). 검은 기운이 적을수록 잘 되고, 전설의 우산몬은 10%<br>동료 보관함: 함께 다니는 동료는 4마리예요. 화면 아래 ‘동료’ 단추를 누르면 보관함이 열리고, 쉬는 동료와 언제든 바로 바꿔요<br>특성: 우산몬마다 결투에서 저절로 쓰이는 특별한 능력이 하나씩 있어요(30가지). 동료 보관함과 도감에서 볼 수 있어요<br>독도 지킴이와는 인증 결투로 겨뤄요<br>힌트: 문제 아래 기록 힌트 · 학습 기록에 도움 표시<br>대화와 컷신: 클릭·엔터·스페이스로 넘기기</div>' + typeRingHTML() + '<p>길에서는 표지판, 관찰 지점, 기억 비석, 조사 상자, 길에서 만난 사람과 몽땅랜드 직원을 찾아봐요. 사나워진 야생 우산몬은 마을과 마을 사이의 길 위를 걸어 다녀요.</p>');
     $('#importSave').onchange = async e => { const file = e.target.files[0]; if (!file) return; try { if (file.size > 3e6) throw new Error('파일이 너무 커요.'); const parsed = validateSave(JSON.parse(await file.text())); saved = parsed; closeModal(); continueGame(); toast('저장한 모험을 불러왔어요.'); } catch (err) { toast(err.message || '저장 파일을 확인해 주세요.'); } };
   });
 }
@@ -1342,7 +1435,7 @@ $('#notebookBtn').onclick = () => { if (!battle) showStudy(); }; $('#guideBtn').
 $('#questBtn').onclick = $('#questPeek').onclick = showQuest; $('#partyBtn').onclick = $('#buddyPeek').onclick = showParty;
 $('#pocketBtn').onclick = () => showStorage();
 $('#fullscreenBtn').onclick = toggleFullscreen;
-// 작은 지도(1인칭에서만): 내 둘레 15×15칸. 걸을 수 있는 곳은 밝게, 사람은 주황 점, 우산몬은 보라 점, 나는 바라보는 쪽을 가리키는 화살표
+// 작은 지도(3D 보기에서만): 내 둘레 15×15칸. 걸을 수 있는 곳은 밝게, 사람은 주황 점, 우산몬은 보라 점, 나는 바라보는 쪽을 가리키는 화살표
 let miniMap = null, miniAt = 0;
 function paintMiniMap(now, people) {
   if (!miniMap) { miniMap = document.createElement('canvas'); miniMap.width = miniMap.height = 120; miniMap.className = 'mini-map'; miniMap.setAttribute('aria-hidden', 'true'); scene.append(miniMap); }
@@ -1356,13 +1449,17 @@ function paintMiniMap(now, people) {
   for (const n of people) { const x = Math.round(n.drawX ?? n.x) - cx + 7, y = Math.round(n.drawY ?? n.y) - cy + 7; if (x < 0 || y < 0 || x >= N || y >= N || n.scenery || n.player) continue; g.fillStyle = n.kind === 'wild' || n.kind === 'friend' || n.kind === 'legend' ? '#7a3fb0' : n.actor ? '#e2702a' : '#8a6a3c'; g.fillRect(x * S + 2, y * S + 2, S - 4, S - 4); }
   g.translate(7 * S + S / 2, 7 * S + S / 2); g.rotate(yaw ?? 0); g.fillStyle = '#d62828'; g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, -7); g.lineTo(5, 6); g.lineTo(0, 3); g.lineTo(-5, 6); g.closePath(); g.fill(); g.stroke();
 }
+// 조작 손(v0.62): 오른손잡이는 이동 조이스틱이 왼쪽·둘러보기가 오른쪽, 왼손잡이는 반대예요. 이 기기에 기억해요.
+let leftHanded = false; try { leftHanded = localStorage.getItem('dokdo-hand') === 'left'; } catch { /* 기본 오른손 */ }
+function setHand(left) { leftHanded = !!left; scene.classList.toggle('left-handed', leftHanded); try { localStorage.setItem('dokdo-hand', leftHanded ? 'left' : 'right'); } catch { /* 괜찮아요 */ } }
+const handLabel = () => leftHanded ? '왼손잡이 · 이동 오른쪽, 둘러보기 왼쪽' : '오른손잡이 · 이동 왼쪽, 둘러보기 오른쪽';
 function setView3d(on) {
   view3d = !!on; setPixelSnap(!view3d); try { localStorage.setItem('dokdo-view3d', view3d ? '1' : '0'); } catch { /* 기억하지 못해도 괜찮아요 */ }
-  const b = $('#viewBtn'); b.setAttribute('aria-pressed', String(view3d)); b.title = view3d ? '2D로 보기' : '3D(1인칭)로 보기'; b.setAttribute('aria-label', b.title); b.innerHTML = `◈ <span>${view3d ? '2D 보기' : '3D 보기'}</span>`;
-  scene.classList.toggle('view3d', view3d); labelKey = ''; yaw = null;
+  const b = $('#viewBtn'); b.setAttribute('aria-pressed', String(view3d)); b.title = view3d ? '2D로 보기' : '3D로 보기'; b.setAttribute('aria-label', b.title); b.innerHTML = `◈ <span>${view3d ? '2D 보기' : '3D 보기'}</span>`;
+  scene.classList.toggle('view3d', view3d); labelKey = ''; yaw = null; freePos = null; if (!moving && state.started) view = { x: state.x, y: state.y };
 }
-$('#viewBtn').onclick = () => { setView3d(!view3d); sfx('toggle'); if (view3d) toast(map.kind === 'room' ? '건물 밖으로 나가면 1인칭 시점으로 보여요.' : '1인칭 시점: ↑ 앞으로 · ↓ 뒷걸음 · ←→ 돌기. 화면을 눌러도 걸어요.'); };
-setView3d(view3d);
+$('#viewBtn').onclick = () => { setView3d(!view3d); sfx('toggle'); if (!view3d && document.pointerLockElement === canvas) document.exitPointerLock?.(); if (view3d) toast(map.kind === 'room' ? '건물 밖으로 나가면 3D로 보여요.' : matchMedia('(pointer:coarse)').matches ? '3D 보기: 이동 조이스틱으로 걷고, 둘러보기 조이스틱이나 화면 끌기로 둘러봐요.' : '3D 보기: W A S D로 보는 쪽으로 걷고, 화면을 누르면 마우스로 둘러봐요(Esc로 풀기). 방향키로도 둘러볼 수 있어요.'); };
+setView3d(view3d); setHand(leftHanded);
 $('#soundBtn').onclick = () => { setOn(!isOn()); if (isOn()) sfx('toggle'); updateUI(); };
 window.addEventListener('beforeunload', () => save());
 // 단추를 누를 때 작은 소리(결투 창은 battle-ui가 따로 내요)
@@ -1385,10 +1482,10 @@ if (typeof location !== 'undefined' && new URLSearchParams(location.search).has(
     get longestQuestion() { return QUESTIONS.reduce((m, q) => (q.prompt.length + q.options.join('').length + q.explanation.length > m.prompt.length + m.options.join('').length + m.explanation.length ? q : m)); },
     set forceQuestion(q) { testQuestion = q; }, questionById: id => QUESTIONS.find(q => q.id === id), closeBattleForTest: () => { if (battle) closeBattle(); },
     screenOf(x, y) { const r = canvas.getBoundingClientRect(), p = toScreen(x * TILE + 16, y * TILE + 16); return { x: r.left + p.x * sceneScale, y: r.top + p.y * sceneScale }; },
-    get view3d() { return view3d; }, setView3d,
-    standAtDoor(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b); settleMovement(); state.x = f.x; state.y = f.y; view = { x: f.x, y: f.y }; state.dir = 'up'; return f; },
+    get view3d() { return view3d; }, setView3d, get look() { return { yaw, pitch }; }, setLook(y, p = 0) { yaw = y; pitch = clampPitch(p); }, setHand,
+    standAtDoor(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b); settleMovement(); freePos = null; state.x = f.x; state.y = f.y; view = { x: f.x, y: f.y }; state.dir = 'up'; return f; },
     goInside(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b), p = pathfind(map, state.x, state.y, f.x, f.y, liveNPCs()); if (state.x === f.x && state.y === f.y) enterBuilding(b); else { path = p; pathAction = () => enterBuilding(b); } return p.length; },
-    legendRadio: false, dexDetail, showDex, showQuest, checkLegends, place(x, y, dir = 'right') { settleMovement(); path = []; state.x = x; state.y = y; view = { x, y }; state.dir = dir; },
+    legendRadio: false, dexDetail, showDex, showQuest, checkLegends, place(x, y, dir = 'right') { settleMovement(); freePos = null; path = []; state.x = x; state.y = y; view = { x, y }; state.dir = dir; },
     walkToTile(x, y) { const p = pathfind(map, moving?.toX ?? state.x, moving?.toY ?? state.y, x, y, liveNPCs()); path = p; pathAction = null; return p.length; }
   };
 }

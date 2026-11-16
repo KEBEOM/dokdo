@@ -1,48 +1,50 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// 1인칭 시점 (v0.61) — ‘3D 보기’ 단추를 누르면 지도 화면을 내 눈높이에서 봐요
+// 3D 보기 (v0.62) — 내 캐릭터를 조금 뒤, 조금 위에서 따라가며 보는 시점
 //
-// 내 캐릭터는 보이지 않고, 바라보는 쪽의 땅이 멀리까지 펼쳐져요. 사람·우산몬·나무·건물은 도트 그림 그대로 세워서 보여요.
-//   카메라: 내가 선 곳에서 BACK 만큼 뒤, 눈높이 EYE. 바라보는 각도 yaw(위 0 · 오른쪽 90° · 아래 180° · 왼쪽 −90°)
+// 카메라는 내 캐릭터 뒤 BACK 거리, 높이 EYE 에 있어요. 보는 방향은 마음대로 돌릴 수 있어요.
+//   yaw   좌우로 보는 각도(위쪽 0 · 오른쪽 90° · 아래쪽 180° · 왼쪽 −90°, 라디안)
+//   pitch 위아래로 보는 정도(−1 땅 쪽 … 0 보통 … +1 하늘 쪽). 지평선(hz)을 위아래로 옮겨서 나타내요.
 //   project(cam, wx, wy)   지도 위의 점 → 화면 위치 x, y(발이 닿는 곳), 크기 k, 거리 z (카메라 뒤면 null)
-//   unproject(cam, sx, sy) 화면의 점 → 지도 위의 점(누른 곳 찾기). 지평선 위나 너무 먼 곳이면 null
-//   rowDepth(y)            화면의 가로줄 y 에 보이는 땅까지의 거리
-// 조작: ↑ 앞으로 · ↓ 뒤로(뒷걸음) · ← → 제자리에서 돌기 (relativeStep)
+//   unproject(cam, sx, sy) 화면의 점 → 지도 위의 점(누른 곳 찾기). 하늘이나 너무 먼 곳이면 null
+//   rowDepth(cam, y)       화면의 가로줄 y 에 보이는 땅까지의 거리
+// 조작: W A S D 는 ‘보는 방향’을 기준으로 앞·왼쪽·뒤·오른쪽 칸으로 걸어요(cameraStep).
+//       마우스(또는 오른쪽 조이스틱, 방향키)로 둘러봐요.
 // ─────────────────────────────────────────────────────────────────────────────
-export const EYE = 30;        // 눈높이(지도 픽셀). 한 칸은 32, 캐릭터 키는 48쯤이에요
-export const BACK = 40;       // 카메라가 내 자리보다 뒤로 물러난 거리. 바로 앞 칸의 상대가 화면에 알맞게 들어와요
-export const DEPTH = 512;     // 보이는 거리(16칸)
-export const NEAR_Z = 14;     // 이보다 가까운 것은 그리지 않아요
+export const EYE = 64;        // 카메라 높이(지도 픽셀). 한 칸은 32, 캐릭터 키는 48쯤이에요
+export const BACK = 128;      // 카메라가 내 캐릭터보다 뒤로 물러난 거리(4칸)
+export const DEPTH = 512;     // 카메라에서 보이는 거리(16칸)
+export const NEAR_Z = 20;     // 이보다 가까운 것은 그리지 않아요
+export const HORIZON = .36;   // 보통 때 지평선의 높이(화면 높이의 비율)
 export const DIR_ANGLE = { up: 0, right: Math.PI / 2, down: Math.PI, left: -Math.PI / 2 };
 export const DIR_VEC = { up: [0, -1], right: [1, 0], down: [0, 1], left: [-1, 0] };
 const ORDER = ['up', 'right', 'down', 'left'];
+const quarter = yaw => ((Math.round(yaw / (Math.PI / 2)) % 4) + 4) % 4;   // 보는 방향에 가장 가까운 네 방향(0 위 · 1 오른쪽 · 2 아래 · 3 왼쪽)
 
-// 각도 cur 를 target 쪽으로 가까운 방향으로 maxStep 만큼 돌려요
-export function turnToward(cur, target, maxStep) {
-  let d = (target - cur) % (2 * Math.PI); if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI;
-  return Math.abs(d) <= maxStep ? target : cur + Math.sign(d) * maxStep;
+export const clampPitch = p => Math.max(-1, Math.min(1, p));
+// 누른 방향(화면 기준 [dx, dy]: ↑ = [0, −1])을 보는 방향 기준의 지도 방향으로 바꿔요
+export function cameraStep(yaw, [dx, dy]) {
+  let x = dx, y = dy; for (let i = quarter(yaw); i > 0; i--) [x, y] = [-y, x];
+  return [x || 0, y || 0];
 }
-// 1인칭 조작: 누른 방향(화면 기준 [dx, dy])을 지금 바라보는 쪽 기준으로 바꿔요
-//   ↑ → { move: 앞 }   ↓ → { move: 뒤, keep: true(돌지 않고 뒷걸음) }   ← → → { turn: 새로 바라볼 쪽 }
-export function relativeStep(dir, [dx, dy]) {
-  const [fx, fy] = DIR_VEC[dir] || DIR_VEC.down;
-  if (dy < 0) return { move: [fx, fy] };
-  if (dy > 0) return { move: [-fx || 0, -fy || 0], keep: true };
-  return { turn: ORDER[(ORDER.indexOf(dir) + (dx > 0 ? 1 : 3)) % 4] };
-}
+// 지도에서 dir 쪽을 보는 캐릭터가 카메라에는 어느 쪽 모습으로 보이는지(뒤에서 보면 뒷모습 'up')
+export function seenDir(yaw, dir) { const i = ORDER.indexOf(dir); return i < 0 ? dir : ORDER[(i - quarter(yaw) + 4) % 4]; }
 
-export function makeFirstPerson(W, H) {
-  const f = Math.max(W, H) * .5, hz = Math.round(H * .42), halfW = Math.ceil(DEPTH * (W / 2) / f);
+export function makeChase(W, H) {
+  const f = Math.min(Math.max(W, H) * .5, H * .9), halfW = Math.ceil(DEPTH * (W / 2) / f);
   return {
-    W, H, f, hz, RW: halfW * 2, RH: DEPTH, radius: Math.ceil(Math.hypot(DEPTH, halfW)),
-    camera(px, py, yaw) { const s = Math.sin(yaw), c = Math.cos(yaw); return { x: px - s * BACK, y: py + c * BACK, fx: s, fy: -c, rx: c, ry: s, yaw }; },
+    W, H, f, RW: halfW * 2, RH: DEPTH, radius: Math.ceil(Math.hypot(DEPTH, halfW)),
+    camera(px, py, yaw, pitch = 0) {
+      const s = Math.sin(yaw), c = Math.cos(yaw), p = clampPitch(pitch);
+      return { x: px - s * BACK, y: py + c * BACK, fx: s, fy: -c, rx: c, ry: s, yaw, pitch: p, hz: H * (HORIZON + p * (p > 0 ? .8 : .55)) };
+    },
     project(cam, wx, wy) {
       const dx = wx - cam.x, dy = wy - cam.y, z = dx * cam.fx + dy * cam.fy; if (z < NEAR_Z) return null;
-      const k = f / z; return { x: W / 2 + (dx * cam.rx + dy * cam.ry) * k, y: hz + EYE * k, k, z };
+      const k = f / z; return { x: W / 2 + (dx * cam.rx + dy * cam.ry) * k, y: cam.hz + EYE * k, k, z };
     },
     unproject(cam, sx, sy) {
-      if (sy <= hz + 1) return null; const z = EYE * f / (sy - hz); if (z > DEPTH) return null;
+      if (sy <= cam.hz + 1) return null; const z = EYE * f / (sy - cam.hz); if (z > DEPTH) return null;
       const l = (sx - W / 2) * z / f; return { x: cam.x + cam.fx * z + cam.rx * l, y: cam.y + cam.fy * z + cam.ry * l };
     },
-    rowDepth(y) { return y <= hz ? Infinity : EYE * f / (y - hz); }
+    rowDepth(cam, y) { return y <= cam.hz ? Infinity : EYE * f / (y - cam.hz); }
   };
 }

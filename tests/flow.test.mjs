@@ -139,12 +139,12 @@ assert.deepEqual(await page.$$eval('#dqCommand .dq-option:not([disabled])', b =>
 assert.ok(await page.$('#dqCommand .coach-pick[data-cmd="quiz"]'), '문제 풀기 is highlighted');
 await fight(); assert.equal(await G(() => window.__dokdo.state.tutorial.battle), true, 'practice duel done');
 await until(() => !!document.querySelector('#coachPanel'), 5000); assert.match(await page.textContent('#coachPanel'), /1 \/ 4/);
-for (const k of ['ArrowUp', 'ArrowDown', 'ArrowUp']) { await page.keyboard.down(k); await page.waitForTimeout(120); await page.keyboard.up(k); await page.waitForTimeout(380); }
+for (const k of ['ArrowUp', 'ArrowDown', 'ArrowUp']) { await page.keyboard.down(k); await page.waitForTimeout(300); await page.keyboard.up(k); await page.waitForTimeout(250); } // 자유 걷기(v0.63): 0.3초면 한 칸 넘게 걸어요
 assert.equal(await G(() => window.__dokdo.state.tutorial.walk), 1, 'three steps walked'); assert.match(await page.textContent('#coachPanel'), /말 걸기/);
 
 // ── 2. Movement by key, and the bridge stays closed before the badge ──
-const y0 = await G(() => window.__dokdo.state.y);
-await page.keyboard.down('ArrowUp'); await page.waitForTimeout(120); await page.keyboard.up('ArrowUp'); await page.waitForTimeout(400);
+const y0 = await G(() => { const d = window.__dokdo; d.place(d.state.x, d.state.y, 'up'); return d.state.y; });
+await page.keyboard.down('ArrowUp'); await page.waitForTimeout(220); await page.keyboard.up('ArrowUp'); await page.waitForTimeout(300);
 assert.equal(await G(() => window.__dokdo.state.y), y0 - 1, 'one step north along the pier');
 await G(() => { const d = window.__dokdo, ex = [...d.map.exits].find(([, v]) => v === 'next')[0].split(',').map(Number); d.state.x = ex[0] - 1; d.state.y = ex[1]; });
 await page.keyboard.down('ArrowRight'); await page.waitForTimeout(500); await page.keyboard.up('ArrowRight');
@@ -391,16 +391,38 @@ await toMenu(); await page.waitForTimeout(700);
 assert.deepEqual(await G(() => ['.dq-me', '.dq-vs', '.dq-portrait'].map(q => getComputedStyle(document.querySelector(q)).opacity)), ['0', '0', '0'], 'they leave together, and I am not shown afterwards');
 assert.ok(await page.isVisible('#allySprite'), 'my 우산몬 comes out after the VS');
 await G(() => window.__dokdo.closeBattleForTest());
-// ── v0.61: 1인칭 시점 — ←→는 제자리에서 돌고, 작은 지도가 보여요 ──
+// ── v0.62: 3D 보기 — 뒤에서 따라가는 시점, 보는 방향 기준 W A S D, 끌어서 둘러보기, 작은 지도 ──
 await G(() => window.__dokdo.closeModal()); for (let i = 0; i < 8 && await page.$('#dialogue:not(.hidden) #nextTalk'); i++) await page.click('#nextTalk');
 if (await G(() => window.__dokdo.map.kind !== 'room' && !window.__dokdo.busy)) {
-  const fp0 = await G(() => { window.__dokdo.setView3d(true); const s = window.__dokdo.state; s.dir = 'up'; return [s.x, s.y]; });
-  await page.waitForTimeout(300); assert.ok(await page.isVisible('.mini-map'), 'the mini map shows in first person');
-  await page.keyboard.press('ArrowLeft'); await page.waitForTimeout(400);
-  assert.deepEqual(await G(() => { const s = window.__dokdo.state; return [s.x, s.y, s.dir]; }), [...fp0, 'left'], '← turns on the spot');
-  await page.keyboard.press('ArrowRight'); await page.waitForTimeout(400); assert.equal(await G(() => window.__dokdo.state.dir), 'up', '→ turns back');
-  await G(() => window.__dokdo.setView3d(false)); await page.waitForTimeout(200); assert.ok(!(await page.isVisible('.mini-map')), 'no mini map in 2D');
+  await G(() => { window.__dokdo.setView3d(true); window.__dokdo.state.dir = 'up'; window.__dokdo.setLook(0, 0); });
+  await page.waitForTimeout(300); assert.ok(await page.isVisible('.mini-map'), 'the mini map shows in the 3D view');
+  await page.keyboard.press('a'); await page.waitForTimeout(400); assert.equal(await G(() => window.__dokdo.state.dir), 'left', 'looking north, A goes west');
+  if (await G(() => !window.__dokdo.battle && !window.__dokdo.busy)) {
+    await G(() => window.__dokdo.setLook(Math.PI / 2, 0)); await page.keyboard.press('w'); await page.waitForTimeout(400);
+    assert.equal(await G(() => window.__dokdo.battle ? 'right' : window.__dokdo.state.dir), 'right', 'looking east, W goes east');
+  }
+  if (await G(() => !window.__dokdo.battle && !window.__dokdo.busy)) {
+    await G(() => window.__dokdo.setLook(0, 0)); await page.keyboard.down('ArrowRight'); await page.waitForTimeout(250); await page.keyboard.up('ArrowRight'); await page.keyboard.down('ArrowUp'); await page.waitForTimeout(250); await page.keyboard.up('ArrowUp');
+    const lk = await G(() => window.__dokdo.look); assert.ok(lk.yaw > .1 && lk.pitch > .05, 'arrow keys look around (right and up)');
+  }
+  // v0.63 자유 걷기: 칸 사이에도 설 수 있고, 2D로 돌아오면 칸 가운데로 돌아와요
+  if (await G(() => !!window.__dokdo.battle)) await G(() => window.__dokdo.closeBattleForTest());
+  await G(() => window.__dokdo.changeMap('route0', 'a', { instant: true })); await page.waitForTimeout(900);
+  for (let i = 0; i < 8 && await page.$('#dialogue:not(.hidden) #nextTalk'); i++) await page.click('#nextTalk');
+  const f0 = await G(() => { window.__dokdo.setLook(Math.PI / 2, 0); return window.__dokdo.state.x; });
+  await page.keyboard.down('w'); await page.waitForTimeout(330); await page.keyboard.up('w'); await page.waitForTimeout(120);
+  const f1 = await G(() => ({ x: window.__dokdo.state.x, vx: window.__dokdo.motion().view.x, battle: !!window.__dokdo.battle, dir: window.__dokdo.state.dir }));
+  if (!f1.battle) { assert.equal(f1.dir, 'right'); assert.ok(f1.vx > f0 + .5, `W walks the way the camera looks (${f0} → ${f1.vx})`); assert.ok(Math.abs(f1.vx - Math.round(f1.vx)) > .001, 'free walking can stop between tiles'); assert.equal(f1.x, Math.round(f1.vx), 'my tile is the nearest one'); }
+  if (await G(() => !!window.__dokdo.battle)) await G(() => window.__dokdo.closeBattleForTest());
+  await G(() => { document.exitPointerLock?.(); window.__dokdo.setView3d(false); }); await page.waitForTimeout(200); assert.ok(!(await page.isVisible('.mini-map')), 'no mini map in 2D');
+  // 2D에서도 자유 걷기: 방향키 두 개를 함께 누르면 비스듬히 걸어요
+  if (await G(() => !window.__dokdo.battle && !window.__dokdo.busy)) {
+    const g0 = await G(() => { const d = window.__dokdo; d.place(d.state.x, d.state.y, 'right'); return d.motion().view; });
+    await page.keyboard.down('ArrowRight'); await page.waitForTimeout(260); await page.keyboard.up('ArrowRight'); await page.waitForTimeout(120);
+    const g1 = await G(() => ({ v: window.__dokdo.motion().view, x: window.__dokdo.state.x, battle: !!window.__dokdo.battle }));
+    if (!g1.battle) { assert.ok(g1.v.x > g0.x + .4, `→ walks right in 2D (${g0.x} → ${g1.v.x})`); assert.equal(g1.x, Math.round(g1.v.x)); }
+  }
 }
-assert.deepEqual(errors, [], 'no browser errors after the v0.60–0.61 checks');
+assert.deepEqual(errors, [], 'no browser errors after the v0.60–0.62 checks');
 await browser.close(); server.close();
 console.log(`PASS: wild 우산몬 walk on routes (none in towns, bump to battle, gone afterwards), 문제 풀기 asks right away, type advantage, 형태변환 in the menu for legends, 동료 만들기 button, 동료 보관함 swap (4 along), 전설의 우산몬 quest (radio, golden spot, meeting scene, plain win keeps the spot, 10% 동료 만들기, join with 변환폼, dex photo), 백무 사장 reveal/fall/epilogue scenes, 사나워진 우산몬 duels with 검은 기운 gauges, 몽땅랜드 designs in battle, softened hits on correct defence, opening read line by line with the mission choice, starter + guide, key walking, closed bridge, guide, DQ commands (정화하기 with two starting skills, guard skill, item, orb, switch, run), my 우산몬 drawn from behind, 백무단 pictures fading out, explorer drawings in the character choice, 울릉도 도동항 and the ferry to 독도, buildings with floors (door, stairs, dex, books, review desk, rest), 김박사 picture and starter cutscene, 사철나무 purified from 백무 사장 and joining once, practice duel and walking tutorial, clickable picture map, easy words (사나워진 우산몬 · 검은 기운 · 몽땅랜드 컴퍼니), quiz rules (wrong attack = miss, correct defence = light hit), hints, KO recovery, route objects, trainer, memory stone, 8 chapters walked through 7 routes, first-arrival scenes, fast travel, legend, ending, saves and a v0.21 save; ${totalTurns} battle turns.`);

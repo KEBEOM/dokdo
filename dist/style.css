@@ -997,5 +997,15 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
 .mini-map{display:none;position:absolute;left:14px;top:94px;width:120px;height:120px;z-index:6;border:3px solid #f6f3e6;border-radius:8px;box-shadow:0 0 0 2px #1a2030,0 3px 0 2px #0006;image-rendering:pixelated;pointer-events:none;opacity:.92}
 .view3d .mini-map{display:block}
 .battling .mini-map,.in-room .mini-map{display:none!important}
-@media (max-width:600px),(max-height:460px){.mini-map{width:84px;height:84px;top:56px;left:8px}}
+@media (max-width:600px),(max-height:460px){.mini-map{width:84px;height:84px;top:64px;left:8px}}
 .mini-map[hidden],.battling .mini-map,.story .mini-map{display:none!important}
+
+/* ───────── v0.62: 3D 보기(뒤에서 따라가는 시점) — 둘러보기 조이스틱 · 조작 손 ───────── */
+.right-pad{display:flex;flex-direction:column;align-items:center;gap:12px;pointer-events:none}
+.right-pad>*{pointer-events:auto}
+.look-stick{display:none;border-color:#bfe3ff99}
+.look-stick .joy-knob{background:radial-gradient(circle at 35% 30%,#f4fbff,#9fd0f2 70%,#6aa9d6)}
+.screen-frame.look-on .look-stick,.look-on .look-stick{display:block}
+.left-handed .touch-controls{flex-direction:row-reverse}
+.view3d #world,.view3d canvas{touch-action:none}
+.hand-settings{margin-top:8px}
