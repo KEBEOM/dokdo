@@ -10,7 +10,7 @@ import { MONSTERS, ZONES, TYPES, getSpecies, isUnique, pickStarterField, STARTER
 import { CONCEPTS, QUESTIONS, SOURCES } from './learning.js';
 import { STUDY_PAGES } from './study.js';
 import { stampSVG } from './stamps.js';
-import { newState, validateSave, createMonster, damage, enemyHit, attackHit, advantage, TYPE_RING, TYPE_REASON, healAll, gainXP, captureChance, runChance, xpForDefeat, BENCH_RATE, addMonster, recordAnswer, BOSS_KINDS, PIERCE_CHANCE, QUESTION_POWER } from './engine.js';
+import { newState, validateSave, createMonster, damage, enemyHit, attackHit, advantage, TYPE_RING, TYPE_REASON, healAll, gainXP, PARTY_MAX, captureChance, runChance, xpForDefeat, BENCH_RATE, addMonster, recordAnswer, BOSS_KINDS, PIERCE_CHANCE, QUESTION_POWER } from './engine.js';
 import { portrait, look } from './sprites.js';
 import { LEGENDS, ALL_LEGEND_IDS, legendProgress, legendScene, openFlag, metFlag, ownsSpecies } from './legends.js';
 import { PHOTO_CREDITS, LICENSE_TEXT, photoKey } from './photo-credits.js';
@@ -18,26 +18,47 @@ import { onAssetReady, preloadMonsters, assetImage, assetURL } from './assets.js
 import { VILLAIN_ATLASES } from './villain-atlases.js';
 import { music, sfx, jingle, setOn, setVolume, isOn, audioPrefs, currentMusic, wantedMusic } from './audio.js';
 import { TRACKS } from './music-data.js';
+import { makeFirstPerson, turnToward, relativeStep, DIR_ANGLE } from './view3d.js';
+import { TRAITS, TRAIT_KINDS, traitOf } from './traits.js';
+import { pictureKey } from './characters.js';
+import { setPixelSnap } from './characters.js';
 import { EXPLORERS, PROFESSOR_PICTURE, paintExplorerCard, paintExplorerPortrait, drawResident } from './characters.js';
 import { createNPCMotion } from './npc-motion.js';
 import { createRoamers } from './roamers.js';
 import { MOVE_DURATION, moveView } from './movement.js';
 import { selectBattleQuestion, shuffledChoices, quizFormat, oxShown } from './battle-quiz.js';
 import { pickRecord } from './records.js';
-import { createMap, npcs, blocked, pathfind, drawWorld, drawActors, TILE, W, H, wantedRole, VILLAIN_BY_ZONE } from './world.js';
+import { createMap, npcs, blocked, pathfind, drawWorld, drawActors, TILE, W, H, wantedRole, VILLAIN_BY_ZONE, ROLE_ACTOR } from './world.js';
 import { MAPS, getMapDef, townId, nextMapId, prevMapId } from './maps.js';
 import { createCutscenePlayer } from './cutscene.js';
 import { OPENING, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_FALL, TREE_JOINS, EPILOGUE, FERRY, FERRY_AGAIN } from './story.js';
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.58';
+const VERSION = '0.61';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const KEY = 'dokdomon-save-v1';
 
 let state = newState(), saved = null, map = createMap('town0');
+// 입체 시점(v0.59): ‘3D’ 단추로 지도 화면을 바꿔요(건물 안은 늘 2D). view3d.js가 계산하고, 이 기기에 기억해요.
+let rot3d = null, view3d = false; try { view3d = localStorage.getItem('dokdo-view3d') === '1'; } catch { /* 기본 2D */ }
+let proj3d = null, ground3d = null;
+const in3d = () => view3d && map.kind !== 'room';
+function projection() { if (!proj3d || proj3d.W !== sceneWidth || proj3d.H !== sceneHeight) proj3d = makeFirstPerson(sceneWidth, sceneHeight); return proj3d; }
+// 1인칭 카메라(v0.61): 내 자리 조금 뒤, 눈높이에서 바라보는 쪽을 봐요. yaw는 바라보는 쪽으로 부드럽게 돌아요.
+let yaw = null, lastTurn = 0;
+function fpCamera() { if (yaw === null) yaw = DIR_ANGLE[state.dir] ?? Math.PI; return projection().camera(view.x * TILE + 16, view.y * TILE + 16, yaw); }
+// 지도 위의 점(픽셀) → 화면 위의 점(지도 칸 단위 픽셀, sceneScale을 곱하기 전). lift: 땅에서 띄울 높이
+function toScreen(wx, wy, lift = 0) {
+  if (!in3d()) return { x: wx - camera.x, y: wy - lift - camera.y, k: 1 };
+  const p = projection().project(fpCamera(), wx, wy); return p ? { x: p.x, y: p.y - lift * p.k, k: p.k } : { x: -9999, y: -9999, k: 0 };
+}
+function fromScreen(sx, sy) {
+  if (!in3d()) return { x: sx + camera.x, y: sy + camera.y };
+  return projection().unproject(fpCamera(), sx, sy);
+}
 let camera = { x: 0, y: 0 }, view = { x: state.x, y: state.y }, moving = null, path = [], pathAction = null;
 let walks = 0, lastEncounter = 0, walkDistance = 0, battle = null, dialogueState = null, modalReturn = null, avatarChoice = null;
 let lastTick = performance.now(), transition = false;
@@ -111,8 +132,8 @@ function paintWorldLabels(people = liveNPCs()) {
   for (const n of labelNodes) {
     const live = positions.get(n.uid), fixed = n.building || n.exit;
     const px = live?.drawX ?? live?.x ?? 0, py = live?.drawY ?? live?.y ?? 0;
-    const wx = fixed ? n.x : px * TILE + 16, wy = fixed ? n.y : py * TILE + 28 - 48 - 24; // 48 = 캐릭터 키, 그 위 ‘!’ 표시보다 위쪽
-    const x = Math.round((wx - camera.x) * sceneScale), y = Math.round((wy - camera.y) * sceneScale);
+    const at = fixed ? toScreen(n.x, n.y) : toScreen(px * TILE + 16, py * TILE + 28, 48 + 24); // 48 = 캐릭터 키, 그 위 ‘!’ 표시보다 위쪽
+    const x = Math.round(at.x * sceneScale), y = Math.round(at.y * sceneScale);
     const onScreen = x >= 0 && x <= sceneWidth * sceneScale && y >= 20 && y < sceneHeight * sceneScale - 25;
     const shown = onScreen && (n.exit || (!talking && (n.building ? near(n.door.x, n.door.y, 3) : n.uid === closest)));
     n.el.hidden = !onScreen; n.el.classList.toggle('show', shown);
@@ -150,7 +171,7 @@ function resetTransient() {
 function restorePanel() { if (activePanel) { $('#panelStorage').append(activePanel); activePanel = null; } }
 function openPanel(id, title, kicker) { openModal(head(title, kicker) + '<div id="panelMount"></div>', () => { activePanel = $(id); $('#panelMount').append(activePanel); }); }
 function showQuest() { if (!battle) { openPanel('#questPanel', '모험 수첩', map.name); tutorialEvent('quest'); } }
-function showParty() { if (!battle) openPanel('#partyPanel', '함께하는 우산몬', `동료 ${state.party.length} / 6`); }
+function showParty() { if (!battle) showStorage(); }
 async function toggleFullscreen() {
   try { if (document.fullscreenElement) await document.exitFullscreen(); else if (scene.requestFullscreen) await scene.requestFullscreen(); else toast('현재 브라우저에서는 이 화면 크기로 플레이할 수 있어요.'); }
   catch { toast('전체 화면을 열 수 없어 현재 화면 크기로 플레이해요.'); }
@@ -248,7 +269,7 @@ function meetFriend(n) {
   if (!state.seen.includes(m.id)) state.seen.push(m.id);
   const bars = m.base ? `<div class="base-stats" aria-label="기본 능력치">${[['체력', 'hp'], ['공격', 'attack'], ['방어', 'defense'], ['스피드', 'speed']].map(([l, k]) => `<div><span>${l}</span><i><b style="width:${Math.round(m.base[k] / 140 * 100)}%"></b></i><em>${m.base[k]}</em></div>`).join('')}</div>` : '';
   const gym = TYPES[ZONES[0].type].name, vsGym = STRONG[m.type] === ZONES[0].type ? `첫 독도 지킴이 ${ZONES[0].boss}의 ${gym} 속성 우산몬에게 강해요!` : STRONG[ZONES[0].type] === m.type ? `첫 독도 지킴이 ${ZONES[0].boss}의 ${gym} 속성 우산몬에게는 조금 약하지만, 정답을 맞히면 이길 수 있어요.` : `첫 독도 지킴이 ${ZONES[0].boss}은 ${gym} 속성 우산몬을 데려와요.`;
-  openModal(head(m.name, `나리분지 초원 · 첫 동료 고르기`) + `<div class="monster-detail meet-friend"><canvas data-portrait="${m.id}" width="160" height="160"></canvas><div><span class="type-chip">${type} 속성</span> <span class="type-chip">${esc(m.group || '')}</span><p class="meet-hello">${esc(josa(m.name, '이/가'))} ${FRIEND_HELLO[m.group] || '고개를 갸웃하며 바라봐요.'}</p>${bars}<p class="meet-type">${type} 속성은 <b>${TYPES[STRONG[m.type]].name}</b> 속성에 강하고, <b>${TYPES[weak].name}</b> 속성에 약해요.<br><small>${TYPE_REASON[m.type]}</small><br>${vsGym}</p></div></div><div class="modal-actions"><button id="takeFriend" class="primary">이 친구를 동료로 데려갈래요</button><button id="keepLooking" class="neutral">조금 더 둘러볼래요</button></div>`, () => {
+  openModal(head(m.name, `나리분지 초원 · 첫 동료 고르기`) + `<div class="monster-detail meet-friend"><canvas data-portrait="${m.id}" width="160" height="160"></canvas><div><span class="type-chip">${type} 속성</span> <span class="type-chip">${esc(m.group || '')}</span><p class="trait-line">${traitChip(m)} ${esc(traitOf(m.id).text)}</p><p class="meet-hello">${esc(josa(m.name, '이/가'))} ${FRIEND_HELLO[m.group] || '고개를 갸웃하며 바라봐요.'}</p>${bars}<p class="meet-type">${type} 속성은 <b>${TYPES[STRONG[m.type]].name}</b> 속성에 강하고, <b>${TYPES[weak].name}</b> 속성에 약해요.<br><small>${TYPE_REASON[m.type]}</small><br>${vsGym}</p></div></div><div class="modal-actions"><button id="takeFriend" class="primary">이 친구를 동료로 데려갈래요</button><button id="keepLooking" class="neutral">조금 더 둘러볼래요</button></div>`, () => {
     $('#takeFriend').onclick = () => { closeModal(); chooseFriend(m.id, n.uid); };
     $('#keepLooking').onclick = () => { closeModal(); toast('천천히 둘러보세요. 다른 친구에게도 말을 걸어 봐요!'); };
   });
@@ -300,12 +321,12 @@ function updateUI() {
   $('#questTitle').textContent = state.started ? q.title : '첫 동료를 만나러'; $('#questDesc').textContent = state.started ? q.desc : '새로운 모험을 시작해 보세요.';
   $('#questSteps').innerHTML = state.started && q.stage >= 0 ? ['인물과 이야기하기', '기록 조사하기', '기록 되찾기', '지킴이 인증 받기'].map((v, i) => `<div class="quest-step ${i < q.stage ? 'done' : i === q.stage ? 'current' : ''}"><i>${i < q.stage ? '✓' : i + 1}</i>${v}</div>`).join('') : '';
   $('#badges').innerHTML = stampsHTML();
-  $('#badgeCount').textContent = `${state.badges.length} / 8`; $('#partyCount').textContent = `${state.party.length} / 6`;
+  $('#badgeCount').textContent = `${state.badges.length} / 8`; $('#partyCount').textContent = `${state.party.length} / ${PARTY_MAX}`;
   $('#dexProgress').textContent = `${state.caught.length} / 100`; $('#learningProgress').textContent = `${studyRead()} / ${STUDY_PAGES.length}`; $('#dailyNote').textContent = z().fact;
   $('#soundBtn').setAttribute('aria-label', isOn() ? '소리 끄기' : '소리 켜기'); $('#soundBtn').title = isOn() ? '소리 끄기' : '소리 켜기'; $('#soundBtn').innerHTML = `♪ <span>소리 ${isOn() ? '켜짐' : '꺼짐'}</span>`;
   $('#partyCards').innerHTML = state.party.length ? state.party.map((m, i) => `<button class="party-card ${i === state.active ? 'active' : ''}" data-party="${i}"><canvas data-portrait="${m.id}" width="64" height="64"></canvas><strong>${name(m)}</strong><small>Lv.${m.level} · ${m.hp}/${m.maxHp}</small><div class="hp-track"><i style="width:${m.hp / m.maxHp * 100}%"></i></div></button>`).join('') + Array.from({ length: 6 - state.party.length }, () => '<div class="party-slot">+</div>').join('') : '<p class="empty-party">첫 번째 동료가 당신을 기다리고 있어요.</p>';
   $$('[data-party]').forEach(b => b.onclick = () => partyDetail(Number(b.dataset.party)));
-  $('#quickQuestText').textContent = $('#questTitle').textContent; $('#dockPartyCount').textContent = `${state.party.length} / 6`;
+  $('#quickQuestText').textContent = $('#questTitle').textContent; $('#dockPartyCount').textContent = state.storage.length ? `${state.party.length} / ${PARTY_MAX} · 보관 ${state.storage.length}` : `${state.party.length} / ${PARTY_MAX}`;
   const buddy = state.party[state.active] || state.party[0];
   paintLegendList(); preloadMonsters(LEGENDS.filter(q => q.map === map.id).map(q => q.id));
   $('.buddy-peek')?.classList.toggle('hidden', !buddy); // 첫 동료를 고르기 전(나리분지 초원)에는 숨겨요
@@ -463,14 +484,21 @@ function useStairs(s) {
 // ── walking, exits and encounters ──────────────────────────────────────────────
 function exitLocked(x, y) { return map.exits.get(`${x},${y}`) === 'next' && map.kind === 'town' && !state.badges.includes(state.zone); }
 const lockedMessage = () => map.def.island === '울릉도' ? `${keeperName(z())}의 인증을 받으면 독도행 배를 탈 수 있어요.` : `${keeperName(z())}의 인증을 받으면 다리 건너 길이 열려요.`;
-function move(dx, dy, now) {
+function move(dx, dy, now, keepDir = false) {
   if (moving || busy() || Math.abs(dx) + Math.abs(dy) !== 1) return false;
-  const nx = state.x + dx, ny = state.y + dy; state.dir = dx < 0 ? 'left' : dx > 0 ? 'right' : dy < 0 ? 'up' : 'down';
+  const nx = state.x + dx, ny = state.y + dy; if (!keepDir) state.dir = dx < 0 ? 'left' : dx > 0 ? 'right' : dy < 0 ? 'up' : 'down';
   if (exitLocked(nx, ny)) { if (!move.warned || now - move.warned > 1500) { toast(lockedMessage()); move.warned = now; } return false; }
-  if (dy === -1) { const b = buildingDoorAt(nx, ny); if (b) { enterBuilding(b); return true; } } // walking up into a door
+  if (dy === -1 && !keepDir) { const b = buildingDoorAt(nx, ny); if (b) { enterBuilding(b); return true; } } // walking up into a door
   const wild = roamers.at(nx, ny); if (wild?.kind === 'friend') return false; if (wild) { path = []; pathAction = null; startBattle('wild', wild.species, { roamer: wild.uid }); return false; } // 걸어 다니는 우산몬과 부딪히면 결투
   if (blocked(map, nx, ny, liveNPCs())) { if (!move.bumped || now - move.bumped > 380) { sfx('bump'); move.bumped = now; } return false; }
   moving = { fromX: state.x, fromY: state.y, toX: nx, toY: ny, start: now }; return true;
+}
+// 방향키·조이스틱 한 번: 2D에서는 누른 쪽으로 걷고, 1인칭에서는 ↑ 앞으로 · ↓ 뒷걸음 · ←→ 제자리에서 돌아요
+function step(v, now) {
+  if (!in3d()) return move(v[0], v[1], now);
+  const r = relativeStep(state.dir, v);
+  if (r.move) return move(r.move[0], r.move[1], now, !!r.keep);
+  if (now - lastTurn < 280) return false; lastTurn = now; state.dir = r.turn; return true;
 }
 function arrive() {
   if (!moving) return;
@@ -505,7 +533,8 @@ async function changeMap(id, spawnKey = 'a', { heal = false, instant = false, di
 canvas.addEventListener('pointerdown', e => {
   if (busy()) return;
   const bounds = canvas.getBoundingClientRect();
-  const tx = Math.floor(((e.clientX - bounds.left) * canvas.width / bounds.width + camera.x) / 32), ty = Math.floor(((e.clientY - bounds.top) * canvas.height / bounds.height + camera.y) / 32);
+  const hit = fromScreen((e.clientX - bounds.left) * sceneWidth / bounds.width, (e.clientY - bounds.top) * sceneHeight / bounds.height); if (!hit) return;
+  const tx = Math.floor(hit.x / 32), ty = Math.floor(hit.y / 32);
   const people = liveNPCs(), n = people.find(n => Math.abs((n.drawX ?? n.x) - tx) <= .65 && Math.abs((n.drawY ?? n.y) - ty) <= 1);
   if (n) { moveToNPC(n); return; }
   const b = map.kind === 'town' && map.buildings.find(b => tx >= b.x && tx < b.x + b.w && ty >= b.y - 1 && ty < b.y + b.h);
@@ -557,8 +586,8 @@ function frame(now) {
     const stick = stairHold ? null : joystick.direction;
     if (stairHold && !joystick.direction && !keys.size) stairHold = false;
     if (stairHold) { /* let go first */ }
-    else if (stick) { if (!move(...stick.primary, nextStart) && stick.secondary) move(...stick.secondary, nextStart); }
-    else if ((keyDir = keys.next(now))) move(...keyDir, nextStart);
+    else if (stick) { if (!step(stick.primary, nextStart) && stick.secondary && !in3d()) step(stick.secondary, nextStart); }
+    else if ((keyDir = keys.next(now))) step(keyDir, nextStart);
     else if (path.length) { const [x, y] = path.shift(); if (!move(x - state.x, y - state.y, nextStart)) { path = []; pathAction = null; } }
     else if (pathAction) { const fn = pathAction; pathAction = null; fn(); }
   }
@@ -566,10 +595,37 @@ function frame(now) {
   if (moving) { const result = moveView(view, moving, now); walkDistance += result.distance; if (result.complete) arrive(); }
   if (!cutscenes.active() && !battle) {
     const walking = !!moving && !busy(), people = liveNPCs();
-    camera = drawWorld(ctx, map, state, view, now, path.length ? { x: path.at(-1)[0], y: path.at(-1)[1] } : null, { walking, distance: walkDistance }, { width: sceneWidth, height: sceneHeight, labels: false, actors: false }, people);
+    const target = path.length ? { x: path.at(-1)[0], y: path.at(-1)[1] } : null, motion = { walking, distance: walkDistance }, K = sceneScale * actorPixelRatio;
     actorCtx.setTransform(1, 0, 0, 1, 0, 0); actorCtx.clearRect(0, 0, actorCanvas.width, actorCanvas.height); actorCtx.save();
-    actorCtx.scale(sceneScale * actorPixelRatio, sceneScale * actorPixelRatio); actorCtx.translate(-camera.x, -camera.y);
-    drawActors(actorCtx, state, view, now, { walking, distance: walkDistance }, people, map); actorCtx.restore(); paintWorldLabels(people);
+    if (in3d()) {
+      // 1인칭 시점(v0.61): 내 둘레의 땅을 따로 그리고 → 바라보는 쪽이 위로 가게 돌린 뒤 → 가로줄마다 원근을 주어 눕히고 → 서 있는 것들을 먼 것부터 세워 그려요
+      const P = projection(); yaw = turnToward(yaw ?? DIR_ANGLE[state.dir], DIR_ANGLE[state.dir] ?? Math.PI, dt * .011);
+      const cam = fpCamera(), side = P.radius * 2 + 64, gw = Math.min(side, W * TILE), gh = Math.min(side, H * TILE);
+      ground3d ||= document.createElement('canvas'); if (ground3d.width !== gw || ground3d.height !== gh) { ground3d.width = gw; ground3d.height = gh; }
+      const g = ground3d.getContext('2d'); g.imageSmoothingEnabled = false;
+      camera = drawWorld(g, map, state, { x: (cam.x - 16) / TILE, y: (cam.y - 16) / TILE }, now, target, motion, { width: gw, height: gh, labels: false, actors: false }, people);
+      rot3d ||= document.createElement('canvas'); if (rot3d.width !== P.RW || rot3d.height !== P.RH) { rot3d.width = P.RW; rot3d.height = P.RH; }
+      const r = rot3d.getContext('2d'), sn = Math.sin(yaw), cs = Math.cos(yaw), ux = cam.x - camera.x, uy = cam.y - camera.y;
+      r.setTransform(1, 0, 0, 1, 0, 0); r.fillStyle = z().color; r.fillRect(0, 0, P.RW, P.RH); r.imageSmoothingEnabled = false;
+      r.setTransform(cs, -sn, sn, cs, P.RW / 2 - (cs * ux + sn * uy), P.RH - (-sn * ux + cs * uy)); r.drawImage(ground3d, 0, 0);
+      const sky = ctx.createLinearGradient(0, 0, 0, P.hz); sky.addColorStop(0, '#8fcbe6'); sky.addColorStop(1, '#e4f4f6'); ctx.fillStyle = sky; ctx.fillRect(0, 0, sceneWidth, P.hz);
+      ctx.fillStyle = z().color; ctx.fillRect(0, P.hz, sceneWidth, sceneHeight - P.hz);
+      actorCtx.scale(K, K); actorCtx.imageSmoothingEnabled = false;
+      for (let y = P.hz + 1; y < sceneHeight; y++) {
+        const d0 = Math.min(P.rowDepth(y), P.RH), d1 = P.rowDepth(y + 1); if (d1 >= P.RH) continue;
+        const k = P.f / ((d0 + d1) / 2), hw = sceneWidth / 2 / k, sx = Math.max(0, P.RW / 2 - hw), sw = Math.min(P.RW, P.RW / 2 + hw) - sx;
+        actorCtx.drawImage(rot3d, sx, P.RH - d0, sw, Math.max(.5, d0 - d1), sceneWidth / 2 + (sx - P.RW / 2) * k, y, sw * k, 1.03);
+      }
+      const haze = actorCtx.createLinearGradient(0, P.hz, 0, P.hz + sceneHeight * .14); haze.addColorStop(0, '#e4f4f6'); haze.addColorStop(1, '#e4f4f600'); actorCtx.fillStyle = haze; actorCtx.fillRect(0, P.hz, sceneWidth, sceneHeight * .14);
+      drawActors(actorCtx, state, view, now, motion, people, map, (wx, wy) => P.project(cam, wx, wy));
+      paintMiniMap(now, people);
+    } else {
+      if (miniMap) miniMap.hidden = true;
+      camera = drawWorld(ctx, map, state, view, now, target, motion, { width: sceneWidth, height: sceneHeight, labels: false, actors: false }, people);
+      actorCtx.scale(K, K); actorCtx.translate(-camera.x, -camera.y);
+      drawActors(actorCtx, state, view, now, motion, people, map);
+    }
+    actorCtx.restore(); paintWorldLabels(people);
   }
   music(musicFor());
   if (state.started && !document.hidden && now - (frame.legendAt || 0) > 700) { frame.legendAt = now; checkLegends(); }
@@ -703,16 +759,16 @@ function startBattle(kind, id, opts = {}) {
   $('#toast').classList.add('hidden');
   battle = { kind, enemies, index: 0, turn: 1, npc: opts.npc || null, roamer: opts.roamer || null, captureTried: false, guard: false, quiz: null };
   $('#battleScreen').classList.remove('hidden'); scene.classList.add('battling');
-  const foeTrainer = kind === 'enemy' ? VILLAIN_BY_ZONE[state.zone] : kind === 'trainer' ? opts.npc.actor : null;
+  const foeTrainer = kind === 'enemy' ? VILLAIN_BY_ZONE[state.zone] : kind === 'trainer' ? opts.npc.actor : (kind === 'boss' || kind === 'rematch') ? ROLE_ACTOR(state.zone).boss : null;
   const foePortrait = villainPortrait(foeTrainer);
-  battleUI.mount({ backdrop: backdropKind(), sky: z().color, aura: berserk(battle), island: map.def?.island || '', avatar: state.avatar, label: kind === 'tutorial' ? '연습 · 김박사와 함께' : kind === 'wild' ? `기록 되찾기 · ${map.name}` : kind === 'legend' ? `전설의 우산몬 · ${map.name}` : kind === 'boss' || kind === 'rematch' ? `${opponentName(battle)} · 인증 결투` : opponentName(battle), foeTrainer, foePortrait });
-  refreshBattle(); if (!(foePortrait && battleUI.portraitIn())) battleUI.enemyEnter(); sfx('encounter'); updateUI();
+  battleUI.mount({ backdrop: backdropKind(), sky: z().color, aura: berserk(battle), island: map.def?.island || '', myPicture: ['enemy', 'trainer', 'boss', 'rematch'].includes(kind) ? pictureKey(EXPLORERS.find(x => x.id === state.avatar)?.picture) : null, label: kind === 'tutorial' ? '연습 · 김박사와 함께' : kind === 'wild' ? `기록 되찾기 · ${map.name}` : kind === 'legend' ? `전설의 우산몬 · ${map.name}` : kind === 'boss' || kind === 'rematch' ? `${opponentName(battle)} · 인증 결투` : opponentName(battle), foeTrainer, foePortrait });
+  foeEnters(battle); refreshBattle(); if (!battleUI.portraitIn()) battleUI.enemyEnter(); sfx('encounter'); updateUI();
   runBattle(battle).catch(err => { console.error(err); if (battle) finishBattle(false, true); });
 }
 function refreshBattle() {
   if (!battle) return;
   const a = active(), e = enemy(), sp = getSpecies(e.id), dark = berserk(battle);
-  battleUI.setStatus(a, { name: name(a) }, state.party.map((m, i) => ({ hp: m.hp, name: name(m), active: i === state.active })));
+  battleUI.setStatus(a, { name: name(a), trait: traitId(battle, a) ? traitName(a) : '' }, state.party.map((m, i) => ({ hp: m.hp, name: name(m), active: i === state.active })));
   battleUI.setFoe(e, { name: sp.name, type: TYPES[sp.type].name, gauge: dark ? '남은 검은 기운' : '남은 기운', dark, record: e.record, title: dark ? '지워진 기록' : '시험 두루마리' }, battle.enemies.length > 1 ? `${battle.index + 1} / ${battle.enemies.length}번째 우산몬` : '');
   if (dark) battleUI.setAura(e.hp > 0 ? Math.max(.25, e.hp / e.maxHp) : 0);
 }
@@ -725,6 +781,13 @@ function explanationHTML(q) { return `<p class="dq-explain">${esc(q.explanation)
 const conceptTitle = q => CONCEPTS.find(c => c.id === q.concept)?.title || '기억 확인';
 const matchup = (a, e) => advantage(getSpecies(a.id).type, getSpecies(e.id).type);
 const isBoss = b => BOSS_KINDS.includes(b.kind) || (b.kind === 'enemy' && state.zone === 7); // 독도 지킴이 · 백무 사장
+// ── 특성 (v0.60, traits.js) ── 우산몬마다 하나씩. 연습 대결에서는 쓰지 않아요(자동 검사는 따로 켜서 봐요).
+const traitId = (b, m) => (!m || tut(b) || (TEST_MODE && !window.__dokdoTraits)) ? null : traitOf(m.id).id;
+const traitName = m => traitOf(m.id).name;
+function traitState(b, m) { b.traits ||= new Map(); if (!b.traits.has(m)) b.traits.set(m, { rights: 0, streak: 0, lastWrong: false, hit: false }); return b.traits.get(m); }
+const healBy = (m, rate) => { const before = m.hp; m.hp = Math.min(m.maxHp, m.hp + Math.max(1, Math.round(m.maxHp * rate))); return m.hp - before; };
+// 기운 읽기: 상대가 나올 때 두루마리를 10% 먼저 채워요
+function foeEnters(b) { const a = active(), e = enemy(); if (traitId(b, a) === 'reader' && e.hp === e.maxHp) e.hp = Math.max(1, e.hp - Math.round(e.maxHp * .1)); }
 function attackRule(b, mult) {
   if (mult > 1) return '상성이 좋아요! 맞히면 1.5배로 채우고, 틀려도 절반은 채워져요.';
   if (mult < 1) return '상성이 나빠요. 맞혀도 0.75배만 채워지고, 틀리면 채워지지 않아요.';
@@ -738,6 +801,9 @@ async function askQuiz(b, phase, header, chosen = null) {
     : `맞히면 충격이 40% 줄어요. 틀리면 그대로 받아요.${pierce ? ' 이 상대는 가끔 정답도 뚫고 들어와요(관통)!' : ''}`;
   const wanted = quizFormat(q, phase), format = wanted === 'order' && TEST_MODE && !window.__dokdoOrder ? 'choice' : wanted; // 자동 검사는 순서 놓기를 따로 켜서 봐요
   const shown = format === 'ox' ? oxShown(q, Math.random, TEST_MODE) : null;
+  if (phase === 'attack' && traitId(b, active()) === 'eliminate' && ['choice', 'cards'].includes(format)) { // 약점 찾기: 틀린 답 하나를 지워요
+    const wrong = order.filter(i => i !== q.answer), drop = TEST_MODE ? (q.answer + 2) % 4 : wrong[Math.floor(Math.random() * wrong.length)]; order.splice(order.indexOf(drop), 1);
+  }
   b.quiz.format = format;
   const res = await battleUI.quiz({ q, order, phase, header, rule, concept: conceptTitle(q), format, shown });
   if (battle !== b) return null;
@@ -753,16 +819,36 @@ async function attackWithQuiz(b, q = null) {
   tip(b, '알맞은 답을 눌러요. 맞히면 위쪽 두루마리의 빈칸이 채워져요. 모르겠으면 ‘기록 힌트 보기’를 눌러도 돼요.');
   const r = await askQuiz(b, 'attack', `${josa(name(a), '과/와')} 기록 찾기`, q); if (!r) return;
   tip(b, r.correct ? '잘했어요! 두루마리에 글자가 돌아온 게 보이죠?' : '괜찮아요! 틀려도 내 우산몬은 다치지 않아요. 다시 해 봐요.');
-  const d = attackHit(a, e, r.correct);
+  const d = attackHit(a, e, r.correct), tr = traitId(b, a), ts = traitState(b, a); let note = '';
+  if (r.correct) {
+    ts.rights++; ts.streak++; let k = 1;
+    if (tr === 'opener' && ts.rights === 1) k *= 1.5;
+    if (tr === 'clutch' && a.hp < a.maxHp / 2) k *= 1.3;
+    if (tr === 'streak' && ts.streak > 1) k *= 1 + Math.min(.3, .1 * (ts.streak - 1));
+    if (tr === 'sharp' && ts.rights % 3 === 0) k *= 1.5;
+    if (tr === 'typeace' && d.mult > 1) k *= 1.2;
+    if (tr === 'underdog' && d.mult < 1) k /= d.mult;
+    if (tr === 'finisher' && e.hp / e.maxHp < .3) k *= 1.4;
+    if (tr === 'careful' && !b.quiz.assisted) k *= 1.15;
+    if (tr === 'comeback' && ts.lastWrong) k *= 1.4;
+    if (k !== 1) { d.amount = Math.max(1, Math.round(d.amount * k)); note = ` [${traitName(a)}]`; }
+    ts.lastWrong = false;
+    if (tr === 'mend' && a.hp < a.maxHp) { healBy(a, .06); note = ` [${traitName(a)}: 체력 회복]`; }
+  } else {
+    ts.streak = 0; ts.lastWrong = true;
+    if (tr === 'grit' && d.amount === 0) { d.amount = Math.max(1, Math.round(attackHit(a, e, true).amount * .3)); note = ` [${traitName(a)}]`; }
+  }
   if (d.amount > 0) { e.hp = Math.max(0, e.hp - d.amount); sfx(d.mult > 1 ? 'hitStrong' : d.mult < 1 ? 'hitWeak' : 'hit'); battleUI.damage(d.amount, 'enemy'); refreshBattle(); }
   if (r.correct) {
     const eff = d.mult > 1 ? ' 상성이 좋아 기록이 크게 채워졌다!' : d.mult < 1 ? ' 상성이 나빠 조금만 채워졌다…' : '';
-    await battleUI.explain(dark ? `정답! 지워진 기록이 되살아난다. 검은 기운을 ${d.amount}만큼 걷어 냈다!${eff}` : `정답! 시험 두루마리가 채워진다. ${name(e)}의 기운이 ${d.amount} 줄었다!${eff}`, explanationHTML(r.q), 'good');
+    await battleUI.explain(dark ? `정답! 지워진 기록이 되살아난다. 검은 기운을 ${d.amount}만큼 걷어 냈다!${eff}${note}` : `정답! 시험 두루마리가 채워진다. ${name(e)}의 기운이 ${d.amount} 줄었다!${eff}${note}`, explanationHTML(r.q), 'good');
   } else if (d.amount > 0) {
-    await battleUI.explain(`아쉬워요! 그래도 상성이 좋아서 기록이 조금 채워졌다(${dark ? '검은 기운' : '기운'} −${d.amount}).`, explanationHTML(r.q), 'bad');
+    await battleUI.explain(note ? `아쉬워요! 그래도 끈기 있게 기록을 조금 채웠다(${dark ? '검은 기운' : '기운'} −${d.amount}).${note}` : `아쉬워요! 그래도 상성이 좋아서 기록이 조금 채워졌다(${dark ? '검은 기운' : '기운'} −${d.amount}).`, explanationHTML(r.q), 'bad');
   } else {
     await battleUI.explain(dark ? '아쉬워요! 이번에는 기록이 채워지지 않았다.' : '아쉬워요! 시험 두루마리가 채워지지 않았다.', explanationHTML(r.q), 'bad');
   }
+  // 연속 풀이: 결투마다 한 번, 맞히면 곧바로 한 문제 더
+  if (battle === b && r.correct && tr === 'double' && !ts.doubled && e.hp > 0) { ts.doubled = true; await battleUI.say(`${name(a)}의 ${traitName(a)}! 한 문제 더 풀 수 있다!`, { tone: 'good' }); if (battle === b) await attackWithQuiz(b); }
 }
 // ── 전설의 우산몬 형태변환 (v0.41): 노멀폼(그림 068) ↔ 변환폼(그림 068-2) ──
 // 변환폼이면 정답의 힘 ×1.3, 튼튼함 ×1.2. 결투가 끝나면 노멀폼으로 돌아와요(저장 파일에는 노멀폼만).
@@ -777,7 +863,7 @@ async function morph(b, m, side) {
 }
 // 동료 만들기: 버튼을 누르면 확률로 동료가 돼요(구슬 필요 없음). 시도하면 그 차례에는 공격하지 못해요.
 async function befriend(b) {
-  const e = enemy(), sp = getSpecies(e.id), chance = captureChance(e);
+  const e = enemy(), sp = getSpecies(e.id), triesKey = `legend-tries:${e.id}`, chance = Math.min(.95, captureChance(e, state.flags[triesKey] || 0) + (traitId(b, active()) === 'charm' ? .15 : 0));
   await battleUI.say(`${name(e)}에게 손을 내밀었다… 마음이 닿을까?`);
   if (battle !== b) return 'end';
   const sure = !sp.legendary && state.caught.length < 2; // 첫 동료 한 마리는 꼭 함께해요
@@ -787,20 +873,21 @@ async function befriend(b) {
     await awardXP(b, e); if (battle !== b) return 'end';
     finishBattle(false, false, { captured: e, legend: b.kind === 'legend' ? b : null }); return 'end';
   }
-  await battleUI.say(sp.legendary ? `${josa(name(e), '은/는')} 아직 마음을 열지 않았다. (전설의 우산몬은 10%의 확률로만 동료가 돼요)` : '아직 마음을 열지 않았다. 검은 기운을 더 걷어 내면 잘 돼요.'); return 'turn';
+  if (sp.legendary) { state.flags[triesKey] = (state.flags[triesKey] || 0) + 1; save(); }
+  await battleUI.say(sp.legendary ? `${josa(name(e), '은/는')} 아직 마음을 열지 않았다. 하지만 조금 가까워졌다! (다음 성공률 ${Math.round(captureChance(e, state.flags[triesKey]) * 100)}%)` : '아직 마음을 열지 않았다. 검은 기운을 더 걷어 내면 잘 돼요.'); return 'turn';
 }
 async function playerTurn(b) {
   const a = active(), e = enemy(), first = tut(b) && b.turn === 1, wild = b.kind === 'wild' || b.kind === 'legend', mult = matchup(a, e);
   const forms = getSpecies(a.id).forms === 2 && !tut(b);
   tip(b, first ? '‘기록 찾기’를 눌러 보세요. 독도 문제가 나와요!' : '이번엔 마음대로 골라 봐요! 상성이 좋은 동료로 바꾸면 더 크게 걷어 낼 수 있어요.');
-  const chance = wild ? Math.round(captureChance(e) * 100) : 0;
+  const tr = traitId(b, a), chance = wild ? Math.round(Math.min(.95, captureChance(e, state.flags[`legend-tries:${e.id}`] || 0) + (tr === 'charm' ? .15 : 0)) * 100) : 0;
   const cmd = await battleUI.menu([
     { label: '기록 찾기', value: 'quiz', sub: `${TYPES[getSpecies(a.id).type].name} → ${TYPES[getSpecies(e.id).type].name}${mult > 1 ? ' · 유리' : mult < 1 ? ' · 불리' : ''}`, hint: first },
     { label: '동료 만들기', value: 'befriend', sub: wild ? `성공률 ${chance}%` : '야생 우산몬만', disabled: first || !wild },
     { label: '도구', value: 'item', sub: `회복젤 ${state.items.heal}`, disabled: first },
     { label: '동료', value: 'party', sub: '교체', disabled: first || state.party.filter(m => m.hp > 0).length < 2 },
     ...(forms ? [{ label: a.form === 2 ? '원래 모습으로' : '형태변환', value: 'morph', sub: a.form === 2 ? '노멀폼으로' : '변환폼 · 힘 UP' }] : []),
-    { label: '물러나기', value: 'run', sub: wild ? `성공률 ${Math.round(runChance(a, enemy()) * 100)}%` : '결투 중', disabled: first, back: true }
+    { label: '물러나기', value: 'run', sub: wild ? `성공률 ${tr === 'swift' ? 100 : Math.round(runChance(a, enemy()) * 100)}%` : '결투 중', disabled: first, back: true }
   ], { prompt: `${josa(name(a), '은/는')} 무엇을 할까?`, layout: forms ? 'cards' : '' });
   if (battle !== b) return 'end';
   if (cmd === 'quiz') { await attackWithQuiz(b); return 'turn'; }
@@ -808,22 +895,22 @@ async function playerTurn(b) {
   if (cmd === 'befriend') return befriend(b);
   if (cmd === 'item') {
     const pick = await battleUI.menu([
-      { label: `회복젤 ×${state.items.heal}`, value: 'heal', sub: '체력 45% 회복', disabled: state.items.heal <= 0 || a.hp === a.maxHp }
+      { label: `회복젤 ×${state.items.heal}`, value: 'heal', sub: `체력 ${tr === 'medic' ? 70 : 45}% 회복`, disabled: state.items.heal <= 0 || a.hp === a.maxHp }
     ], { title: '도구', prompt: '어떤 도구를 쓸까?', cancel: true });
     if (pick === null) return 'free';
-    state.items.heal--; jingle('heal'); const before = a.hp; a.hp = Math.min(a.maxHp, a.hp + Math.ceil(a.maxHp * .45)); refreshBattle(); updateUI(); save();
+    state.items.heal--; jingle('heal'); const before = a.hp; a.hp = Math.min(a.maxHp, a.hp + Math.ceil(a.maxHp * (tr === 'medic' ? .7 : .45))); refreshBattle(); updateUI(); save();
     await battleUI.say(`회복젤을 썼다! ${name(a)}의 체력이 ${a.hp - before} 회복됐다!`); return 'turn';
   }
   if (cmd === 'party') {
     const e = enemy();
     const pick = await battleUI.menu(state.party.map((m, i) => { const mu = matchup(m, e); return { label: name(m), value: String(i), sub: `Lv ${m.level} · HP ${m.hp}/${m.maxHp}${mu > 1 ? ' · 유리' : mu < 1 ? ' · 불리' : ''}`, disabled: m.hp <= 0 || i === state.active }; }), { title: '동료', prompt: '누구와 교체할까?', cancel: true });
     if (pick === null) return 'free';
-    state.active = Number(pick); refreshBattle(); battleUI.allyAct?.('enter'); updateUI(); save();
+    state.active = Number(pick); if (traitId(b, active()) === 'cheer') healBy(active(), .15); refreshBattle(); battleUI.allyAct?.('enter'); updateUI(); save();
     await battleUI.say(`${name(active())}, 부탁해!`); return 'turn';
   }
   if (tut(b)) { await battleUI.say('연습 대결은 끝까지 해 봐요! 그만하려면 위쪽 ‘연습 건너뛰기’를 눌러요.'); return 'free'; }
   if (!wild) { await battleUI.say('이 결투에서는 물러날 수 없다!'); return 'free'; }
-  if (Math.random() < runChance(a, enemy())) { sfx('run'); await battleUI.say('무사히 물러났다!'); finishBattle(false, true); return 'end'; }
+  if (tr === 'swift' || Math.random() < runChance(a, enemy())) { sfx('run'); await battleUI.say('무사히 물러났다!'); finishBattle(false, true); return 'end'; }
   await battleUI.say('물러나지 못했다!'); return 'turn';
 }
 async function enemyTurn(b) {
@@ -831,13 +918,21 @@ async function enemyTurn(b) {
   if (b.kind === 'legend' && getSpecies(e.id).forms === 2 && e.form !== 2 && e.hp > 0 && e.hp <= e.maxHp / 2) { await morph(b, e, 'enemy'); if (battle !== b) return; }
   tip(b, '이번엔 검은 기운이 밀려와요! ‘이 답이 맞을까?’를 ○ ×로 빠르게 판단해요. 맞히면 충격이 40% 줄어요.');
   const r = await askQuiz(b, 'defense', dark ? '검은 기운이 밀려온다!' : `${name(e)}의 시험!`); if (!r) return;
-  const pierce = r.correct && isBoss(b) && Math.random() < PIERCE_CHANCE;
-  const d = enemyHit(e, a, { correct: r.correct, pierce });
+  const tr = traitId(b, a), ts = traitState(b, a); let note = '';
+  const pierce = r.correct && isBoss(b) && tr !== 'antipierce' && Math.random() < PIERCE_CHANCE;
+  let d = enemyHit(e, a, { correct: r.correct, pierce });
+  if (tr === 'sturdy') { d *= .85; note = ` [${traitName(a)}]`; }
+  if (tr === 'shield' && r.correct && !pierce) { d *= 2 / 3; note = ` [${traitName(a)}]`; }
+  if (tr === 'firstguard' && !ts.hit) { d *= .5; note = ` [${traitName(a)}]`; }
+  ts.hit = true; d = Math.max(1, Math.round(d));
+  if (tr === 'endure' && !ts.endured && a.hp > 1 && a.hp - d <= 0) { d = a.hp - 1; ts.endured = true; note = ` [${traitName(a)}: 체력 1로 버텼다!]`; }
   a.hp = Math.max(tut(b) ? 1 : 0, a.hp - d);
+  if (tr === 'counter' && r.correct) { e.hp = Math.max(1, e.hp - Math.max(1, Math.round(e.maxHp * .05))); note = ` [${traitName(a)}: 두루마리가 조금 채워졌다]`; }
+  if (tr === 'thorns' && e.hp > 1) { e.hp = Math.max(1, e.hp - Math.max(1, Math.round(d * .2))); note = ` [${traitName(a)}]`; }
   tip(b, '내 체력(HP)은 왼쪽 위에서 볼 수 있어요. 줄어들면 쉼터나 회복젤로 채워요.'); if (d > 0) sfx('hurt'); battleUI.damage(d, 'player'); refreshBattle(); updateUI();
   if (pierce) await battleUI.explain(`정답! 그런데 ${name(e)}의 힘이 너무 세서 그대로 뚫고 들어왔다! (관통) ${josa(name(a), '은/는')} ${d}의 충격을 받았다!`, explanationHTML(r.q), 'bad');
-  else if (r.correct) await battleUI.explain(`정답! ${josa(name(a), '이/가')} 잘 막아 내서 충격이 40% 줄었다. ${d}의 충격만 받았다!`, explanationHTML(r.q), 'good');
-  else await battleUI.explain(`${dark ? '검은 기운이 덮쳤다!' : `${name(e)}의 시험을 막지 못했다!`} ${josa(name(a), '은/는')} ${d}의 충격을 받았다!`, explanationHTML(r.q), 'bad');
+  else if (r.correct) await battleUI.explain(`정답! ${josa(name(a), '이/가')} 잘 막아 내서 충격이 줄었다. ${d}의 충격만 받았다!${note}`, explanationHTML(r.q), 'good');
+  else await battleUI.explain(`${dark ? '검은 기운이 덮쳤다!' : `${name(e)}의 시험을 막지 못했다!`} ${josa(name(a), '은/는')} ${d}의 충격을 받았다!${note}`, explanationHTML(r.q), 'bad');
 }
 async function allyFainted(b) {
   battleUI.allyAct?.('tired'); sfx('faint');
@@ -852,7 +947,8 @@ async function awardXP(b, foe) {
   const lines = [];
   state.party.forEach((m, i) => {
     if (m.hp <= 0 && i !== state.active) return;
-    const xp = xpForDefeat(m.level, foe.level, i === state.active ? 1 : BENCH_RATE), before = m.level;
+    const lead = state.party[state.active], rate = i === state.active ? 1 : traitId(b, lead) === 'share' ? 1 : BENCH_RATE;
+    const xp = Math.round(xpForDefeat(m.level, foe.level, rate) * (traitId(b, m) === 'learner' ? 1.2 : 1)), before = m.level;
     gainXP(m, xp);
     if (i === state.active) lines.push(`${josa(name(m), '이/가')} 경험치 ${xp}을 얻었다! (상대 Lv.${foe.level} · 내 Lv.${before})`);
     if (m.level > before) lines.push(`${name(m)}의 레벨이 올라 Lv.${josa(String(m.level), '이/가')} 되었다!`);
@@ -863,6 +959,7 @@ async function awardXP(b, foe) {
 }
 async function enemyFainted(b) {
   const e = enemy(); battleUI.enemyCalmed?.(); battleUI.setAura(0); sfx('purify');
+  if (active().hp > 0 && traitId(b, active()) === 'afterglow') { healBy(active(), .25); refreshBattle(); updateUI(); }
   tip(b, '검은 기운이 모두 걷혔어요! 이렇게 우산몬을 원래대로 돌려 주면 돼요.');
   if (berserk(b)) await battleUI.say(`${name(e)}의 검은 기운이 모두 사라졌다! ${josa(name(e), '이/가')} 원래대로 돌아왔다.`, { tone: 'good' });
   else await battleUI.say(`시험 두루마리를 모두 채웠다! ${josa(name(e), '이/가')} 물러났다.`);
@@ -871,7 +968,7 @@ async function enemyFainted(b) {
   if (battle !== b) return false;
   await awardXP(b, e); if (battle !== b) return false;
   if (b.index + 1 < b.enemies.length) {
-    b.index++; b.turn++; refreshBattle();
+    b.index++; b.turn++; foeEnters(b); refreshBattle();
     battleUI.enemyEnter(); // 몽땅랜드 직원은 결투를 시작할 때 한 번만 나와요
     if (getSpecies(enemy().id).legendary) {
       await battleUI.say(`${josa(opponentName(b), '이/가')} 마지막으로 전설의 우산몬 ${josa(name(enemy()), '을/를')} 내보냈다!`); if (battle !== b) return false;
@@ -884,7 +981,7 @@ async function enemyFainted(b) {
 async function victory(b) {
   const kind = b.kind, coins = { wild: 12, enemy: 45, trainer: 30, tutorial: 10 }[kind] ?? 80;
   b.won = true; jingle('victory'); // 결투 음악을 멈추고 승리 노래
-  state.coins += coins;
+  state.coins += traitId(b, active()) === 'picker' ? Math.round(coins * 1.5) : coins;
   for (const m of state.party) { if (!state.caught.includes(m.id)) state.caught.push(m.id); if (!state.seen.includes(m.id)) state.seen.push(m.id); }
   refreshBattle(); updateUI(); save();
   if (kind === 'wild') await battleUI.say(`원래대로 돌아온 ${josa(name(enemy()), '이/가')} 고마운 듯 풀숲으로 돌아갔다.`, { tone: 'good' });
@@ -909,7 +1006,7 @@ async function runBattle(b) {
     await battleUI.say(`${josa(opponentName(b), '이/가')} 사나워진 ${josa(name(e0), '을/를')} 내보냈다!`);
     if (!alive()) return;
     await battleUI.say(`검은 기운이 ${name(e0)}의 기록을 지우고 있다. 기록을 되찾자!`, { tone: 'dark' });
-  } else await battleUI.say(`${opponentName(b)}의 인증 결투! ${josa(name(e0), '이/가')} 나왔다!`);
+  } else { await battleUI.say(`${opponentName(b)}의 인증 결투!`); if (!alive()) return; battleUI.portraitOut(); await battleUI.say(`${opponentName(b)}의 ${josa(name(e0), '이/가')} 나왔다!`); if (!alive()) return; }
   while (alive()) {
     const outcome = await playerTurn(b);
     if (!alive() || outcome === 'end') return;
@@ -917,6 +1014,7 @@ async function runBattle(b) {
     if (enemy().hp <= 0) { if (!(await enemyFainted(b))) return; continue; }
     if (active().hp <= 0) { if (!(await allyFainted(b))) return; }
     await enemyTurn(b); if (!alive()) return;
+    if (active().hp > 0 && traitId(b, active()) === 'rest' && active().hp < active().maxHp) { healBy(active(), .04); refreshBattle(); updateUI(); }
     if (active().hp <= 0 && !(await allyFainted(b))) return;
     b.turn++; b.guard = false;
   }
@@ -932,7 +1030,7 @@ function finishBattle(win, escaped = false, info = {}) {
   if (!battle) return;
   const b = battle, kind = b.kind; closeBattle();
   if (info.captured && info.legend) legendJoins(info.legend);
-  else if (info.captured) toast(`${josa(getSpecies(info.captured.id).name, '이/가')} 동료가 되었어요!`);
+  else if (info.captured) toast(state.storage.some(m => m === state.storage.at(-1) && m.id === info.captured.id) && state.party.length >= PARTY_MAX ? `${josa(getSpecies(info.captured.id).name, '이/가')} 동료가 되어 보관함으로 갔어요! 아래 ‘동료’ 단추에서 바로 바꿀 수 있어요.` : `${josa(getSpecies(info.captured.id).name, '이/가')} 동료가 되었어요!`);
   else if (win) {
     if (kind === 'enemy') {
       progress().enemy = true; state.items.heal += 2;
@@ -1015,25 +1113,27 @@ function showShop() {
     $('#buyHeal').onclick = () => { state.coins -= 20; state.items.heal += 3; save(); showShop(); };
   });
 }
-// 동료 주머니(v0.42): 보관 기계 없이 어디서나 함께 다닐 동료를 바꿔요. 6마리가 다 차 있으면 쉬고 있는 동료와 맞바꿔요.
+// 동료 보관함(v0.60): 함께 다니는 동료는 4마리. 나머지는 보관함에서 쉬고, 기계 없이 어디서나 바로 바꿔요.
+// 화면 아래 ‘동료’ 단추를 누르면 바로 여기가 열려요. 함께 다니는 동료를 누르면 자세히(특성·순서·회복·맡기기), 보관함의 동료를 누르면 데려가요.
+const traitChip = m => { const t = traitOf(m.id); return `<span class="trait-chip" title="${esc(t.text)}">✦ ${esc(t.name)}</span>`; };
 function showStorage(pick = null) {
   if (battle) return;
-  const card = (m, attr, note, cls = '') => `<button class="dex-card ${cls}" ${attr}><canvas data-portrait="${m.id}" width="80" height="80"></canvas><strong>${name(m)}</strong><small>Lv.${m.level} · ${note}</small></button>`;
-  const swapping = pick !== null && state.storage[pick];
-  openModal(head('동료 주머니', `함께 다니는 동료 ${state.party.length} / 6 · 쉬는 동료 ${state.storage.length}`) +
-    (swapping ? `<p class="swap-note"><strong>${name(state.storage[pick])}</strong>${josa(name(state.storage[pick]), '을/를').slice(name(state.storage[pick]).length)} 데려갈게요. 함께 다니는 동료 중 누구와 바꿀까요?</p>` : `<p>쉬고 있는 동료를 누르면 데려가요. 6마리가 다 차 있으면 누구와 바꿀지 골라요.</p>`) +
-    `<h3>함께 다니는 동료</h3><div class="dex-grid">${state.party.map((m, i) => card(m, `data-party-slot="${i}"`, swapping ? '이 동료와 바꾸기' : '쉬게 하기', 'owned' + (swapping ? ' swap-target' : ''))).join('')}</div>` +
-    `<h3>쉬고 있는 동료</h3><div class="dex-grid">${state.storage.length ? state.storage.map((m, i) => card(m, `data-rest-slot="${i}"`, i === pick ? '고른 동료' : state.party.length >= 6 ? '바꾸기' : '데려가기', i === pick ? 'selected' : '')).join('') : '<p class="footer-note">아직 쉬고 있는 동료가 없어요. 6마리가 넘으면 여기로 와요.</p>'}</div>` +
+  const card = (m, attr, note, cls = '') => `<button class="dex-card ${cls}" ${attr}><canvas data-portrait="${m.id}" width="80" height="80"></canvas><strong>${name(m)}</strong><small>Lv.${m.level} · ${TYPES[getSpecies(m.id).type].name}</small>${traitChip(m)}<em>${note}</em></button>`;
+  const swapping = pick !== null && state.storage[pick], full = state.party.length >= PARTY_MAX;
+  openModal(head('동료 보관함', `함께 다니는 동료 ${state.party.length} / ${PARTY_MAX} · 보관함 ${state.storage.length}`) +
+    (swapping ? `<p class="swap-note"><strong>${name(state.storage[pick])}</strong>${josa(name(state.storage[pick]), '을/를').slice(name(state.storage[pick]).length)} 데려갈게요. 함께 다니는 동료 중 누구와 바꿀까요?</p>` : `<p>함께 다니는 동료는 ${PARTY_MAX}마리예요. 보관함의 동료를 누르면 바로 바꿔요. ✦는 특성이에요.</p>`) +
+    `<h3>함께 다니는 동료</h3><div class="dex-grid storage-grid">${state.party.map((m, i) => card(m, `data-party-slot="${i}"`, swapping ? '이 동료와 바꾸기' : i === state.active ? '맨 앞 · 자세히' : '자세히', 'owned' + (swapping ? ' swap-target' : ''))).join('')}${Array.from({ length: PARTY_MAX - state.party.length }, () => '<div class="party-slot" aria-hidden="true">+</div>').join('')}</div>` +
+    `<h3>보관함에서 쉬는 동료 (${state.storage.length})</h3><div class="dex-grid storage-grid">${state.storage.length ? state.storage.map((m, i) => card(m, `data-rest-slot="${i}"`, i === pick ? '고른 동료' : full ? '바꾸기' : '데려가기', i === pick ? 'selected' : '')).join('') : `<p class="footer-note">아직 보관함에 동료가 없어요. ${PARTY_MAX}마리가 넘으면 새 동료는 여기로 와요.</p>`}</div>` +
     (swapping ? '<div class="modal-actions"><button id="swapCancel" class="neutral">그만두기</button></div>' : ''), () => {
     $$('[data-party-slot]').forEach(b => b.onclick = () => {
       const i = Number(b.dataset.partySlot);
-      if (swapping) { const out = state.party[i]; state.party[i] = state.storage.splice(pick, 1)[0]; state.storage.push(out); toast(`${josa(name(state.party[i]), '이/가')} 함께해요. ${josa(name(out), '은/는')} 쉬러 갔어요.`); }
-      else { if (state.party.length === 1) { toast('함께할 동료 한 마리는 남겨 주세요.'); return; } state.storage.push(state.party.splice(i, 1)[0]); }
+      if (!swapping) { partyDetail(i); return; }
+      const out = state.party[i]; state.party[i] = state.storage.splice(pick, 1)[0]; state.storage.push(out); toast(`${josa(name(state.party[i]), '이/가')} 함께해요. ${josa(name(out), '은/는')} 보관함에서 쉬어요.`);
       state.active = Math.min(state.active, state.party.length - 1); save(); updateUI(); showStorage();
     });
     $$('[data-rest-slot]').forEach(b => b.onclick = () => {
       const i = Number(b.dataset.restSlot);
-      if (state.party.length < 6) { state.party.push(state.storage.splice(i, 1)[0]); save(); updateUI(); showStorage(); }
+      if (state.party.length < PARTY_MAX) { state.party.push(state.storage.splice(i, 1)[0]); save(); updateUI(); showStorage(); }
       else showStorage(i);
     });
     $('#swapCancel')?.addEventListener('click', () => showStorage());
@@ -1041,8 +1141,10 @@ function showStorage(pick = null) {
 }
 function partyDetail(index) {
   if (battle) return; const m = state.party[index]; if (!m) return; const sp = getSpecies(m.id);
-  openModal(head(sp.name, `함께하는 동료 · Lv.${m.level}`) + `<div class="monster-detail"><canvas data-portrait="${m.id}" width="160" height="160"></canvas><div><span class="type-chip">${TYPES[sp.type].name}</span><p>${sp.motif} 모티브</p><div class="stat-list"><span>체력 ${m.hp}/${m.maxHp}</span><span>공격 ${m.attack}</span><span>방어 ${m.defense}</span><span>스피드 ${m.speed}</span></div></div></div><div class="fact-box">결투에서는 ‘문제 풀기’를 누르면 바로 문제가 나와요. 맞힌 답이 사나워진 우산몬의 검은 기운을 걷어 내요. 상성이 좋은 상대에게는 1.5배!</div><div class="modal-actions"><button id="leadMon" class="primary" ${m.hp <= 0 ? 'disabled' : ''}>첫 번째로 내보내기</button><button id="fieldHeal" class="neutral" ${state.items.heal <= 0 ? 'disabled' : ''}>회복젤 사용 (${state.items.heal})</button></div>`, () => {
-    $('#leadMon').onclick = () => { state.active = index; save(); updateUI(); closeModal(); };
+  openModal(head(sp.name, `함께하는 동료 · Lv.${m.level}`) + `<div class="monster-detail"><canvas data-portrait="${m.id}" width="160" height="160"></canvas><div><span class="type-chip">${TYPES[sp.type].name}</span><p>${sp.motif} 모티브</p><p class="trait-line">${traitChip(m)} ${esc(traitOf(m.id).text)}</p><div class="stat-list"><span>체력 ${m.hp}/${m.maxHp}</span><span>공격 ${m.attack}</span><span>방어 ${m.defense}</span><span>스피드 ${m.speed}</span></div></div></div><div class="fact-box">결투에서는 ‘기록 찾기’로 문제를 풀어 검은 기운이 지운 기록을 되찾아요. 상성이 좋은 상대에게는 1.5배! 특성은 결투에서 저절로 쓰여요.</div><div class="modal-actions"><button id="leadMon" class="primary" ${m.hp <= 0 ? 'disabled' : ''}>첫 번째로 내보내기</button><button id="fieldHeal" class="neutral" ${state.items.heal <= 0 ? 'disabled' : ''}>회복젤 사용 (${state.items.heal})</button><button id="toStorage" class="neutral" ${state.party.length <= 1 ? 'disabled' : ''}>보관함에 맡기기</button><button id="backStorage" class="neutral">← 동료 보관함</button></div>`, () => {
+    $('#leadMon').onclick = () => { state.active = index; save(); updateUI(); showStorage(); };
+    $('#toStorage').onclick = () => { if (state.party.length <= 1) return; const out = state.party.splice(index, 1)[0]; state.storage.push(out); state.active = Math.min(state.active > index ? state.active - 1 : state.active === index ? 0 : state.active, state.party.length - 1); save(); updateUI(); toast(`${josa(name(out), '은/는')} 보관함에서 쉬어요.`); showStorage(); };
+    $('#backStorage').onclick = () => showStorage();
     $('#fieldHeal').onclick = () => { state.items.heal--; m.hp = Math.min(m.maxHp, m.hp + Math.ceil(m.maxHp * .45)); save(); updateUI(); partyDetail(index); };
   });
 }
@@ -1066,7 +1168,7 @@ function dexDetail(id, filter, view = 'dot') {
   const toggles = seen ? `<div class="dex-view">${[['dot', '도트 그림'], ...(hasForms ? [['form2', '변환폼']] : []), ...(credit ? [['photo', '실제 사진 보기']] : [])].map(([v, label]) => `<button data-view="${v}" class="${view === v ? 'selected' : ''}" aria-pressed="${view === v}">${label}</button>`).join('')}</div>` : '';
   const statBars = seen && m.base ? `<div class="base-stats" aria-label="기본 능력치">${[['체력', 'hp'], ['공격', 'attack'], ['방어', 'defense'], ['스피드', 'speed']].map(([l, k]) => `<div><span>${l}</span><i><b style="width:${Math.round(m.base[k] / 140 * 100)}%"></b></i><em>${m.base[k]}</em></div>`).join('')}</div>` : '';
   const legendNote = m.legendary ? `<br><strong>전설의 우산몬</strong>${hasForms ? ' · 결투에서 형태변환을 쓸 수 있어요' : ''}` : '';
-  openModal(head(seen ? m.name : '아직 만나지 못한 친구', `NO.${String(id).padStart(3, '0')}${m.legendary ? ' · 전설' : ''}`) + `<div class="monster-detail${photo ? ' with-photo' : ''}">${picture}<div><span class="type-chip">${seen ? TYPES[m.type].name : '발견 전'}</span><p>${seen ? m.detail : `${ZONES[m.zone].name} 부근에서 단서를 찾아보세요.`}</p></div></div>${toggles}${statBars}${seen ? `<div class="fact-box"><strong>실제 생물 모티브 · ${m.motif}</strong><br>${esc(m.area)} · ${esc(m.group)}<br>기록 확인: ${esc(m.recordStatus)}<br>${esc(m.recordNote)}${legendNote}<br>모습과 능력은 게임용 창작이에요.${m.source ? `<br><a href="${m.source}" target="_blank" rel="noopener" class="source-link">관련 자료 살펴보기 ↗</a>` : ''}</div>` : ''}<div class="modal-actions"><button id="backDex" class="neutral">← 도감으로</button></div>`, () => {
+  openModal(head(seen ? m.name : '아직 만나지 못한 친구', `NO.${String(id).padStart(3, '0')}${m.legendary ? ' · 전설' : ''}`) + `<div class="monster-detail${photo ? ' with-photo' : ''}">${picture}<div><span class="type-chip">${seen ? TYPES[m.type].name : '발견 전'}</span><p>${seen ? m.detail : `${ZONES[m.zone].name} 부근에서 단서를 찾아보세요.`}</p>${seen ? `<p class="trait-line">${traitChip(m)} ${esc(traitOf(m.id).text)}</p>` : ''}</div></div>${toggles}${statBars}${seen ? `<div class="fact-box"><strong>실제 생물 모티브 · ${m.motif}</strong><br>${esc(m.area)} · ${esc(m.group)}<br>기록 확인: ${esc(m.recordStatus)}<br>${esc(m.recordNote)}${legendNote}<br>모습과 능력은 게임용 창작이에요.${m.source ? `<br><a href="${m.source}" target="_blank" rel="noopener" class="source-link">관련 자료 살펴보기 ↗</a>` : ''}</div>` : ''}<div class="modal-actions"><button id="backDex" class="neutral">← 도감으로</button></div>`, () => {
     $('#backDex').onclick = () => showDex(filter);
     $$('[data-view]').forEach(b => b.onclick = () => dexDetail(id, filter, b.dataset.view));
   });
@@ -1220,7 +1322,7 @@ function showMenu() {
     $('#menuTutorial').onclick = () => { closeModal(); state.tutorial = { battle: false, walk: 0 }; save(); renderCoachPanel(); startTutorial(); };
     $('#menuAvatar').onclick = () => chooseAvatar(id => { state.avatar = id; save(); updateUI(); toast('탐험대원을 바꿨어요.'); });
     $('#restartBtn').onclick = () => { saved = state.started ? state : saved; startNew(); };
-    $('#menuHelp').onclick = () => openModal(head('천천히, 함께 탐험해요') + '<div class="fact-box">이동: 방향키 / WASD / 조이스틱(터치 화면) / 지도 화면 누르기<br>건물: 문 바로 아래에서 위로 걸으면(또는 건물을 누르면) 들어가요. 계단을 밟으면 위아래 층으로, 문 깔개를 밟으면 밖으로 나가요<br>대화·조사: 가까이에서 E·스페이스 / 대화 버튼<br>자동 안내: 수첩의 목적지 안내<br>다음 지역: 독도 지킴이 인증 후 마을 오른쪽 다리 → 길을 따라 걷기<br>세계 지도: 가 본 마을로 바로 이동<br>결투 명령: 기록 찾기 · 동료 만들기 · 도구 · 동료 · 물러나기 (전설의 우산몬은 형태변환도)<br>기록 찾기: 누르면 독도 문제가 나와요. 맞히면 위쪽 두루마리(검은 기운이 지운 기록)의 빈칸이 채워져요. 문제에 따라 나침반·순서 놓기·근거 카드로 풀고, 검은 기운이 밀려올 때는 ○ ×로 빠르게 판단해요<br>상성(화살표 앞이 뒤에 강해요): 잎→빛→메아리→잎, 파도→바위→바람→파도. 상성이 좋으면 맞혔을 때 1.5배, 틀려도 절반은 닿아요. 상성이 나쁘면 0.75배<br>사나워진 우산몬: 문제를 맞히면 검은 기운을 걷어 내요. 모두 걷히면 평온을 되찾아요<br>상대의 문제: 맞히면 충격이 40% 줄고, 틀리면 그대로 받아요. 독도 지킴이·백무 사장은 가끔 정답도 뚫고 들어와요(관통)<br>동료 만들기: 버튼을 누르면 확률로 동료가 돼요(그 차례엔 공격 못 해요). 검은 기운이 적을수록 잘 되고, 전설의 우산몬은 10%<br>동료 주머니: ‘동료’ 메뉴에서 쉬는 동료와 언제든 바꿔요<br>독도 지킴이와는 인증 결투로 겨뤄요<br>힌트: 문제 아래 기록 힌트 · 학습 기록에 도움 표시<br>대화와 컷신: 클릭·엔터·스페이스로 넘기기</div>' + typeRingHTML() + '<p>길에서는 표지판, 관찰 지점, 기억 비석, 조사 상자, 길에서 만난 사람과 몽땅랜드 직원을 찾아봐요. 사나워진 야생 우산몬은 마을과 마을 사이의 길 위를 걸어 다녀요.</p>');
+    $('#menuHelp').onclick = () => openModal(head('천천히, 함께 탐험해요') + '<div class="fact-box">이동: 방향키 / WASD / 조이스틱(터치 화면) / 지도 화면 누르기<br>건물: 문 바로 아래에서 위로 걸으면(또는 건물을 누르면) 들어가요. 계단을 밟으면 위아래 층으로, 문 깔개를 밟으면 밖으로 나가요<br>대화·조사: 가까이에서 E·스페이스 / 대화 버튼<br>자동 안내: 수첩의 목적지 안내<br>다음 지역: 독도 지킴이 인증 후 마을 오른쪽 다리 → 길을 따라 걷기<br>세계 지도: 가 본 마을로 바로 이동<br>결투 명령: 기록 찾기 · 동료 만들기 · 도구 · 동료 · 물러나기 (전설의 우산몬은 형태변환도)<br>기록 찾기: 누르면 독도 문제가 나와요. 맞히면 위쪽 두루마리(검은 기운이 지운 기록)의 빈칸이 채워져요. 문제에 따라 나침반·순서 놓기·근거 카드로 풀고, 검은 기운이 밀려올 때는 ○ ×로 빠르게 판단해요<br>상성(화살표 앞이 뒤에 강해요): 잎→빛→메아리→잎, 파도→바위→바람→파도. 상성이 좋으면 맞혔을 때 1.5배, 틀려도 절반은 닿아요. 상성이 나쁘면 0.75배<br>사나워진 우산몬: 문제를 맞히면 검은 기운을 걷어 내요. 모두 걷히면 평온을 되찾아요<br>상대의 문제: 맞히면 충격이 40% 줄고, 틀리면 그대로 받아요. 독도 지킴이·백무 사장은 가끔 정답도 뚫고 들어와요(관통)<br>동료 만들기: 버튼을 누르면 확률로 동료가 돼요(그 차례엔 공격 못 해요). 검은 기운이 적을수록 잘 되고, 전설의 우산몬은 10%<br>동료 보관함: 함께 다니는 동료는 4마리예요. 화면 아래 ‘동료’ 단추를 누르면 보관함이 열리고, 쉬는 동료와 언제든 바로 바꿔요<br>특성: 우산몬마다 결투에서 저절로 쓰이는 특별한 능력이 하나씩 있어요(30가지). 동료 보관함과 도감에서 볼 수 있어요<br>독도 지킴이와는 인증 결투로 겨뤄요<br>힌트: 문제 아래 기록 힌트 · 학습 기록에 도움 표시<br>대화와 컷신: 클릭·엔터·스페이스로 넘기기</div>' + typeRingHTML() + '<p>길에서는 표지판, 관찰 지점, 기억 비석, 조사 상자, 길에서 만난 사람과 몽땅랜드 직원을 찾아봐요. 사나워진 야생 우산몬은 마을과 마을 사이의 길 위를 걸어 다녀요.</p>');
     $('#importSave').onchange = async e => { const file = e.target.files[0]; if (!file) return; try { if (file.size > 3e6) throw new Error('파일이 너무 커요.'); const parsed = validateSave(JSON.parse(await file.text())); saved = parsed; closeModal(); continueGame(); toast('저장한 모험을 불러왔어요.'); } catch (err) { toast(err.message || '저장 파일을 확인해 주세요.'); } };
   });
 }
@@ -1240,6 +1342,27 @@ $('#notebookBtn').onclick = () => { if (!battle) showStudy(); }; $('#guideBtn').
 $('#questBtn').onclick = $('#questPeek').onclick = showQuest; $('#partyBtn').onclick = $('#buddyPeek').onclick = showParty;
 $('#pocketBtn').onclick = () => showStorage();
 $('#fullscreenBtn').onclick = toggleFullscreen;
+// 작은 지도(1인칭에서만): 내 둘레 15×15칸. 걸을 수 있는 곳은 밝게, 사람은 주황 점, 우산몬은 보라 점, 나는 바라보는 쪽을 가리키는 화살표
+let miniMap = null, miniAt = 0;
+function paintMiniMap(now, people) {
+  if (!miniMap) { miniMap = document.createElement('canvas'); miniMap.width = miniMap.height = 120; miniMap.className = 'mini-map'; miniMap.setAttribute('aria-hidden', 'true'); scene.append(miniMap); }
+  miniMap.hidden = false; if (now - miniAt < 120) return; miniAt = now;
+  const g = miniMap.getContext('2d'), N = 15, S = 8, cx = Math.round(view.x), cy = Math.round(view.y);
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, 120, 120);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const x = cx - 7 + i, y = cy - 7 + j, out = x < 0 || y < 0 || x >= W || y >= H, t = out ? 0 : map[y][x];
+    g.fillStyle = out || t === 0 ? '#4a9fbd' : blocked(map, x, y, [], true) ? '#5c7a4c' : '#efe6c4'; g.fillRect(i * S, j * S, S, S);
+  }
+  for (const n of people) { const x = Math.round(n.drawX ?? n.x) - cx + 7, y = Math.round(n.drawY ?? n.y) - cy + 7; if (x < 0 || y < 0 || x >= N || y >= N || n.scenery || n.player) continue; g.fillStyle = n.kind === 'wild' || n.kind === 'friend' || n.kind === 'legend' ? '#7a3fb0' : n.actor ? '#e2702a' : '#8a6a3c'; g.fillRect(x * S + 2, y * S + 2, S - 4, S - 4); }
+  g.translate(7 * S + S / 2, 7 * S + S / 2); g.rotate(yaw ?? 0); g.fillStyle = '#d62828'; g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, -7); g.lineTo(5, 6); g.lineTo(0, 3); g.lineTo(-5, 6); g.closePath(); g.fill(); g.stroke();
+}
+function setView3d(on) {
+  view3d = !!on; setPixelSnap(!view3d); try { localStorage.setItem('dokdo-view3d', view3d ? '1' : '0'); } catch { /* 기억하지 못해도 괜찮아요 */ }
+  const b = $('#viewBtn'); b.setAttribute('aria-pressed', String(view3d)); b.title = view3d ? '2D로 보기' : '3D(1인칭)로 보기'; b.setAttribute('aria-label', b.title); b.innerHTML = `◈ <span>${view3d ? '2D 보기' : '3D 보기'}</span>`;
+  scene.classList.toggle('view3d', view3d); labelKey = ''; yaw = null;
+}
+$('#viewBtn').onclick = () => { setView3d(!view3d); sfx('toggle'); if (view3d) toast(map.kind === 'room' ? '건물 밖으로 나가면 1인칭 시점으로 보여요.' : '1인칭 시점: ↑ 앞으로 · ↓ 뒷걸음 · ←→ 돌기. 화면을 눌러도 걸어요.'); };
+setView3d(view3d);
 $('#soundBtn').onclick = () => { setOn(!isOn()); if (isOn()) sfx('toggle'); updateUI(); };
 window.addEventListener('beforeunload', () => save());
 // 단추를 누를 때 작은 소리(결투 창은 battle-ui가 따로 내요)
@@ -1261,7 +1384,8 @@ if (typeof location !== 'undefined' && new URLSearchParams(location.search).has(
     playStory, stories: { OPENING, GUIDE, BOSS_REVEAL, BOSS_FALL, TREE_JOINS },
     get longestQuestion() { return QUESTIONS.reduce((m, q) => (q.prompt.length + q.options.join('').length + q.explanation.length > m.prompt.length + m.options.join('').length + m.explanation.length ? q : m)); },
     set forceQuestion(q) { testQuestion = q; }, questionById: id => QUESTIONS.find(q => q.id === id), closeBattleForTest: () => { if (battle) closeBattle(); },
-    screenOf(x, y) { const r = canvas.getBoundingClientRect(); return { x: r.left + (x * TILE + 16 - camera.x) * sceneScale, y: r.top + (y * TILE + 16 - camera.y) * sceneScale }; },
+    screenOf(x, y) { const r = canvas.getBoundingClientRect(), p = toScreen(x * TILE + 16, y * TILE + 16); return { x: r.left + p.x * sceneScale, y: r.top + p.y * sceneScale }; },
+    get view3d() { return view3d; }, setView3d,
     standAtDoor(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b); settleMovement(); state.x = f.x; state.y = f.y; view = { x: f.x, y: f.y }; state.dir = 'up'; return f; },
     goInside(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b), p = pathfind(map, state.x, state.y, f.x, f.y, liveNPCs()); if (state.x === f.x && state.y === f.y) enterBuilding(b); else { path = p; pathAction = () => enterBuilding(b); } return p.length; },
     legendRadio: false, dexDetail, showDex, showQuest, checkLegends, place(x, y, dir = 'right') { settleMovement(); path = []; state.x = x; state.y = y; view = { x, y }; state.dir = dir; },

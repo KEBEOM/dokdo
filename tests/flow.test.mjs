@@ -207,16 +207,16 @@ for (let i = 0; i < 12 && await G(() => !!window.__dokdo.battle); i++) await pag
 assert.equal(await G(() => window.__dokdo.battle), null); assert.equal(await G(() => window.__dokdo.talk?.name), '쉼터지기');
 await dismiss(); assert.ok(await G(() => window.__dokdo.state.party.every(m => m.hp === m.maxHp)));
 // 동료 주머니: with six friends, swap with one who is resting — no machine needed
-await G(() => { const s = window.__dokdo.state, base = s.party[0]; while (s.party.length < 6) s.party.push({ ...base, uid: 'p' + s.party.length, id: 40 + s.party.length }); s.storage.push({ ...base, uid: 'rest1', id: 44 }); });
-await page.click('#partyBtn'); await page.click('#pocketBtn'); await page.click('[data-rest-slot="0"]'); assert.ok(await page.isVisible('.swap-note'), 'asks who to swap with');
-await page.click('[data-party-slot="5"]');
-assert.deepEqual(await G(() => ({ p5: window.__dokdo.state.party[5].id, rest: window.__dokdo.state.storage.map(m => m.id), size: window.__dokdo.state.party.length })), { p5: 44, rest: [45], size: 6 });
+await G(() => { const s = window.__dokdo.state, base = s.party[0]; while (s.party.length < 4) s.party.push({ ...base, uid: 'p' + s.party.length, id: 40 + s.party.length }); s.storage.push({ ...base, uid: 'rest1', id: 44 }); });
+await page.click('#partyBtn'); assert.ok(await page.isVisible('.storage-grid .trait-chip'), 'the 동료 button opens the storage with traits'); await page.click('[data-rest-slot="0"]'); assert.ok(await page.isVisible('.swap-note'), 'asks who to swap with');
+await page.click('[data-party-slot="3"]');
+assert.deepEqual(await G(() => ({ p5: window.__dokdo.state.party[3].id, rest: window.__dokdo.state.storage.map(m => m.id), size: window.__dokdo.state.party.length })), { p5: 44, rest: [43], size: 4 });
 await G(() => { const s = window.__dokdo.state; s.party = s.party.slice(0, 2); s.storage = []; window.__dokdo.closeModal(); });
 
 // ── 5b. 길 위를 걸어 다니는 야생 우산몬: 마을엔 없고, 길에는 보이게 걸어 다녀요. 부딪히면 결투, 끝나면 사라져요 ──
 assert.equal(await G(() => window.__dokdo.people().filter(n => n.kind === 'wild').length), 0, 'no wild 우산몬 in town');
 await G(() => window.__dokdo.changeMap('route0', 'a')); await until(() => window.__dokdo.map.id === 'route0' && !window.__dokdo.transition, 15000); await dismiss();
-await until(() => window.__dokdo.people().filter(n => n.kind === 'wild').length === 4, 5000);
+await until(() => window.__dokdo.people().filter(n => n.kind === 'wild').length === 10, 5000);
 let bumped = false;
 for (let i = 0; i < 12 && !bumped; i++) {
   const ok = await G(() => { const d = window.__dokdo, r = d.people().find(n => n.kind === 'wild' && !n.walking && !d.people().some(p => p.x === n.x - 1 && p.y === n.y) && [1, 2, 3, 4].includes(d.map[n.y][n.x - 1])); if (!r) return null; d.place(r.x - 1, r.y, 'right'); return r.uid; });
@@ -357,7 +357,7 @@ if (await G(() => !!window.__dokdo.battle)) await G(() => window.__dokdo.closeBa
 await G(() => { window.__dokdo.closeModal(); window.__dokdoOrder = true; const s = window.__dokdo.state; for (const m of s.party) m.hp = m.maxHp; });
 for (let i = 0; i < 8 && await page.$('#dialogue:not(.hidden) #nextTalk'); i++) await page.click('#nextTalk');
 await G(() => window.__dokdo.startBattle('wild', 39)); await toMenu();
-assert.ok(await page.isVisible('.dq-scroll .scroll-record'), 'the foe shows a record scroll'); assert.ok(await page.isVisible('.dq-explorer'), 'the explorer stands with the 우산몬');
+assert.ok(await page.isVisible('.dq-scroll .scroll-record'), 'the foe shows a record scroll'); assert.equal(await page.$('.dq-me'), null, 'my picture stays away from wild duels'); assert.equal(await page.$('.dq-explorer'), null);
 const blanks = () => page.$$eval('.scroll-record i:not(.sp)', a => ({ all: a.length, on: a.filter(x => x.classList.contains('on')).length }));
 assert.equal((await blanks()).on, 0, 'the record starts blank');
 await G(() => { window.__dokdo.forceQuestion = window.__dokdo.questionById('H1-26'); const e = window.__dokdo.battle.enemies[0]; e.maxHp = e.hp = 9999; });
@@ -374,5 +374,33 @@ await G(() => { window.__dokdo.forceQuestion = window.__dokdo.questionById('G1-1
 assert.equal(await G(() => window.__dokdo.battle.quiz.format), 'compass'); await answer(true);
 assert.ok((await blanks()).on > 0, 'right answers fill the record');
 await G(() => { window.__dokdo.forceQuestion = null; window.__dokdoOrder = false; window.__dokdo.closeBattleForTest(); });
+// ── v0.60: 특성(연속 풀이)과 사람과 겨룰 때만 나오는 내 큰 그림 ──
+const { traitOf } = await import('../dist/traits.js'); const dbl = Array.from({ length: 100 }, (_, i) => i + 1).find(i => traitOf(i).id === 'double');
+assert.ok(dbl, 'some species has the 연속 풀이 trait');
+await page.evaluate(id => { window.__dokdoTraits = true; const s = window.__dokdo.state; s.active = 0; s.party[0].id = id; for (const m of s.party) m.hp = m.maxHp; window.__dokdo.startBattle('wild', 39); }, dbl); await toMenu();
+assert.ok(await page.isVisible('.dq-status .dq-trait'), 'my status shows the trait');
+await G(() => { window.__dokdo.forceQuestion = window.__dokdo.questionById('G2-4'); const e = window.__dokdo.battle.enemies[0]; e.maxHp = e.hp = 9999; });
+await page.click('[data-cmd="quiz"]'); await page.waitForSelector('.dq-quiz .dq-answer:not(.locked)'); const firstQ = await G(() => window.__dokdo.battle.quiz.q.id); await answer(true);
+assert.equal(await toMenu(), 'quiz', 'no command menu in between');
+assert.deepEqual(await G(() => ({ phase: window.__dokdo.battle.quiz.phase, open: !window.__dokdo.battle.quiz.answered })), { phase: 'attack', open: true }, '연속 풀이 gives a second attack question in the same turn');
+await answer(true); await G(() => { window.__dokdoTraits = false; window.__dokdo.closeBattleForTest(); });
+await G(() => { const s = window.__dokdo.state; for (const m of s.party) m.hp = m.maxHp; window.__dokdo.startBattle('rematch'); }); await page.waitForSelector('.dq-me.show');
+assert.ok(await page.isVisible('.dq-me.show') && await page.isVisible('.dq-vs.show') && await page.isVisible('.dq-portrait.show'), 'my big picture, VS and the opponent come in together');
+await until(() => { const c = document.querySelector('.dq-me canvas'); return [...c.getContext('2d').getImageData(0, 0, c.width, c.height).data].some((v, i) => i % 4 === 3 && v > 0); });
+await toMenu(); await page.waitForTimeout(700);
+assert.deepEqual(await G(() => ['.dq-me', '.dq-vs', '.dq-portrait'].map(q => getComputedStyle(document.querySelector(q)).opacity)), ['0', '0', '0'], 'they leave together, and I am not shown afterwards');
+assert.ok(await page.isVisible('#allySprite'), 'my 우산몬 comes out after the VS');
+await G(() => window.__dokdo.closeBattleForTest());
+// ── v0.61: 1인칭 시점 — ←→는 제자리에서 돌고, 작은 지도가 보여요 ──
+await G(() => window.__dokdo.closeModal()); for (let i = 0; i < 8 && await page.$('#dialogue:not(.hidden) #nextTalk'); i++) await page.click('#nextTalk');
+if (await G(() => window.__dokdo.map.kind !== 'room' && !window.__dokdo.busy)) {
+  const fp0 = await G(() => { window.__dokdo.setView3d(true); const s = window.__dokdo.state; s.dir = 'up'; return [s.x, s.y]; });
+  await page.waitForTimeout(300); assert.ok(await page.isVisible('.mini-map'), 'the mini map shows in first person');
+  await page.keyboard.press('ArrowLeft'); await page.waitForTimeout(400);
+  assert.deepEqual(await G(() => { const s = window.__dokdo.state; return [s.x, s.y, s.dir]; }), [...fp0, 'left'], '← turns on the spot');
+  await page.keyboard.press('ArrowRight'); await page.waitForTimeout(400); assert.equal(await G(() => window.__dokdo.state.dir), 'up', '→ turns back');
+  await G(() => window.__dokdo.setView3d(false)); await page.waitForTimeout(200); assert.ok(!(await page.isVisible('.mini-map')), 'no mini map in 2D');
+}
+assert.deepEqual(errors, [], 'no browser errors after the v0.60–0.61 checks');
 await browser.close(); server.close();
-console.log(`PASS: wild 우산몬 walk on routes (none in towns, bump to battle, gone afterwards), 문제 풀기 asks right away, type advantage, 형태변환 in the menu for legends, 동료 만들기 button, 동료 주머니 swap, 전설의 우산몬 quest (radio, golden spot, meeting scene, plain win keeps the spot, 10% 동료 만들기, join with 변환폼, dex photo), 백무 사장 reveal/fall/epilogue scenes, 사나워진 우산몬 duels with 검은 기운 gauges, 몽땅랜드 designs in battle, softened hits on correct defence, opening read line by line with the mission choice, starter + guide, key walking, closed bridge, guide, DQ commands (정화하기 with two starting skills, guard skill, item, orb, switch, run), my 우산몬 drawn from behind, 백무단 pictures fading out, explorer drawings in the character choice, 울릉도 도동항 and the ferry to 독도, buildings with floors (door, stairs, dex, books, review desk, rest), 김박사 picture and starter cutscene, 사철나무 purified from 백무 사장 and joining once, practice duel and walking tutorial, clickable picture map, easy words (사나워진 우산몬 · 검은 기운 · 몽땅랜드 컴퍼니), quiz rules (wrong attack = miss, correct defence = light hit), hints, KO recovery, route objects, trainer, memory stone, 8 chapters walked through 7 routes, first-arrival scenes, fast travel, legend, ending, saves and a v0.21 save; ${totalTurns} battle turns.`);
+console.log(`PASS: wild 우산몬 walk on routes (none in towns, bump to battle, gone afterwards), 문제 풀기 asks right away, type advantage, 형태변환 in the menu for legends, 동료 만들기 button, 동료 보관함 swap (4 along), 전설의 우산몬 quest (radio, golden spot, meeting scene, plain win keeps the spot, 10% 동료 만들기, join with 변환폼, dex photo), 백무 사장 reveal/fall/epilogue scenes, 사나워진 우산몬 duels with 검은 기운 gauges, 몽땅랜드 designs in battle, softened hits on correct defence, opening read line by line with the mission choice, starter + guide, key walking, closed bridge, guide, DQ commands (정화하기 with two starting skills, guard skill, item, orb, switch, run), my 우산몬 drawn from behind, 백무단 pictures fading out, explorer drawings in the character choice, 울릉도 도동항 and the ferry to 독도, buildings with floors (door, stairs, dex, books, review desk, rest), 김박사 picture and starter cutscene, 사철나무 purified from 백무 사장 and joining once, practice duel and walking tutorial, clickable picture map, easy words (사나워진 우산몬 · 검은 기운 · 몽땅랜드 컴퍼니), quiz rules (wrong attack = miss, correct defence = light hit), hints, KO recovery, route objects, trainer, memory stone, 8 chapters walked through 7 routes, first-arrival scenes, fast travel, legend, ending, saves and a v0.21 save; ${totalTurns} battle turns.`);

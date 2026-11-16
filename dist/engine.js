@@ -45,10 +45,14 @@ export function healAll(state){for(const m of state.party){const st=stats(m.id,m
 export const XP_RATE=.35,XP_CAP=1.5,BENCH_RATE=.5;
 export function xpForDefeat(myLevel,foeLevel,share=1){const need=myLevel*13;return Math.max(1,Math.round(Math.min(need*XP_CAP,need*XP_RATE*foeLevel/myLevel)*share));}
 export function gainXP(m,amount){m.xp+=amount;const changes=[];while(m.xp>=m.level*13){m.xp-=m.level*13;m.level++;changes.push(`${getSpecies(m.id).name} Lv.${m.level}`);const sp=getSpecies(m.id);if(sp.evolvesTo&&m.level>=sp.evolveLevel){m.id=sp.evolvesTo;changes.push(`${sp.name} → ${getSpecies(m.id).name}`);}Object.assign(m,stats(m.id,m.level));m.hp=m.maxHp;m.pp=PP_MAX.slice();}return changes;}
-// 동료 만들기: 검은 기운이 적을수록 잘 돼요. 전설의 우산몬은 언제나 10%.
+// 동료 만들기: 검은 기운이 적을수록 잘 돼요. 전설의 우산몬은 10%에서 시작해요.
 export const LEGEND_CAPTURE=.1;
-export function captureChance(enemy){if(getSpecies(enemy.id).legendary)return LEGEND_CAPTURE;return Math.min(.93,.45+(1-enemy.hp/enemy.maxHp)*.43);}
-export function addMonster(state,mon){if(state.party.length<6)state.party.push(mon);else state.storage.push(mon);if(!state.caught.includes(mon.id))state.caught.push(mon.id);if(!state.seen.includes(mon.id))state.seen.push(mon.id);}
+// tries: 그 전설의 우산몬에게 지금까지 손을 내밀었다가 실패한 횟수 — 한 번 실패할 때마다 5%씩 올라요(최대 60%)
+export const LEGEND_STEP=.05,LEGEND_MAX=.6;
+export function captureChance(enemy,tries=0){if(getSpecies(enemy.id).legendary)return Math.min(LEGEND_MAX,LEGEND_CAPTURE+LEGEND_STEP*Math.max(0,tries));return Math.min(.93,.45+(1-enemy.hp/enemy.maxHp)*.43);}
+// 함께 다니는 동료는 4마리까지(v0.60). 그보다 많이 만나면 동료 보관함(storage)으로 가요.
+export const PARTY_MAX=4;
+export function addMonster(state,mon){if(state.party.length<PARTY_MAX)state.party.push(mon);else state.storage.push(mon);if(!state.caught.includes(mon.id))state.caught.push(mon.id);if(!state.seen.includes(mon.id))state.seen.push(mon.id);}
 export function recordAnswer(state,q,correct,assisted=false,context={}){const r=state.learning[q.concept]||{attempts:0,correct:0,independent:0,seen:[],sessions:[],last:0};r.attempts++;if(correct){r.correct++;if(!assisted)r.independent++;}if(!r.seen.includes(q.id))r.seen.push(q.id);if(!r.sessions.includes(state.sessionId))r.sessions.push(state.sessionId);r.last=Date.now();state.learning[q.concept]=r;state.answerLog.push({q:q.id,concept:q.concept,correct,assisted,time:Date.now(),session:state.sessionId,mode:context.mode||'study',phase:context.phase||'',opponent:context.opponent||null,zone:state.zone});if(state.answerLog.length>2000)state.answerLog.shift();return r;}
 export function newState(){return {schema:1,rosterVersion:ROSTER_VERSION,started:false,zone:0,map:'town0',visited:[0],flags:{},x:START.x,y:START.y,dir:'up',avatar:null,party:[],storage:[],active:0,caught:[],seen:[],badges:[],progress:Array.from({length:8},()=>({met:false,studied:0,enemy:false,boss:false})),learning:{},answerLog:[],items:{heal:8,orb:15},coins:120,playMs:0,ended:false,legend:false,sound:false,tutorial:{battle:true,walk:4},sessionId:Date.now().toString(36),savedAt:0};}
 export function validateSave(value){
@@ -58,6 +62,8 @@ export function validateSave(value){
   const choosing=value.map==='meadow0'&&Array.isArray(value.starterField)&&value.starterField.length>0&&value.starterField.length<=30&&value.starterField.every(n=>Number.isInteger(n)&&n>=1&&n<=100);
   if(value.started&&value.party.length===0&&!choosing)fail();
   const v={...newState(),...JSON.parse(JSON.stringify(value))};
+  // v0.60: 예전 저장(동료 6마리)은 앞의 4마리만 함께 다니고, 나머지는 동료 보관함으로 옮겨요.
+  if(v.party.length>PARTY_MAX){v.storage=[...(v.storage||[]),...v.party.slice(PARTY_MAX)];v.party=v.party.slice(0,PARTY_MAX);if(!(v.active>=0&&v.active<v.party.length))v.active=0;}
   const legacy=(value.rosterVersion??1)===1;
   if(!legacy&&value.rosterVersion!==ROSTER_VERSION)fail();
   v.avatar=['girl','boy'].includes(value.avatar)?value.avatar:null;

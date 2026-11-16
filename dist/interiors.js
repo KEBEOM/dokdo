@@ -42,7 +42,7 @@ export const ROOM_TEMPLATES = {
         0: { type: 'shopkeeper', actor: 'woman', name: '쉼터 직원', lines: ['어서 오세요! 회복젤을 팔아요. 지친 동료는 침대에서 쉬게 해 주세요.'] },
         1: { type: 'rest', name: '푹신한 침대', furniture: 'bed' },
         2: { type: 'person', actor: 'man', name: '여행자 하람', lines: [`${ZONES[z].name}에 왔다면 ‘${ZONES[z].histTitle}’ 이야기를 꼭 들어 봐요.`, ZONES[z].hint] },
-        3: { type: 'sign', name: '쉼터 알림판', furniture: 'board', lines: ['쉼터 이용 안내: 침대에서 쉬면 동료들의 기운이 돌아와요.', '함께 다닐 동료는 언제든 ‘동료’ 메뉴의 동료 주머니에서 바꿀 수 있어요.'] }
+        3: { type: 'sign', name: '쉼터 알림판', furniture: 'board', lines: ['쉼터 이용 안내: 침대에서 쉬면 동료들의 기운이 돌아와요.', '함께 다닐 동료는 언제든 화면 아래 ‘동료’ 단추의 동료 보관함에서 바꿀 수 있어요. 함께 다니는 동료는 4마리예요.'] }
       }) },
     { label: '2층 · 동료 방', art: [
       'wwwyywwwwwyyww',
@@ -53,8 +53,8 @@ export const ROOM_TEMPLATES = {
       'wq__2____tt__w',
       'wwwwwwwwwwwwww'],
       objects: z => ({
-        0: { type: 'sign', name: '동료 사진 액자', furniture: 'shelf', lines: ['함께 모험한 우산몬들의 사진이 걸려 있어요.', '동료는 ‘동료’ 메뉴의 동료 주머니에서 언제든 바꿀 수 있어요.'] },
-        1: { type: 'person', actor: 'child-girl', name: '쉬러 온 아이 다솜', lines: ['동료 주머니를 열면 쉬고 있는 동료와 언제든 바꿀 수 있어. 기계는 필요 없어!', `여기 ${ZONES[z].name}에서는 ${TYPES[ZONES[z].type].name} 속성 우산몬이 힘을 내.`] },
+        0: { type: 'sign', name: '동료 사진 액자', furniture: 'shelf', lines: ['함께 모험한 우산몬들의 사진이 걸려 있어요.', '동료는 ‘동료’ 단추의 동료 보관함에서 언제든 바꿀 수 있어요.'] },
+        1: { type: 'person', actor: 'child-girl', name: '쉬러 온 아이 다솜', lines: ['동료 보관함을 열면 쉬고 있는 동료와 언제든 바꿀 수 있어. 기계는 필요 없어!', `여기 ${ZONES[z].name}에서는 ${TYPES[ZONES[z].type].name} 속성 우산몬이 힘을 내.`] },
         2: { type: 'sign', name: '여행 사진첩', furniture: 'shelf', lines: book(z, 3) }
       }) }
   ],

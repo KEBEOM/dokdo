@@ -54,7 +54,7 @@ test('damage, type advantage, capture and recovery remain finite',()=>{
 });
 test('starter keeps its biological name as it levels and party overflows to storage',()=>{
   const m=createMonster(1,7);gainXP(m,91);assert.equal(m.level,8);assert.equal(m.id,1);while(m.level<16)gainXP(m,m.level*13);assert.equal(m.id,1);
-  const s=newState();for(let i=1;i<=7;i++)addMonster(s,createMonster(i));assert.equal(s.party.length,6);assert.equal(s.storage.length,1);assert.equal(s.caught.length,7);
+  const s=newState();for(let i=1;i<=7;i++)addMonster(s,createMonster(i));assert.equal(s.party.length,4);assert.equal(s.storage.length,3);assert.equal(s.caught.length,7);
 });
 test('learning logs separate incorrect, assisted and independent responses',()=>{
   const s=newState(),q=QUESTIONS[0];recordAnswer(s,q,false,false);recordAnswer(s,q,true,true);assert.equal(s.learning[q.concept].independent,0);assert.equal(s.answerLog.length,2);s.sessionId='second';recordAnswer(s,q,true,false);const r=s.learning[q.concept];assert.equal(r.independent,1);assert.equal(r.sessions.length,2);assert.equal(r.attempts,3);

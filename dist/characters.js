@@ -68,12 +68,15 @@ function upscale(img,n){
  const c=document.createElement('canvas');c.width=(img.naturalWidth||img.width)*n;c.height=(img.naturalHeight||img.height)*n;
  const g=c.getContext('2d');g.imageSmoothingEnabled=false;g.drawImage(img,0,0,c.width,c.height);upscaled.set(key,c);return c;
 }
+// 입체 시점에서는 깊이에 따라 크기가 계속 바뀌어서, 정수 배로 맞추지 않고 늘 부드럽게 줄여 그려요(크기가 툭툭 바뀌지 않게).
+let pixelSnap=true;
+export function setPixelSnap(on){pixelSnap=!!on;}
 function drawCrisp(ctx,img,atlas,f,x,y,size){
  const m=typeof ctx.getTransform==='function'?ctx.getTransform():null;
  if(!atlas.dot||!m||typeof m.a!=='number'||!(m.a>0)||m.b||m.c||Math.abs(m.a-m.d)>1e-6)return false;
  const [sx,sy,sw,sh]=f.rect,[ax,ay]=f.anchor,dot=atlas.dot,want=size/atlas.unit*dot*m.a,k=Math.max(1,Math.round(want));
  const px=Math.round(m.a*(x+size/2)+m.e),py=Math.round(m.d*(y+size*.9375)+m.f);
- const exact=Math.abs(want-k)<=.2*Math.max(1,want/4);
+ const exact=pixelSnap&&Math.abs(want-k)<=.2*Math.max(1,want/4);
  ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.translate(px,py);if(f.flip)ctx.scale(-1,1);
  if(exact){ctx.imageSmoothingEnabled=false;ctx.drawImage(img,sx,sy,sw,sh,Math.round((sx-ax)/dot)*k,Math.round((sy-ay)/dot)*k,sw/dot*k,sh/dot*k);}
  else{

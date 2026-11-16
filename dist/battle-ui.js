@@ -8,7 +8,7 @@ import { SCENERY_ATLAS } from './scenery-atlas.js';
 import { CUTSCENE_ATLAS } from './cutscene-atlas.js';
 import { islandFrame } from './island-pictures.js';
 import { terrainSample } from './terrain.js';
-import { drawResident, drawExplorer } from './characters.js';
+import { drawResident } from './characters.js';
 import { recordCells } from './records.js';
 import { directionAngle, orderItems, orderChoice } from './battle-quiz.js';
 
@@ -17,23 +17,23 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
   let writer = null, waiting = null, menuState = null, quizState = null, els = {};
 
-  let trainer = null, portraitKey = null, portraitTimer = 0, explorer = null;
+  let trainer = null, portraitKey = null, portraitTimer = 0, explorer = null, introActor = null;
   // foePortrait: the 몽땅랜드 member's large picture (assets key). It shows while they appear and fades out
   // when their 우산몬 comes out. Without it, the small walking sprite stands at the side instead.
-  function mount({ backdrop = 'field', sky = '#7fb7c4', aura = false, label = '', foeTrainer = null, foePortrait = null, island = '', avatar = null }) {
-    explorer = avatar; trainer = foePortrait ? null : foeTrainer; portraitKey = foePortrait; clearTimeout(portraitTimer);
+  function mount({ backdrop = 'field', sky = '#7fb7c4', aura = false, label = '', foeTrainer = null, foePortrait = null, island = '', myPicture = null }) {
+    explorer = myPicture; introActor = foePortrait ? null : foeTrainer; trainer = foePortrait ? null : foeTrainer; portraitKey = foePortrait; clearTimeout(portraitTimer);
     root.classList.add('dq');
     root.innerHTML = `
       <div class="dq-top">
         <div class="dq-window dq-status" id="dqStatus"></div>
         <div class="dq-window dq-foe dq-scroll" id="dqFoe"></div>
       </div>
-      <div class="dq-stage ${trainer ? 'has-trainer' : ''}">
+      <div class="dq-stage ${trainer ? 'has-trainer' : ''} ${myPicture ? 'has-vs' : ''}">
         <canvas class="dq-backdrop" width="320" height="140" aria-hidden="true"></canvas>
         ${trainer ? '<canvas class="dq-trainer" width="144" height="144" aria-hidden="true"></canvas>' : ''}
-        ${foePortrait ? '<div class="dq-portrait" aria-hidden="true"><canvas width="384" height="384"></canvas></div>' : ''}
+        ${foePortrait || (myPicture && foeTrainer) ? '<div class="dq-portrait" aria-hidden="true"><canvas width="384" height="384"></canvas></div>' : ''}
         <div class="dq-enemy ${aura ? 'aura' : ''}"><canvas class="dq-pad" width="96" height="26" aria-hidden="true"></canvas><i class="dq-shadow" aria-hidden="true"></i><canvas id="enemySprite" class="battle-mon enemy" width="160" height="160" aria-label="상대 우산몬"></canvas><span class="dq-dmg" aria-hidden="true"></span></div>
-        ${avatar ? '<canvas class="dq-explorer" width="96" height="120" aria-hidden="true"></canvas>' : ''}
+        ${myPicture ? '<div class="dq-me" aria-hidden="true"><canvas width="256" height="256"></canvas></div><b class="dq-vs" aria-hidden="true">VS</b>' : ''}
         <div class="dq-mine"><canvas class="dq-pad" width="96" height="26" aria-hidden="true"></canvas><i class="dq-shadow" aria-hidden="true"></i><canvas id="allySprite" class="dq-ally-mon" width="160" height="160" aria-label="내 우산몬"></canvas></div>
         <span class="dq-label">${esc(label)}</span>
       </div>
@@ -90,19 +90,19 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
 
   function bar(cur, max, tag = 'HP') { const r = Math.max(0, cur / max); return `<div class="dq-barrow"><b class="dq-tag">${tag}</b><div class="dq-bar"><i style="width:${r * 100}%;background:${r < .3 ? '#e8503a' : r < .6 ? '#f2c230' : '#3fd16b'}"></i></div></div>`; }
   function setStatus(m, info, party) {
-    els.status.innerHTML = `<div class="dq-status-row"><canvas class="dq-ally" width="48" height="48" aria-hidden="true"></canvas><div><strong>${esc(info.name)}</strong><span class="dq-lv">Lv ${m.level}</span>
+    els.status.innerHTML = `<div class="dq-status-row"><canvas class="dq-ally" width="48" height="48" aria-hidden="true"></canvas><div><strong>${esc(info.name)}</strong><span class="dq-lv">Lv ${m.level}</span>${info.trait ? `<span class="dq-trait" title="특성">${esc(info.trait)}</span>` : ''}
       <div class="dq-hp">체력 <b>${m.hp}</b> / ${m.maxHp}</div>${bar(m.hp, m.maxHp, '체력')}</div></div>
       <div class="dq-party" aria-label="동료 상태">${party.map(p => `<i class="${p.hp <= 0 ? 'down' : p.active ? 'on' : ''}" title="${esc(p.name)}"></i>`).join('')}</div>`;
     portrait(els.status.querySelector('.dq-ally'), look(m));
     battlePortrait(els.ally, look(m), true); // my 우산몬 looks right, toward the foe
-    paintExplorer();
     els.allyWrap.classList.toggle('tired', m.hp <= 0);
   }
-  // 탐험대원이 내 우산몬 뒤에 함께 서요(기록 되찾기 결투, v0.58)
+  // 사람과 겨룰 때만, 상대가 나오는 순간 내 큰 그림(캐릭터 고르기 그림)이 ‘VS’와 함께 나왔다가 상대와 같이 빠져요(v0.60)
   function paintExplorer() {
-    const c = root.querySelector('.dq-explorer'); if (!c || !explorer) return;
-    const g = c.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, c.width, c.height);
-    drawExplorer(g, explorer, 0, c.height - c.width, c.width, 'right', false, 0, false);
+    const c = root.querySelector('.dq-me canvas'); if (!c || !explorer) return;
+    const g = c.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, c.width, c.height); g.imageSmoothingEnabled = false;
+    let tries = 0; const paint = () => { if (!c.isConnected) return; g.clearRect(0, 0, c.width, c.height); if (!drawAsset(g, explorer, 0, 0, c.width, c.height) && tries++ < 40) setTimeout(paint, 100); };
+    paint();
   }
   // 상대의 두루마리: 검은 기운이 지운 기록 한 줄. 기운이 줄어든 만큼 빈칸이 채워져요.
   function setFoe(e, info, extra = '') {
@@ -116,14 +116,17 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
     battlePortrait(els.enemy, look(e)); paintTrainer(); paintPortrait(); // the foe looks left
   }
   function paintPortrait() {
-    const c = els.portrait?.querySelector('canvas'); if (!c || !portraitKey) return;
+    const c = els.portrait?.querySelector('canvas'); if (!c || !(portraitKey || introActor)) return;
     const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); g.imageSmoothingEnabled = false;
-    drawAsset(g, portraitKey, 0, 0, c.width, c.height);
+    if (portraitKey) drawAsset(g, portraitKey, 0, 0, c.width, c.height);
+    else drawResident(g, introActor, 0, 0, c.width, 0, 'left', false, 0); // 큰 그림이 없는 상대는 도트 모습을 크게
   }
   // The 몽땅랜드 member steps in (their 우산몬 waits off stage) …
-  function portraitIn() {
+  function portraitIn(withMe = true) {
     const p = els.portrait; if (!p) return false;
     clearTimeout(portraitTimer); paintPortrait();
+    const me = withMe && root.querySelector('.dq-me');
+    if (me) { paintExplorer(); const vs = root.querySelector('.dq-vs'); for (const el of [me, vs]) { el.classList.remove('leave'); void el.offsetWidth; el.classList.add('show'); } els.allyWrap.classList.add('waiting'); root.classList.add('vs'); }
     els.enemyWrap.classList.add('waiting'); els.enemyWrap.classList.remove('enter');
     p.classList.remove('leave'); void p.offsetWidth; p.classList.add('show'); root.classList.add('intro'); return true;
   }
@@ -131,11 +134,12 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
   function portraitOut() {
     const p = els.portrait; if (!p) { enemyEnter(); return; }
     clearTimeout(portraitTimer); p.classList.remove('show'); void p.offsetWidth; p.classList.add('leave'); root.classList.remove('intro');
+    if (root.classList.contains('vs')) { root.classList.remove('vs'); for (const el of root.querySelectorAll('.dq-me, .dq-vs')) { el.classList.remove('show'); void el.offsetWidth; el.classList.add('leave'); } setTimeout(() => { if (els.allyWrap) { els.allyWrap.classList.remove('waiting'); allyAct('enter'); } }, 380); }
     portraitTimer = setTimeout(() => { if (els.enemyWrap) { els.enemyWrap.classList.remove('waiting'); enemyEnter(); } }, 380);
   }
   // Sending out the next 우산몬: the member shows up for a moment, then fades again.
   function portraitFlash() {
-    if (!portraitIn()) { enemyEnter(); return; }
+    if (!portraitIn(false)) { enemyEnter(); return; }
     portraitTimer = setTimeout(portraitOut, 900);
   }
   // The 몽땅랜드 member who started the fight stands at the side of the field.
@@ -312,6 +316,6 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
     if (ok && (waiting || writer?.typing)) { if (document.activeElement?.tagName === 'A') return false; confirm(); e.preventDefault(); return true; }
     return false;
   }
-  function destroy() { clearTimeout(portraitTimer); writer?.clear(); waiting = null; menuState = null; quizState = null; root.innerHTML = ''; root.classList.remove('dq', 'menu-open', 'quiz-open', 'shake', 'intro'); }
+  function destroy() { clearTimeout(portraitTimer); writer?.clear(); waiting = null; menuState = null; quizState = null; root.innerHTML = ''; root.classList.remove('dq', 'menu-open', 'quiz-open', 'shake', 'intro', 'vs'); }
   return { morph, mount, setStatus, setFoe, say, menu, quiz, reveal, explain, confirm, damage, enemyDefeated, enemyCalmed, enemyEnter, setAura, allyAct, portraitIn, portraitOut, portraitFlash, coach, handleKey, destroy, get waiting() { return !!waiting; } };
 }

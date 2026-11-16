@@ -9,10 +9,15 @@ export function rankBattleQuestions(state,rng=Math.random){
     if(!a.correct&&!log.slice(i+1).some(b=>b.concept===a.concept&&b.correct&&!b.assisted))due.add(a.concept);
   }
   const counts=new Map();for(const a of log)counts.set(a.q,(counts.get(a.q)||0)+1);
+  // v0.59 수준 맞추기: 최근 10문제를 잘 맞히면 어려운 문제(수·연도·순서·근거)를, 많이 틀리면 쉬운 문제를 더 자주 내요.
+  // 혼자 힘으로 맞힌 문제와 지나온 장의 쉬운 문제는 뒤로 미뤄요.
+  const last=log.slice(-10),acc=last.length>=4?last.filter(a=>a.correct&&!a.assisted).length/last.length:.5;
+  const lean=acc>=.7?-1.6:acc<.4?1:-.4; // 어려운 문제 쪽으로 기우는 정도(음수 = 어려운 문제 먼저)
+  const solved=new Set(log.filter(a=>a.correct&&!a.assisted).map(a=>a.q));
   const pool=QUESTIONS.filter(q=>q.zone<=state.zone).map(q=>({q,score:
     (recent.has(q.id)?100:0)-(due.has(q.concept)?12:0)+
-    (counts.get(q.id)||0)*1.2+(state.learning[q.concept]?.independent||0)*.3-
-    (q.zone===state.zone?1:0)+rng()
+    (counts.get(q.id)||0)*1.2+(solved.has(q.id)?2.5:0)+(state.learning[q.concept]?.independent||0)*.3-
+    (q.zone===state.zone?1:0)+(state.zone-q.zone)*.3+(difficulty(q)-2)*lean+rng()
   }));
   pool.sort((a,b)=>a.score-b.score);return pool.map(p=>p.q);
 }
@@ -53,4 +58,14 @@ export function oxShown(q, rng = Math.random, fixedWrong = false) {
 export function orderChoice(q, seq) {
   const i = q.options.indexOf(seq.join(' → '));
   return i >= 0 ? i : (q.answer + 1) % q.options.length;
+}
+
+// 문제의 수준(1 쉬움 · 2 보통 · 3 어려움): 수·연도를 가려야 하거나, 순서를 놓거나, 자료·근거를 따지는 문제일수록 높아요.
+export function difficulty(q){
+  let n=0;
+  if(q.options.filter(o=>/\d/.test(o)).length>=3)n+=2;          // 비슷한 수·연도 가운데 고르기
+  if(q.options.every(o=>o.includes(' → ')))n+=2;                  // 순서 놓기
+  if(['H3','H4','S3','S4','N4'].includes(q.concept))n+=1;         // 기록·자료·근거 다루기
+  if(q.zone>=4)n+=1;if(q.prompt.length>=30)n+=1;
+  return n>=3?3:n>=1?2:1;
 }

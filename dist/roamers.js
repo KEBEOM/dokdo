@@ -10,11 +10,13 @@
 //   ROAMER_COUNT  한 길에 동시에 걸어 다니는 수
 //   RESPAWN_MS    사라진 뒤 새로 나타나기까지 걸리는 시간(무작위 범위)
 //   STEP_MS       한 칸 걷는 시간 · WAIT_MS 한 걸음 쉬는 시간(무작위 범위)
+// v0.59: 한 길에 10마리가 걸어 다녀요(전에는 4마리). 리젠 시간은 ‘멈춰 있던 시간(결투·대화·메뉴)’을 뺀 시계로 재요.
+//        전에는 결투가 길수록 다음 우산몬이 그만큼 늦게 나와서, 거의 다시 나타나지 않는 것처럼 보였어요.
 // ─────────────────────────────────────────────────────────────────────────────
 import { MONSTERS, isUnique } from './data.js';
 import { blocked } from './world.js';
 
-export const ROAMER_COUNT = 4, RESPAWN_MS = [5000, 11000], STEP_MS = 420, WAIT_MS = [700, 2200];
+export const ROAMER_COUNT = 10, RESPAWN_MS = [3000, 6000], STEP_MS = 420, WAIT_MS = [700, 2200];
 export const FIELD_TILES = new Set([1, 3]); // 1 잔디(평야) · 3 풀숲(들판)
 const DIRS = [[0, -1, 'up'], [0, 1, 'down'], [-1, 0, 'left'], [1, 0, 'right']];
 
@@ -26,7 +28,9 @@ export function roamerPool(zone) {
 
 const walksHere = map => map.kind === 'route' || map.kind === 'meadow';
 export function createRoamers(rng = Math.random) {
-  let list = [], mapId = null, nextSpawn = 0, seq = 0, pausedAt = 0, friends = [];
+  let list = [], mapId = null, nextSpawn = 0, seq = 0, pausedAt = 0, pausedTotal = 0, friends = [];
+  // 멈춘 시간을 뺀 시계: 결투·대화 중에는 흐르지 않아요
+  const T = now => (pausedAt || now) - pausedTotal;
   const between = ([a, b]) => a + rng() * (b - a);
   const near = (a, b, r) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y) <= r;
   const isFree = (map, x, y, others, player, self = null) =>
@@ -34,7 +38,7 @@ export function createRoamers(rng = Math.random) {
     !list.some(r => r !== self && ((r.x === x && r.y === y) || (r.fromX === x && r.fromY === y && r.moving))) &&
     !(player && ((player.x === x && player.y === y) || (player.toX === x && player.toY === y)));
 
-  function spawn(map, others, player, now, fixed = null) {
+  function spawn(map, others, player, t, fixed = null) { const now = t;
     const pool = fixed ? [fixed] : roamerPool(map.zone), spots = [];
     const keep = Object.values(map.spawns || {});
     for (let y = 0; y < map.length; y++) for (let x = 0; x < map[y].length; x++) {
@@ -52,8 +56,9 @@ export function createRoamers(rng = Math.random) {
   }
 
   // 지도가 바뀌면 새로 채워요. 마을·건물 안에서는 아무도 없어요.
-  function sync(map, others, player, now) {
+  function sync(map, others, player, time) {
     if (map.id === mapId) return;
+    const now = T(time);
     mapId = map.id; list = []; nextSpawn = now + between(RESPAWN_MS);
     if (map.kind === 'route') for (let i = 0; i < ROAMER_COUNT; i++) spawn(map, others, player, now);
     if (map.kind === 'meadow') for (const id of friends) spawn(map, others, player, now, id);
@@ -62,7 +67,8 @@ export function createRoamers(rng = Math.random) {
   function update(map, others, player, now, paused) {
     if (!walksHere(map)) { list = []; return; }
     if (paused) { if (!pausedAt) pausedAt = now; return; }
-    if (pausedAt) { const d = now - pausedAt; pausedAt = 0; nextSpawn += d; for (const r of list) { r.nextMove += d; if (r.moving) r.moving.t0 += d; } }
+    if (pausedAt) { pausedTotal += now - pausedAt; pausedAt = 0; }
+    now = T(now);
     for (const r of list) {
       if (r.moving && now - r.moving.t0 >= STEP_MS) r.moving = null;
       if (r.moving || now < r.nextMove) continue;
@@ -77,7 +83,8 @@ export function createRoamers(rng = Math.random) {
   }
 
   // 그릴 위치(칸 사이를 부드럽게)와 함께
-  function snapshot(now) {
+  function snapshot(time) {
+    const now = T(time);
     return list.map(r => {
       const p = r.moving ? Math.min(1, (now - r.moving.t0) / STEP_MS) : 1;
       return { ...r, drawX: r.fromX + (r.x - r.fromX) * p, drawY: r.fromY + (r.y - r.fromY) * p, walking: p < 1 };
@@ -85,8 +92,8 @@ export function createRoamers(rng = Math.random) {
   }
   const at = (x, y) => list.find(r => r.x === x && r.y === y) || null;
   // 결투가 끝난 우산몬은 사라지고, 잠시 뒤 다른 자리에 새로 나타나요.
-  function remove(uid, now = 0) { list = list.filter(r => r.uid !== uid); nextSpawn = Math.max(nextSpawn, now + between(RESPAWN_MS)); }
-  function reset() { list = []; mapId = null; pausedAt = 0; }
+  function remove(uid, time = 0) { const now = T(time); list = list.filter(r => r.uid !== uid); nextSpawn = now + between(RESPAWN_MS); }
+  function reset() { list = []; mapId = null; pausedAt = 0; pausedTotal = 0; }
   // 초원의 우산몬 목록(종 번호). 바꾸면 다음 sync 때 새로 놓여요.
   function setFriends(ids) { friends = [...ids]; mapId = null; }
   return { sync, update, snapshot, at, remove, reset, setFriends, get count() { return list.length; }, get list() { return list; } };

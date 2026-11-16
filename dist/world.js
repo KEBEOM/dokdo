@@ -42,7 +42,7 @@ export function villageResidents(zone) {
 
 // 몽땅랜드: 수집원·조사원·기록 관리자는 대원, 먹선·쇄도·무음은 팀장, 마지막은 백무 사장.
 export const VILLAIN_BY_ZONE = ['villain-grunt-m', 'villain-grunt-f', 'villain-grunt-m', 'villain-exec-ink', 'villain-exec-crimson', 'villain-grunt-f', 'villain-exec-indigo', 'villain-leader'];
-const ROLE_ACTOR = zone => ({
+export const ROLE_ACTOR = zone => ({
   history: zone === 0 ? 'professor' : zone === 4 || zone === 7 ? 'child-girl' : 'man',
   guide: 'child-boy', enemy: VILLAIN_BY_ZONE[zone],
   boss: zone % 2 ? 'woman' : 'man', shop: 'woman', prof: 'woman', extra: 'man'
@@ -199,12 +199,27 @@ function marker(ctx, x, y, time, color = '#fbdf86') {
 }
 
 // One depth pass for houses, scenery, props and people, ordered by their feet.
-export function drawActors(ctx, state, view, time, motion = { walking: false, distance: 0 }, people = null, map = null) {
+// project(입체 시점, view3d.js): 땅 위의 점 (wx, wy) → { x, y, k } 화면 위치와 크기. 주면 하나하나를 발밑 기준으로 세워서 그려요.
+export function drawActors(ctx, state, view, time, motion = { walking: false, distance: 0 }, people = null, map = null, project = null) {
   map ||= createMap(state.map || state.zone);
   people ||= npcs(map, state.progress[state.zone], state.flags);
   const wanted = map.kind === 'town' ? wantedRole(state.progress[state.zone] || {}) : null;
-  for (const n of sceneDrawOrder(people, view, map)) {
-    if (n.scenery) { drawDecor(ctx, n, map, time); continue; }
+  const base = project && typeof ctx.getTransform === 'function' ? ctx.getTransform() : null;
+  const order = sceneDrawOrder(people, view, map);
+  if (!base) { for (const n of order) drawOne(n); }
+  else {
+    // 1인칭 시점(v0.61): 내 캐릭터는 그리지 않고, 먼 것부터 가까운 것 순서로 세워 그려요
+    const list = [];
+    for (const n of order) {
+      if (n.player) continue;
+      const fx = n.building ? (n.building.x + n.building.w / 2) * TILE : n.x * TILE + (n.w ? n.w * 16 : 16), fy = n.depth, p = project(fx, fy);
+      if (p && p.k > 0) list.push({ n, fx, fy, p });
+    }
+    list.sort((a, b) => (b.p.z ?? 0) - (a.p.z ?? 0));
+    for (const { n, fx, fy, p } of list) { ctx.save(); ctx.setTransform(base.a * p.k, 0, 0, base.d * p.k, base.a * (p.x - fx * p.k), base.d * (p.y - fy * p.k)); drawOne(n); ctx.restore(); }
+  }
+  function drawOne(n) {
+    if (n.scenery) { drawDecor(ctx, n, map, time); return; }
     const fx = n.x * 32 + (32 - CHARACTER_SIZE) / 2, fy = n.y * 32 + 28 - CHARACTER_SIZE;
     if (n.furniture) drawFurniture(ctx, n.furniture, n.x, n.y, time, { open: n.used, glow: n.kind === 'rest' });
     else if (n.kind === 'board') drawIslandArt(ctx, 'record-board', n.x * 32 - 8, n.y * 32 - 16, 48, 54);

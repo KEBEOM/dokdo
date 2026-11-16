@@ -922,3 +922,80 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
   .dq-scroll .scroll-paper{border-bottom:0;padding-bottom:1px}
 }
 @media (max-height:820px){.battle-screen.dq .dq-cards{gap:6px}.battle-screen.dq .dq-cards .dq-answer{min-height:0;flex-direction:row;align-items:center;padding:8px 12px}}
+/* v0.59 휴대폰: 위쪽 단추가 다섯 개(3D 보기 추가)라 조금씩 줄여요 */
+@media(max-width:600px){.hud-actions{gap:3px}.hud-actions button{min-width:34px;min-height:40px;padding:5px;font-size:17px}.hud-top .location{max-width:calc(100% - 195px)}}
+@media(max-width:600px){.hud-top{gap:5px}.hud-top .location{max-width:calc(100% - 218px);min-width:0;padding:8px 8px}.hud-top .location strong,.hud-top .location small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}.hud-top .location>div{min-width:0}}
+@media(max-width:380px){.hud-actions{gap:2px}.hud-actions button{min-width:32px;padding:4px;font-size:16px}.hud-top .location{max-width:calc(100% - 196px)}#weather{display:none}}
+
+/* ───────── v0.60: 특성 · 동료 보관함 · 사람과 겨룰 때의 내 큰 그림 · 결투 글씨 가독성 ───────── */
+.trait-chip{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:999px;background:#fff4c9;color:#5a3a10;border:1.5px solid #c99a2e;font-size:13px;font-weight:800;white-space:nowrap;line-height:1.5}
+.trait-line{margin:8px 0;font-size:15px;line-height:1.6}
+.storage-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.storage-grid .dex-card{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 6px 9px}
+.storage-grid .dex-card em{font-style:normal;font-size:12px;font-weight:700;opacity:.75}
+.storage-grid .dex-card.swap-target{outline:3px dashed #e0a52c;outline-offset:-3px}
+.storage-grid .dex-card.selected{outline:3px solid #2f7d5b;outline-offset:-3px}
+.storage-grid .party-slot{display:grid;place-items:center;min-height:120px;border:2px dashed #9aa3b055;border-radius:12px;font-size:26px;color:#9aa3b0}
+.storage-grid .footer-note{grid-column:1/-1}
+@media (max-width:560px){.storage-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.storage-grid .party-slot{min-height:84px}}
+.dq-trait{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;background:#fff0b8;color:#5a3a10;border:1.5px solid #c99a2e;font-size:12px;font-weight:800;white-space:nowrap;vertical-align:middle}
+/* 사람과 겨룰 때의 ‘VS’ 등장: 내 큰 그림(왼쪽)과 상대(오른쪽)가 함께 나왔다가 함께 빠져요 */
+.dq-me{position:absolute;left:6%;bottom:0;height:min(100%,58vw);aspect-ratio:1/1;z-index:2;pointer-events:none;opacity:0;visibility:hidden}
+.dq-me canvas{width:100%;height:100%;image-rendering:pixelated;filter:drop-shadow(0 6px 0 #0004)}
+.dq-me.show{visibility:visible;animation:dq-me-in .45s ease-out both}
+.dq-me.leave{visibility:visible;animation:dq-me-out .6s ease-in both}
+@keyframes dq-me-in{from{opacity:0;transform:translateX(-18%)}to{opacity:1;transform:none}}
+@keyframes dq-me-out{0%{opacity:1;transform:none}100%{opacity:0;transform:translateX(-10%) scale(.96)}}
+.dq-vs{position:absolute;left:50%;top:50%;z-index:4;pointer-events:none;opacity:0;visibility:hidden;font-family:var(--serif,serif);font-style:italic;font-weight:900;font-size:clamp(44px,9vw,110px);line-height:1;color:#fff4c9;-webkit-text-stroke:3px #3a1d0a;paint-order:stroke fill;text-shadow:0 5px 0 #3a1d0a,0 0 22px #ffb300aa;transform:translate(-50%,-50%)}
+.dq-vs.show{visibility:visible;animation:dq-vs-in .5s cubic-bezier(.2,1.6,.4,1) .15s both}
+.dq-vs.leave{visibility:visible;animation:dq-vs-out .35s ease-in both}
+@keyframes dq-vs-in{from{opacity:0;transform:translate(-50%,-50%) scale(2.4) rotate(-8deg)}to{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(-4deg)}}
+@keyframes dq-vs-out{from{opacity:1;transform:translate(-50%,-50%) rotate(-4deg)}to{opacity:0;transform:translate(-50%,-50%) scale(.6)}}
+.dq-mine.waiting{opacity:0;visibility:hidden}
+.battle-screen.dq.vs .dq-trainer{visibility:hidden}
+.battle-screen.dq.vs .dq-status{visibility:hidden}
+.battle-screen.dq .dq-stage.has-vs .dq-portrait,.battle-screen.dq .dq-stage.has-vs .dq-me{height:min(100cqh,44cqw)}
+.battle-screen.dq .dq-stage.has-vs .dq-portrait{right:4%}.battle-screen.dq .dq-stage.has-vs .dq-me{left:4%}
+@media (prefers-reduced-motion:reduce){.dq-me.show,.dq-vs.show{animation-duration:.01s;animation-delay:0s}}
+/* 결투 글씨 가독성(v0.60): 문제·보기·결과를 크게, 작은 안내 글은 또렷하게 */
+.dq-quiz-head,.dq-quiz .quiz-rule{color:#f1e3bd}
+.dq-quiz .quiz-rule{font-weight:600}
+.battle-screen.dq .dq-quiz #battleQuestionTitle{font-weight:800;letter-spacing:-.2px}
+.dq-explain{color:#fff}
+.dq-scroll .dq-gauge-label{font-size:12px;color:#5a4526;font-weight:600}
+.dq-scroll .scroll-title{color:#6e4f22}
+.battle-screen.dq .dq-command .dq-option small{color:#4d4132;font-weight:600}
+@media (min-width:900px) and (min-height:700px){
+  .battle-screen.dq .dq-status strong,.dq-scroll .scroll-head strong{font-size:21px}
+  .battle-screen.dq .dq-lv{font-size:15px}.battle-screen.dq .dq-hp{font-size:16px}.battle-screen.dq .dq-hp b{font-size:20px}
+  .dq-trait{font-size:13px}
+  .dq-scroll .dq-gauge-label{font-size:14px}.dq-scroll .scroll-title{font-size:12px}.dq-scroll .scroll-record i{font-size:20px}
+  .battle-screen.dq .dq-message{font-size:22px}
+  .dq-quiz-head{font-size:16px}.dq-quiz .phase-chip{font-size:16px;padding:5px 14px}
+  .dq-quiz .quiz-rule{font-size:16px;margin:8px 0 2px}
+  .battle-screen.dq .dq-quiz #battleQuestionTitle{font-size:clamp(24px,2.2vw,30px);line-height:1.45;margin:6px 0 12px}
+  .battle-screen.dq .dq-answer{font-size:clamp(20px,1.8vw,24px)}
+  .battle-screen.dq .dq-answer b{width:30px;height:30px;flex-basis:30px;font-size:15px}
+  .battle-screen.dq .dq-answer strong{font-size:15px}
+  .dq-claim{font-size:22px}
+  .dq-result-text{font-size:22px}.dq-explain,.dq-hint{font-size:18px}.dq-right{font-size:17px}
+  .dq-hint-row .text-button{font-size:16px}
+  .battle-screen.dq .dq-command .dq-option{font-size:21px}.battle-screen.dq .dq-command .dq-option small{font-size:13px}
+}
+@media (min-width:900px) and (min-height:860px){
+  .battle-screen.dq .dq-answer{padding:14px 16px;min-height:62px}
+  .battle-screen.dq .dq-answers{gap:10px}
+}
+.storage-grid .dex-card strong{max-width:100%;word-break:break-all;overflow-wrap:anywhere;line-height:1.25}
+.storage-grid .dex-card{min-width:0}
+@media (max-width:600px){
+  .storage-grid .dex-card strong{font-size:13px}.trait-chip{font-size:12px;padding:1px 6px}
+}
+@media (max-width:600px){.dq-vs{top:auto;bottom:22cqw;transform:translate(-50%,50%)}.dq-vs.show{animation-name:dq-vs-in-p}@keyframes dq-vs-in-p{from{opacity:0;transform:translate(-50%,50%) scale(2.4)}to{opacity:1;transform:translate(-50%,50%) rotate(-4deg)}}.dq-vs.leave{animation:none;opacity:0}}
+
+/* ───────── v0.61: 1인칭 시점의 작은 지도 ───────── */
+.mini-map{display:none;position:absolute;left:14px;top:94px;width:120px;height:120px;z-index:6;border:3px solid #f6f3e6;border-radius:8px;box-shadow:0 0 0 2px #1a2030,0 3px 0 2px #0006;image-rendering:pixelated;pointer-events:none;opacity:.92}
+.view3d .mini-map{display:block}
+.battling .mini-map,.in-room .mini-map{display:none!important}
+@media (max-width:600px),(max-height:460px){.mini-map{width:84px;height:84px;top:56px;left:8px}}
+.mini-map[hidden],.battling .mini-map,.story .mini-map{display:none!important}
