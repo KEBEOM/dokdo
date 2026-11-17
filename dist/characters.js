@@ -2,13 +2,21 @@ import {assetImage} from './assets.js';
 import {strideFrame,MOVE_DURATION} from './movement.js';
 import {SHEET_KEYS,PICTURE_KEYS,BASELINE,pixelPrint,sheetAtlas} from './character-sheets.js';
 import {EXPLORER_ATLAS} from './explorer-atlas.js';
+import {V2_CHARACTERS} from './tileset-v2.js';
 import {NPC_ATLASES as RESIDENT_ATLASES} from './npc-atlases.js';
 import {VILLAIN_ATLASES} from './villain-atlases.js';
 // v0.54: 주인공과 김박사는 Aseprite로 고치는 도트 시트(character-sheets.js)에서 그려요.
 export const EXPLORER_ATLASES={boy:sheetAtlas(SHEET_KEYS.boy,{dot:1}),girl:sheetAtlas(SHEET_KEYS.girl,{dot:1})};
 // 고치기 전에 쓰는 원본 그림(예전 큰 그림)
 const splitExplorer=who=>({key:EXPLORER_ATLAS.key,width:EXPLORER_ATLAS.width,height:EXPLORER_ATLAS.height,unit:EXPLORER_ATLAS.unit,rows:{down:0,right:1,up:2},frames:['down','right','up'].map(d=>EXPLORER_ATLAS.frames[EXPLORER_ATLAS.rows[who][d]])});
-const ORIGINAL={boy:splitExplorer('boy'),girl:splitExplorer('girl'),professor:RESIDENT_ATLASES.professor};
+// v0.67 타일셋 v2: 같은 원본 그림(explorers-atlas-v17)을 64×72칸에 발끝(32, 68)을 맞춰 정리한 그림. 한 방향에 5장을 모두 걷기에 써요.
+// unit 64: 캐릭터 상자(48)에 그리면 0.75배 — 예전 원본 그림과 키가 같아서 김박사·마을 사람들과 나란히 서도 어색하지 않아요.
+const normalizedExplorer=who=>{const C=V2_CHARACTERS,W=C.frameWidth,H=C.frameHeight,R=C.rows[who];
+ return {key:C.key,width:W*C.columns,height:H*6,unit:64,dot:1,walk:5,rows:{down:0,right:1,up:2},
+  frames:['down','right','up'].map(d=>Array.from({length:C.columns},(_,c)=>({rect:[c*W,R[d]*H,W,H],anchor:[c*W+C.foot[0],R[d]*H+C.foot[1]]})))};};
+export const EXPLORER_V2={boy:normalizedExplorer('boy'),girl:normalizedExplorer('girl')};
+const ORIGINAL={boy:EXPLORER_V2.boy,girl:EXPLORER_V2.girl,professor:RESIDENT_ATLASES.professor};
+export const EXPLORER_V17={boy:splitExplorer('boy'),girl:splitExplorer('girl')}; // 예전 방식(원본을 그대로 잘라 쓰기) — 비교·되돌리기용
 const ORIGINAL_PICTURE={[PICTURE_KEYS.boy]:'characters/explorer-boy-portrait-v33',[PICTURE_KEYS.girl]:'characters/explorer-girl-portrait-v33',[PICTURE_KEYS.professor]:'characters/professor-portrait-v33'};
 // 시트를 고쳤는지: 'edited'(고침) · 'same'(처음 그대로) · null(아직 그림을 읽는 중)
 const sheetState=new Map();
@@ -43,11 +51,14 @@ export const RESIDENTS=[
 ];
 export const CHARACTER_SIZE=48;
 export function explorerInfo(id){return EXPLORERS.find(p=>p.id===id)||EXPLORERS[0];}
-// One drawn idle pose + four drawn walk poses; left is a whole-frame mirror.
+// 서 있을 때는 0번 그림. 걸을 때: v2 그림은 5장(0→1→2→3→4, 16픽셀마다 한 장 = 한 칸에 2장),
+// Aseprite 시트는 걷기 4장(1→4). 왼쪽은 오른쪽 그림을 통째로 뒤집어요.
+export const WALK5_PIXELS=16;
+export const walk5Frame=distance=>Math.floor((((distance%(WALK5_PIXELS*5))+WALK5_PIXELS*5)%(WALK5_PIXELS*5))/WALK5_PIXELS);
 export function explorerFrame(id,direction,walking,distance=0){
  const atlas=liveAtlas(explorerInfo(id).id),dir=['up','left','right'].includes(direction)?direction:'down';
  const row=atlas.rows[dir==='left'?'right':dir];
- const col=walking?1+strideFrame(distance):0;
+ const col=!walking?0:atlas.walk===5?walk5Frame(distance):1+strideFrame(distance);
  return {row,col,flip:dir==='left',...atlas.frames[row][col]};
 }
 const residentAtlas=id=>id==='professor'?liveAtlas('professor'):NPC_ATLASES[id];

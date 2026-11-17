@@ -1010,11 +1010,6 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
 .view3d #world,.view3d canvas{touch-action:none}
 .hand-settings{margin-top:8px}
 
-/* ───────── v0.64: 점프 단추 ───────── */
-.pad-buttons{display:flex;gap:10px;align-items:center;pointer-events:none}.pad-buttons>*{pointer-events:auto}
-.jump-btn{background:#bfe3ffd9;border-color:#eaf6ff;color:#1f4f72;touch-action:none}
-.left-handed .pad-buttons{flex-direction:row-reverse}
-
 /* ───────── v0.65: 결투 아래 창 정보 줄이기 — 한 번에 한 가지, 글 대신 배지 ───────── */
 .dq-quiz-head{justify-content:flex-start;gap:8px}
 .dq-concept{margin-left:auto;font-size:.85em;opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}

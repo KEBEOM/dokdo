@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/engine.test.mjs && node tests/audio.test.mjs && node tests/duel.test.mjs && node tests/view3d.test.mjs && node tests/layout.test.mjs && node tests/interiors.test.mjs && node tests/maps.test.mjs && node tests/story.test.mjs && node tests/assets.test.mjs && node tests/characters.test.mjs && node tests/depth.test.mjs && node tests/npc-motion.test.mjs && node tests/legends.test.mjs && node tests/roamers.test.mjs && node tests/study.test.mjs && node tests/input.test.mjs && node tests/balance.test.mjs",
+    "test": "node tests/engine.test.mjs && node tests/audio.test.mjs && node tests/duel.test.mjs && node tests/view3d.test.mjs && node tests/tileset-v2.test.mjs && node tests/layout.test.mjs && node tests/interiors.test.mjs && node tests/maps.test.mjs && node tests/story.test.mjs && node tests/assets.test.mjs && node tests/characters.test.mjs && node tests/depth.test.mjs && node tests/npc-motion.test.mjs && node tests/legends.test.mjs && node tests/roamers.test.mjs && node tests/study.test.mjs && node tests/input.test.mjs && node tests/balance.test.mjs",
     "test:flow": "node tests/flow.test.mjs",
     "test:maps": "node tests/maps.test.mjs",
     "test:story": "node tests/story.test.mjs",

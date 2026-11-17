@@ -2,7 +2,7 @@
 
     python scripts/draw-props-bw.py
 
-  dist/assets/scenery/props-bw-v39.png   소품 모음
+  dist/assets/scenery/props-bw-v66.png   소품 모음
   dist/props-atlas.js                    소품마다 자리
 
 1도트 = 게임 1픽셀. 진한 외곽선 1도트, 색은 밝은·보통·어두운 세 단계, 빛은 왼쪽 위에서 와요.
@@ -12,7 +12,7 @@ import json, os, math, random
 from PIL import Image, ImageDraw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT_PNG = os.path.join(ROOT, 'dist', 'assets', 'scenery', 'props-bw-v39.png')
+OUT_PNG = os.path.join(ROOT, 'dist', 'assets', 'scenery', 'props-bw-v66.png')
 OUT_JS = os.path.join(ROOT, 'dist', 'props-atlas.js')
 INK = '#2b2622'
 
@@ -84,10 +84,14 @@ def stone():
     p.outline(); p.shadow(12, 29, 22)
     return p
 
-def rock():
+def rock():  # v0.66 바위: 둥근 덩어리 두 개 — 밝은 윗면, 결 무늬, 아래 그늘, 이끼 한 점
     p = P(28, 20)
-    p.ell(2, 4, 25, 18, '#8e8a86'); p.ell(4, 4, 18, 13, '#b0aca6'); p.ell(6, 5, 12, 9, '#d0ccc4'); p.ell(15, 10, 25, 18, '#6e6a66')
-    p.r(10, 13, 6, 1, '#6e6a66')
+    p.ell(1, 5, 21, 19, '#7c7873'); p.ell(12, 9, 26, 19, '#6a6661')         # 그늘진 아래·오른쪽
+    p.ell(2, 4, 19, 16, '#9a958f'); p.ell(13, 8, 24, 17, '#8a8580')
+    p.ell(4, 4, 15, 11, '#b7b2aa'); p.ell(15, 9, 21, 13, '#a6a19a')          # 빛 받는 윗면
+    p.r(6, 5, 4, 1, '#d8d3ca'); p.r(5, 6, 2, 1, '#d8d3ca'); p.r(16, 10, 2, 1, '#c4bfb7')
+    p.r(9, 12, 5, 1, '#6a6661'); p.r(13, 13, 1, 2, '#6a6661'); p.r(20, 15, 3, 1, '#5a5652')   # 갈라진 결
+    p.r(3, 15, 3, 1, '#6fa54e'); p.r(4, 14, 1, 1, '#9fd27a')                 # 이끼
     p.outline(); p.shadow(14, 19, 26)
     return p
 
@@ -144,5 +148,5 @@ for k, p in ITEMS.items(): sheet.alpha_composite(p.im, (x, 2)); rects[k] = [x, 2
 os.makedirs(os.path.dirname(OUT_PNG), exist_ok=True); sheet.save(OUT_PNG)
 with open(OUT_JS, 'w') as f:
     f.write('// 지도 위 소품 도트 그림의 자리. scripts/draw-props-bw.py가 만들어요.\n')
-    f.write('export const PROPS_ATLAS=' + json.dumps({'key': 'scenery/props-bw-v39', 'width': sheet.width, 'height': sheet.height, 'frames': rects}) + ';\n')
+    f.write('export const PROPS_ATLAS=' + json.dumps({'key': 'scenery/props-bw-v66', 'width': sheet.width, 'height': sheet.height, 'frames': rects}) + ';\n')
 print('props', sheet.size)

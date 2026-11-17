@@ -1,0 +1,1002 @@
+{
+  "name": "Ulleungdo & Dokdo Pixel RPG Tiles",
+  "version": "2.0.0",
+  "tileSize": 32,
+  "pixelArt": true,
+  "terrain": {
+    "image": "terrain_32.png",
+    "columns": 12,
+    "rows": 8,
+    "tiles": {
+      "deep_sea_0": {
+        "id": 0,
+        "col": 0,
+        "row": 0,
+        "collides": true
+      },
+      "deep_sea_1": {
+        "id": 1,
+        "col": 1,
+        "row": 0,
+        "collides": true
+      },
+      "deep_sea_2": {
+        "id": 2,
+        "col": 2,
+        "row": 0,
+        "collides": true
+      },
+      "deep_sea_3": {
+        "id": 3,
+        "col": 3,
+        "row": 0,
+        "collides": true
+      },
+      "sea_0": {
+        "id": 4,
+        "col": 4,
+        "row": 0,
+        "collides": true
+      },
+      "sea_1": {
+        "id": 5,
+        "col": 5,
+        "row": 0,
+        "collides": true
+      },
+      "sea_2": {
+        "id": 6,
+        "col": 6,
+        "row": 0,
+        "collides": true
+      },
+      "sea_3": {
+        "id": 7,
+        "col": 7,
+        "row": 0,
+        "collides": true
+      },
+      "sea_foam_0": {
+        "id": 8,
+        "col": 8,
+        "row": 0,
+        "collides": true
+      },
+      "sea_foam_1": {
+        "id": 9,
+        "col": 9,
+        "row": 0,
+        "collides": true
+      },
+      "sea_sparkle": {
+        "id": 10,
+        "col": 10,
+        "row": 0,
+        "collides": true
+      },
+      "sea_whitecap": {
+        "id": 11,
+        "col": 11,
+        "row": 0,
+        "collides": true
+      },
+      "shallow_0": {
+        "id": 12,
+        "col": 0,
+        "row": 1,
+        "collides": true
+      },
+      "shallow_1": {
+        "id": 13,
+        "col": 1,
+        "row": 1,
+        "collides": true
+      },
+      "shallow_2": {
+        "id": 14,
+        "col": 2,
+        "row": 1,
+        "collides": true
+      },
+      "shallow_3": {
+        "id": 15,
+        "col": 3,
+        "row": 1,
+        "collides": true
+      },
+      "coast_n": {
+        "id": 16,
+        "col": 4,
+        "row": 1,
+        "collides": true
+      },
+      "coast_s": {
+        "id": 17,
+        "col": 5,
+        "row": 1,
+        "collides": true
+      },
+      "coast_e": {
+        "id": 18,
+        "col": 6,
+        "row": 1,
+        "collides": true
+      },
+      "coast_w": {
+        "id": 19,
+        "col": 7,
+        "row": 1,
+        "collides": true
+      },
+      "coast_nw": {
+        "id": 20,
+        "col": 8,
+        "row": 1,
+        "collides": true
+      },
+      "coast_ne": {
+        "id": 21,
+        "col": 9,
+        "row": 1,
+        "collides": true
+      },
+      "coast_sw": {
+        "id": 22,
+        "col": 10,
+        "row": 1,
+        "collides": true
+      },
+      "coast_se": {
+        "id": 23,
+        "col": 11,
+        "row": 1,
+        "collides": true
+      },
+      "grass_0": {
+        "id": 24,
+        "col": 0,
+        "row": 2,
+        "collides": false
+      },
+      "grass_1": {
+        "id": 25,
+        "col": 1,
+        "row": 2,
+        "collides": false
+      },
+      "grass_2": {
+        "id": 26,
+        "col": 2,
+        "row": 2,
+        "collides": false
+      },
+      "grass_3": {
+        "id": 27,
+        "col": 3,
+        "row": 2,
+        "collides": false
+      },
+      "grass_4": {
+        "id": 28,
+        "col": 4,
+        "row": 2,
+        "collides": false
+      },
+      "grass_flowers_0": {
+        "id": 29,
+        "col": 5,
+        "row": 2,
+        "collides": false
+      },
+      "grass_flowers_1": {
+        "id": 30,
+        "col": 6,
+        "row": 2,
+        "collides": false
+      },
+      "grass_flowers_2": {
+        "id": 31,
+        "col": 7,
+        "row": 2,
+        "collides": false
+      },
+      "grass_flowers_3": {
+        "id": 32,
+        "col": 8,
+        "row": 2,
+        "collides": false
+      },
+      "grass_sprouts_0": {
+        "id": 33,
+        "col": 9,
+        "row": 2,
+        "collides": false
+      },
+      "grass_sprouts_1": {
+        "id": 34,
+        "col": 10,
+        "row": 2,
+        "collides": false
+      },
+      "grass_sprouts_2": {
+        "id": 35,
+        "col": 11,
+        "row": 2,
+        "collides": false
+      },
+      "sand_0": {
+        "id": 36,
+        "col": 0,
+        "row": 3,
+        "collides": false
+      },
+      "sand_1": {
+        "id": 37,
+        "col": 1,
+        "row": 3,
+        "collides": false
+      },
+      "sand_2": {
+        "id": 38,
+        "col": 2,
+        "row": 3,
+        "collides": false
+      },
+      "sand_3": {
+        "id": 39,
+        "col": 3,
+        "row": 3,
+        "collides": false
+      },
+      "sand_pebble_0": {
+        "id": 40,
+        "col": 4,
+        "row": 3,
+        "collides": false
+      },
+      "sand_pebble_1": {
+        "id": 41,
+        "col": 5,
+        "row": 3,
+        "collides": false
+      },
+      "dirt_0": {
+        "id": 42,
+        "col": 6,
+        "row": 3,
+        "collides": false
+      },
+      "dirt_1": {
+        "id": 43,
+        "col": 7,
+        "row": 3,
+        "collides": false
+      },
+      "dirt_2": {
+        "id": 44,
+        "col": 8,
+        "row": 3,
+        "collides": false
+      },
+      "dirt_3": {
+        "id": 45,
+        "col": 9,
+        "row": 3,
+        "collides": false
+      },
+      "dirt_pebble_0": {
+        "id": 46,
+        "col": 10,
+        "row": 3,
+        "collides": false
+      },
+      "dirt_pebble_1": {
+        "id": 47,
+        "col": 11,
+        "row": 3,
+        "collides": false
+      },
+      "basalt_0": {
+        "id": 48,
+        "col": 0,
+        "row": 4,
+        "collides": false
+      },
+      "basalt_1": {
+        "id": 49,
+        "col": 1,
+        "row": 4,
+        "collides": false
+      },
+      "basalt_2": {
+        "id": 50,
+        "col": 2,
+        "row": 4,
+        "collides": false
+      },
+      "basalt_3": {
+        "id": 51,
+        "col": 3,
+        "row": 4,
+        "collides": false
+      },
+      "basalt_moss_0": {
+        "id": 52,
+        "col": 4,
+        "row": 4,
+        "collides": false
+      },
+      "basalt_moss_1": {
+        "id": 53,
+        "col": 5,
+        "row": 4,
+        "collides": false
+      },
+      "basalt_moss_2": {
+        "id": 54,
+        "col": 6,
+        "row": 4,
+        "collides": false
+      },
+      "basalt_moss_3": {
+        "id": 55,
+        "col": 7,
+        "row": 4,
+        "collides": false
+      },
+      "rockface_0": {
+        "id": 56,
+        "col": 8,
+        "row": 4,
+        "collides": true
+      },
+      "rockface_1": {
+        "id": 57,
+        "col": 9,
+        "row": 4,
+        "collides": true
+      },
+      "rockface_crack": {
+        "id": 58,
+        "col": 10,
+        "row": 4,
+        "collides": true
+      },
+      "rockface_moss": {
+        "id": 59,
+        "col": 11,
+        "row": 4,
+        "collides": true
+      },
+      "stone_0": {
+        "id": 60,
+        "col": 0,
+        "row": 5,
+        "collides": false
+      },
+      "stone_1": {
+        "id": 61,
+        "col": 1,
+        "row": 5,
+        "collides": false
+      },
+      "stone_2": {
+        "id": 62,
+        "col": 2,
+        "row": 5,
+        "collides": false
+      },
+      "stone_3": {
+        "id": 63,
+        "col": 3,
+        "row": 5,
+        "collides": false
+      },
+      "pavement_0": {
+        "id": 64,
+        "col": 4,
+        "row": 5,
+        "collides": false
+      },
+      "pavement_1": {
+        "id": 65,
+        "col": 5,
+        "row": 5,
+        "collides": false
+      },
+      "pavement_2": {
+        "id": 66,
+        "col": 6,
+        "row": 5,
+        "collides": false
+      },
+      "wood_0": {
+        "id": 67,
+        "col": 7,
+        "row": 5,
+        "collides": false
+      },
+      "wood_1": {
+        "id": 68,
+        "col": 8,
+        "row": 5,
+        "collides": false
+      },
+      "wood_2": {
+        "id": 69,
+        "col": 9,
+        "row": 5,
+        "collides": false
+      },
+      "pier_rope": {
+        "id": 70,
+        "col": 10,
+        "row": 5,
+        "collides": false
+      },
+      "pier_1": {
+        "id": 71,
+        "col": 11,
+        "row": 5,
+        "collides": false
+      },
+      "cliff_top": {
+        "id": 72,
+        "col": 0,
+        "row": 6,
+        "collides": true
+      },
+      "cliff_bottom": {
+        "id": 73,
+        "col": 1,
+        "row": 6,
+        "collides": true
+      },
+      "cliff_left": {
+        "id": 74,
+        "col": 2,
+        "row": 6,
+        "collides": true
+      },
+      "cliff_right": {
+        "id": 75,
+        "col": 3,
+        "row": 6,
+        "collides": true
+      },
+      "cliff_moss": {
+        "id": 76,
+        "col": 4,
+        "row": 6,
+        "collides": true
+      },
+      "cliff_mid": {
+        "id": 77,
+        "col": 5,
+        "row": 6,
+        "collides": true
+      },
+      "pool_0": {
+        "id": 78,
+        "col": 6,
+        "row": 6,
+        "collides": true
+      },
+      "pool_1": {
+        "id": 79,
+        "col": 7,
+        "row": 6,
+        "collides": true
+      },
+      "boulder_0": {
+        "id": 80,
+        "col": 8,
+        "row": 6,
+        "collides": true
+      },
+      "boulder_1": {
+        "id": 81,
+        "col": 9,
+        "row": 6,
+        "collides": true
+      },
+      "stairs_0": {
+        "id": 82,
+        "col": 10,
+        "row": 6,
+        "collides": false
+      },
+      "stairs_1": {
+        "id": 83,
+        "col": 11,
+        "row": 6,
+        "collides": false
+      },
+      "grass_flowers_4": {
+        "id": 84,
+        "col": 0,
+        "row": 7,
+        "collides": false
+      },
+      "grass_flowers_5": {
+        "id": 85,
+        "col": 1,
+        "row": 7,
+        "collides": false
+      },
+      "grass_sprouts_3": {
+        "id": 86,
+        "col": 2,
+        "row": 7,
+        "collides": false
+      },
+      "grass_sprouts_4": {
+        "id": 87,
+        "col": 3,
+        "row": 7,
+        "collides": false
+      },
+      "sea_4": {
+        "id": 88,
+        "col": 4,
+        "row": 7,
+        "collides": true
+      },
+      "sea_5": {
+        "id": 89,
+        "col": 5,
+        "row": 7,
+        "collides": true
+      },
+      "basalt_4": {
+        "id": 90,
+        "col": 6,
+        "row": 7,
+        "collides": false
+      },
+      "basalt_5": {
+        "id": 91,
+        "col": 7,
+        "row": 7,
+        "collides": false
+      },
+      "sand_4": {
+        "id": 92,
+        "col": 8,
+        "row": 7,
+        "collides": false
+      },
+      "sand_5": {
+        "id": 93,
+        "col": 9,
+        "row": 7,
+        "collides": false
+      },
+      "stone_4": {
+        "id": 94,
+        "col": 10,
+        "row": 7,
+        "collides": false
+      },
+      "sea_foam_2": {
+        "id": 95,
+        "col": 11,
+        "row": 7,
+        "collides": true
+      }
+    }
+  },
+  "objects": {
+    "image": "objects_32.png",
+    "atlasSize": [
+      512,
+      416
+    ],
+    "sprites": {
+      "ul_house_red": {
+        "x": 0,
+        "y": 0,
+        "width": 96,
+        "height": 96,
+        "tilesWide": 3,
+        "tilesHigh": 3,
+        "collision": true
+      },
+      "ul_house_blue": {
+        "x": 96,
+        "y": 0,
+        "width": 96,
+        "height": 96,
+        "tilesWide": 3,
+        "tilesHigh": 3,
+        "collision": true
+      },
+      "ul_store": {
+        "x": 192,
+        "y": 0,
+        "width": 96,
+        "height": 96,
+        "tilesWide": 3,
+        "tilesHigh": 3,
+        "collision": true
+      },
+      "ul_cafe": {
+        "x": 288,
+        "y": 0,
+        "width": 96,
+        "height": 96,
+        "tilesWide": 3,
+        "tilesHigh": 3,
+        "collision": true
+      },
+      "ul_ferry_terminal": {
+        "x": 384,
+        "y": 0,
+        "width": 128,
+        "height": 96,
+        "tilesWide": 4,
+        "tilesHigh": 3,
+        "collision": true
+      },
+      "ul_fish_market": {
+        "x": 0,
+        "y": 96,
+        "width": 96,
+        "height": 96,
+        "tilesWide": 3,
+        "tilesHigh": 3,
+        "collision": true
+      },
+      "dd_guard_station": {
+        "x": 96,
+        "y": 96,
+        "width": 96,
+        "height": 96,
+        "tilesWide": 3,
+        "tilesHigh": 3,
+        "collision": true
+      },
+      "dd_lighthouse": {
+        "x": 192,
+        "y": 96,
+        "width": 64,
+        "height": 128,
+        "tilesWide": 2,
+        "tilesHigh": 4,
+        "collision": true
+      },
+      "dd_flag": {
+        "x": 256,
+        "y": 96,
+        "width": 64,
+        "height": 96,
+        "tilesWide": 2,
+        "tilesHigh": 3,
+        "collision": true
+      },
+      "dd_helipad": {
+        "x": 320,
+        "y": 96,
+        "width": 96,
+        "height": 96,
+        "tilesWide": 3,
+        "tilesHigh": 3,
+        "collision": false
+      },
+      "ul_pine_tree": {
+        "x": 416,
+        "y": 96,
+        "width": 64,
+        "height": 64,
+        "tilesWide": 2,
+        "tilesHigh": 2,
+        "collision": true
+      },
+      "ul_leaf_tree": {
+        "x": 0,
+        "y": 224,
+        "width": 64,
+        "height": 64,
+        "tilesWide": 2,
+        "tilesHigh": 2,
+        "collision": true
+      },
+      "dd_big_rock": {
+        "x": 64,
+        "y": 224,
+        "width": 64,
+        "height": 64,
+        "tilesWide": 2,
+        "tilesHigh": 2,
+        "collision": true
+      },
+      "ul_passenger_ship": {
+        "x": 128,
+        "y": 224,
+        "width": 128,
+        "height": 64,
+        "tilesWide": 4,
+        "tilesHigh": 2,
+        "collision": true
+      },
+      "ul_fishing_boat": {
+        "x": 256,
+        "y": 224,
+        "width": 128,
+        "height": 64,
+        "tilesWide": 4,
+        "tilesHigh": 2,
+        "collision": true
+      },
+      "ul_harbor_dock": {
+        "x": 384,
+        "y": 224,
+        "width": 128,
+        "height": 64,
+        "tilesWide": 4,
+        "tilesHigh": 2,
+        "collision": false
+      },
+      "dd_landing_dock": {
+        "x": 0,
+        "y": 288,
+        "width": 128,
+        "height": 64,
+        "tilesWide": 4,
+        "tilesHigh": 2,
+        "collision": false
+      },
+      "dd_info_sign": {
+        "x": 128,
+        "y": 288,
+        "width": 64,
+        "height": 64,
+        "tilesWide": 2,
+        "tilesHigh": 2,
+        "collision": true
+      },
+      "ul_info_sign": {
+        "x": 192,
+        "y": 288,
+        "width": 64,
+        "height": 64,
+        "tilesWide": 2,
+        "tilesHigh": 2,
+        "collision": true
+      },
+      "dd_communications_tower": {
+        "x": 256,
+        "y": 288,
+        "width": 32,
+        "height": 96,
+        "tilesWide": 1,
+        "tilesHigh": 3,
+        "collision": true
+      },
+      "dd_stone_marker": {
+        "x": 288,
+        "y": 288,
+        "width": 32,
+        "height": 64,
+        "tilesWide": 1,
+        "tilesHigh": 2,
+        "collision": true
+      },
+      "dd_seagull": {
+        "x": 320,
+        "y": 288,
+        "width": 32,
+        "height": 32,
+        "tilesWide": 1,
+        "tilesHigh": 1,
+        "collision": false
+      },
+      "ul_seagull": {
+        "x": 352,
+        "y": 288,
+        "width": 32,
+        "height": 32,
+        "tilesWide": 1,
+        "tilesHigh": 1,
+        "collision": false
+      },
+      "dd_small_boulder": {
+        "x": 384,
+        "y": 288,
+        "width": 32,
+        "height": 32,
+        "tilesWide": 1,
+        "tilesHigh": 1,
+        "collision": true
+      },
+      "ul_bush": {
+        "x": 416,
+        "y": 288,
+        "width": 32,
+        "height": 32,
+        "tilesWide": 1,
+        "tilesHigh": 1,
+        "collision": false
+      },
+      "ul_flowering_bush": {
+        "x": 448,
+        "y": 288,
+        "width": 32,
+        "height": 32,
+        "tilesWide": 1,
+        "tilesHigh": 1,
+        "collision": false
+      },
+      "ul_flowers": {
+        "x": 480,
+        "y": 288,
+        "width": 32,
+        "height": 32,
+        "tilesWide": 1,
+        "tilesHigh": 1,
+        "collision": false
+      },
+      "ul_bench": {
+        "x": 0,
+        "y": 384,
+        "width": 32,
+        "height": 32,
+        "tilesWide": 1,
+        "tilesHigh": 1,
+        "collision": true
+      },
+      "ul_barrel": {
+        "x": 32,
+        "y": 384,
+        "width": 32,
+        "height": 32,
+        "tilesWide": 1,
+        "tilesHigh": 1,
+        "collision": true
+      },
+      "ul_fishing_net": {
+        "x": 64,
+        "y": 384,
+        "width": 32,
+        "height": 32,
+        "tilesWide": 1,
+        "tilesHigh": 1,
+        "collision": true
+      },
+      "dd_rope_fence": {
+        "x": 96,
+        "y": 384,
+        "width": 32,
+        "height": 32,
+        "tilesWide": 1,
+        "tilesHigh": 1,
+        "collision": true
+      },
+      "ul_wood_fence": {
+        "x": 128,
+        "y": 384,
+        "width": 32,
+        "height": 32,
+        "tilesWide": 1,
+        "tilesHigh": 1,
+        "collision": true
+      },
+      "dd_metal_fence": {
+        "x": 160,
+        "y": 384,
+        "width": 32,
+        "height": 32,
+        "tilesWide": 1,
+        "tilesHigh": 1,
+        "collision": true
+      },
+      "dd_rock_stairs": {
+        "x": 192,
+        "y": 384,
+        "width": 64,
+        "height": 32,
+        "tilesWide": 2,
+        "tilesHigh": 1,
+        "collision": false
+      },
+      "ul_footbridge": {
+        "x": 256,
+        "y": 384,
+        "width": 64,
+        "height": 32,
+        "tilesWide": 2,
+        "tilesHigh": 1,
+        "collision": false
+      }
+    }
+  },
+  "maps": [
+    "map_ulleungdo.json",
+    "map_dokdo.json"
+  ],
+  "recommendedScale": 2,
+  "note": "Objects use x,y in grid coordinates as TOP-LEFT; draw terrain first, then sort objects by their bottom edge to handle overlap.",
+  "details": {
+    "image": "details_32.png",
+    "columns": 8,
+    "rows": 4,
+    "tileSize": 32,
+    "names": {
+      "foam_0": 0,
+      "foam_1": 1,
+      "foam_2": 2,
+      "foam_3": 3,
+      "foam_4": 4,
+      "sparkle_5": 5,
+      "sparkle_6": 6,
+      "sparkle_7": 7,
+      "sparkle_8": 8,
+      "basalt_9": 9,
+      "basalt_10": 10,
+      "basalt_11": 11,
+      "basalt_12": 12,
+      "moss_13": 13,
+      "moss_14": 14,
+      "moss_15": 15,
+      "flowers_16": 16,
+      "flowers_17": 17,
+      "flowers_18": 18,
+      "grass_19": 19,
+      "grass_20": 20,
+      "grass_21": 21,
+      "basalt_steps": 22,
+      "bollard": 23,
+      "rope_segment": 24,
+      "seagull": 25,
+      "info_sign": 26,
+      "shore_weed": 27,
+      "foam_edge_28": 28,
+      "foam_edge_29": 29,
+      "foam_edge_30": 30,
+      "foam_edge_31": 31
+    },
+    "usage": "transparent decals overlay over compatible ground; non-colliding"
+  },
+  "characters": {
+    "image": "characters_64x72.png",
+    "source": "characters_original_v17.png",
+    "frameWidth": 64,
+    "frameHeight": 72,
+    "columns": 5,
+    "rows": 6,
+    "animationFrames": 5,
+    "rowsByDirection": {
+      "boy": {
+        "down": 0,
+        "right": 1,
+        "up": 2
+      },
+      "girl": {
+        "down": 3,
+        "right": 4,
+        "up": 5
+      }
+    },
+    "left": "mirror right frames using Canvas scaleX(-1); preserve original layout",
+    "footOffset": [
+      32,
+      68
+    ],
+    "collisionBox": {
+      "width": 14,
+      "height": 10,
+      "anchor": "bottom-center"
+    },
+    "note": "preserve source v17 artwork; never crop into 32x32 tiles"
+  },
+  "originalCharacterSource": {
+    "filename": "explorers-atlas-v17.png",
+    "dimensions": [
+      1024,
+      1536
+    ],
+    "layout": "5 frames × 6 directions/characters",
+    "notes": "Source sprites have nonuniform transparent margins. Use supplied normalized atlas rather than slicing source by naive 1024/5 cols."
+  },
+  "compatibilityNote": "CHAPTER 01 starts at Dongdo landing; preserve user game map ids, game UI, 3D toggle, saves and existing quest logic. Demo maps are optional, NOT replacements for current runtime maps."
+}

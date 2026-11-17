@@ -9,6 +9,7 @@ import { CUTSCENE_ATLAS } from './cutscene-atlas.js';
 import { assetImage } from './assets.js';
 import { drawInterior, drawFurniture, FURNITURE_DEPTH } from './interior-art.js';
 import { legendSpots } from './legends.js';
+import { V2_OBJECTS } from './tileset-v2.js';
 
 export const TILE = 32, W = MAP_W, H = MAP_H;
 export const PROP_KINDS = ['sign', 'landmark', 'box', 'trash', 'observe', 'stone', 'legend'];
@@ -110,12 +111,20 @@ export function pathfind(map, sx, sy, tx, ty, people = []) {
 function rect(ctx, x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.floor(x), Math.floor(y), w, h); }
 // 울릉도: 후박나무·동백나무 / 독도: 키 큰 나무 없이 사철나무 덤불과 해국 (소나무는 쓰지 않아요)
 const ulleung = map => map?.def?.island === '울릉도';
+// v0.67 타일셋 v2의 물건 그림(나무·덤불·바위). 그림이 아직 없으면 false를 돌려줘서 예전 그림으로 그려요.
+function drawV2(ctx, name, dx, dy) {
+  const img = assetImage(V2_OBJECTS.key), r = V2_OBJECTS.sprites[name]; if (!img || !r) return false;
+  ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(img, r[0], r[1], r[2], r[3], Math.round(dx), Math.round(dy), r[2], r[3]); ctx.restore(); return true;
+}
 // 나무는 바람에 살랑살랑 흔들려요(v0.64): 밑동은 그대로 두고 위로 갈수록 옆으로 기울여요. 나무마다 박자가 조금씩 달라요.
+// v0.67: 울릉도는 타일셋 v2의 바늘잎나무·넓은잎나무(64×64), 독도는 키 작은 덤불·꽃 덤불(32×32). 아랫변 가운데가 칸의 발 자리예요.
 function tree(ctx, x, y, map, time = 0) {
-  const k = ((x / 32) * 7 + (y / 32) * 13) % 3, key = ulleung(map) ? (k === 0 ? 'tree-dongbaek' : 'tree-hubak') : (k === 0 ? 'shrub-haeguk' : 'shrub-saecheol');
-  const sway = Math.sin(time / 760 + x * .045 + y * .03) * .032 + Math.sin(time / 240 + x * .11) * .009, base = y + 30;
+  const k = ((x / 32) * 7 + (y / 32) * 13) % 3, isle = ulleung(map);
+  const key = isle ? ['tree-dongbaek', 'tree-hubak', 'tree-pine'][k] : (k === 0 ? 'shrub-haeguk' : 'shrub-saecheol');
+  const v2 = isle ? (k === 1 ? 'ul_leaf_tree' : 'ul_pine_tree') : (k === 0 ? 'ul_flowering_bush' : 'ul_bush');
+  const sway = Math.sin(time / 760 + x * .045 + y * .03) * (isle ? .028 : .012) + Math.sin(time / 240 + x * .11) * .006, base = y + 30;
   ctx.save(); ctx.transform(1, 0, sway, 1, -sway * base, 0);
-  if (!drawIslandArt(ctx, key, x - 24, y - 56, 80, 88)) drawTreeDefault(ctx, x, y);
+  if (!(isle ? drawV2(ctx, v2, x - 16, y + 32 - 64) : drawV2(ctx, v2, x, y)) && !drawIslandArt(ctx, key, x - 24, y - 56, 80, 88)) drawTreeDefault(ctx, x, y);
   ctx.restore();
 }
 export function drawTreeDefault(ctx, x, y) {
@@ -238,8 +247,7 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
     }
     else if (n.kind === 'legend') { legendGlow(ctx, n.x, n.y, time); drawMonster(ctx, n.species, n.x * 32 - 10, n.y * 32 - 22 + Math.round(Math.sin(time / 300) * 2), 52, time / 1000); if (!n.used) marker(ctx, n.x, n.y, time, '#ffe9a0'); }
     else if (PROP_KINDS.includes(n.kind)) drawProp(ctx, n.kind, n.x, n.y, { open: n.used, art: n.art, time, water: map[n.y]?.[n.x] === 0 });
-    else if (n.player) { const j = motion.jump || 0; if (j > 0) groundShadow(ctx, n.x * 32 + 16, n.y * 32 + 29, 11, j / 3); // 점프(v0.64): 그림자는 땅에 남고 몸만 떠올라요
-      if (!drawExplorer(ctx, state.avatar, fx, fy - j, CHARACTER_SIZE, seen(state.dir), motion.walking && !j, motion.distance || 0)) drawHuman(ctx, fx, fy - j, '#418e91', state.dir, 0, 'normal', null, CHARACTER_SIZE); }
+    else if (n.player) { if (!drawExplorer(ctx, state.avatar, fx, fy, CHARACTER_SIZE, seen(state.dir), motion.walking, motion.distance || 0)) drawHuman(ctx, fx, fy, '#418e91', state.dir, 0, 'normal', null, CHARACTER_SIZE); }
     else if (n.actor && drawResident(ctx, n.actor, fx, fy, CHARACTER_SIZE, time, seen(n.dir || 'down'), n.walking || false, n.walkDistance || 0)) { /* drawn */ }
     else drawHuman(ctx, fx, fy, n.color || '#a88668', 'down', 0, n.kind, n.sprite, CHARACTER_SIZE);
     if (!n.player && wanted && n.id === wanted) marker(ctx, n.x, n.y, time);
@@ -260,7 +268,7 @@ function drawDecor(ctx, n, map, time) {
       return drawScenery(ctx, 'monument', n.x * 32, (n.y + 1) * 32 - 80, 96, 80);
     }
     case 'boat': return drawScenery(ctx, 'boat', n.x * 32 - 16, n.y * 32 - 30, 64, 100);
-    case 'rock': return drawProp(ctx, 'rock', n.x, n.y, { water: map[n.y]?.[n.x] === 0, time });
+    case 'rock': return drawV2(ctx, 'dd_small_boulder', n.x * 32, n.y * 32) || drawProp(ctx, 'rock', n.x, n.y, { water: map[n.y]?.[n.x] === 0, time }); // v0.67: 타일셋 v2 바위
     case 'crag': return drawProp(ctx, 'crag', n.x, n.y, { w: n.w, h: n.h });
     case 'beacon': return drawProp(ctx, 'beacon', n.x, n.y, { time });
     case 'barrier': return drawProp(ctx, 'barrier', n.x, n.y);

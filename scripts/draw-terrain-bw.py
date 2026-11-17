@@ -1,8 +1,8 @@
-"""지형 타일 도트 그림 (v0.39, (선명한 외곽선 도트 느낌)
+"""지형 타일 도트 그림 (v0.66 자연 다시 그리기 — 휴대용 게임기 시절 2D RPG의 맑은 풀밭·짙은 바다 느낌)
 
     python scripts/draw-terrain-bw.py
 
-  dist/assets/scenery/terrain-bw-v39.png   타일 모음
+  dist/assets/scenery/terrain-nature-v66.png   타일 모음
   dist/terrain-atlas.js                    종류마다 자리 (가로 2칸 × 세로 4칸, 한 칸 = 32×32)
 
 한 칸은 게임 속 한 칸(32×32)과 같은 크기라서 1도트 = 게임 1픽셀로 또렷하게 그려져요.
@@ -13,7 +13,7 @@ import json, os, random
 from PIL import Image, ImageDraw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT_PNG = os.path.join(ROOT, 'dist', 'assets', 'scenery', 'terrain-bw-v39.png')
+OUT_PNG = os.path.join(ROOT, 'dist', 'assets', 'scenery', 'terrain-nature-v66.png')
 OUT_JS = os.path.join(ROOT, 'dist', 'terrain-atlas.js')
 T = 32
 
@@ -29,17 +29,18 @@ class Cell:
             for xx in range(x, x + w): s.p(xx, yy, c)
 
 def grass(seed, flowers=False):
+    """v0.66 풀밭: 밝은 연두 바탕에 짧은 풀포기(‘ᐯ’ 모양 두 잎)와 작은 잎끝 점. 큰 빛줄기와 꽃밭은 terrain.js가 지도 전체에 그려요."""
     rr = random.Random(seed); c = Cell('#8fd16a')
-    for _ in range(rr.randrange(3, 5)):   # grass tufts: a small dark "w" with light tips
+    for _ in range(rr.randrange(4, 7)):   # 풀포기: 두 잎이 벌어진 V 모양(짙은 줄기 + 밝은 잎끝)
         x, y = rr.randrange(T), rr.randrange(T)
-        for dx, dy in [(0, 0), (1, 1), (2, 0), (3, 1), (4, 0)]: c.p(x + dx, y + dy, '#6cb350')
-        c.p(x, y - 1, '#b4e68c'); c.p(x + 2, y - 1, '#b4e68c'); c.p(x + 4, y - 1, '#b4e68c')
-    for _ in range(rr.randrange(4, 8)):   # single blades
-        x, y = rr.randrange(T), rr.randrange(T); c.p(x, y, '#78bd57'); c.p(x, y - 1, '#a6de7e')
+        c.p(x, y, '#5fa84a'); c.p(x - 1, y - 1, '#6cb350'); c.p(x + 1, y - 1, '#6cb350'); c.p(x - 2, y - 2, '#a9e183'); c.p(x + 2, y - 2, '#a9e183')
+        if rr.random() < .5: c.p(x, y - 1, '#6cb350'); c.p(x, y - 2, '#a9e183')
+    for _ in range(rr.randrange(5, 9)):   # 낱잎: 짙은 점 + 위의 밝은 점
+        x, y = rr.randrange(T), rr.randrange(T); c.p(x, y, '#77bd5a'); c.p(x, y - 1, '#a2db7c')
     if flowers:
         for _ in range(2):
-            x, y = rr.randrange(T), rr.randrange(T); col = rr.choice(['#ffffff', '#f6d44c', '#c8a6f0'])
-            c.p(x, y - 1, col); c.p(x - 1, y, col); c.p(x + 1, y, col); c.p(x, y + 1, col); c.p(x, y, '#f29a3a')
+            x, y = rr.randrange(T), rr.randrange(T); col = rr.choice(['#ffffff', '#f6d44c', '#f7c2d6'])
+            c.p(x, y - 1, col); c.p(x - 1, y, col); c.p(x + 1, y, col); c.p(x, y + 1, col); c.p(x, y, '#f29a3a'); c.p(x + 1, y + 1, '#5fa84a')
     return c
 
 def tall(seed):
@@ -57,50 +58,64 @@ def tall(seed):
     return c
 
 def rocky(seed):
-    """v0.45 바위 들판: 독도처럼 화산 응회암 땅에 금이 가 있고, 자갈·이끼와 가끔 해국(보라)·땅채송화(노랑)가 피어 있어요."""
-    rr = random.Random(seed); c = Cell('#bfad8c')
-    for _ in range(rr.randrange(5, 8)):   # 넓적한 바위 판: 밝은 윗면 + 어두운 아래 금
-        x, y, w = rr.randrange(T), rr.randrange(T), rr.randrange(4, 8)
-        c.r(x, y, w, 2, '#cdbd9c'); c.r(x, y + 2, w, 1, '#9c8768'); c.p(x + w, y + 1, '#9c8768')
-    for _ in range(rr.randrange(3, 5)):   # 갈라진 금
+    """v0.66 바위 들판: 독도의 응회암 땅. 넓적한 판석(밝은 윗면·짙은 테두리), 갈라진 금, 자갈, 이끼, 가끔 해국·땅채송화."""
+    rr = random.Random(seed); c = Cell('#c2b08e')
+    for _ in range(rr.randrange(1, 3)):   # 판석: 짙은 테두리 + 밝은 윗면 + 아래 그늘
+        x, y, w, h = rr.randrange(T), rr.randrange(T), rr.randrange(5, 9), rr.randrange(2, 4)
+        c.r(x + 1, y, w - 2, 1, '#a69272'); c.r(x, y + 1, 1, h, '#a69272'); c.r(x + w - 1, y + 1, 1, h, '#a08b6a'); c.r(x + 1, y + h + 1, w - 2, 1, '#8c7758')
+        c.r(x + 1, y + 1, w - 2, h, '#cfbf9c'); c.r(x + 1, y + 1, w - 3, 1, '#e2d6b6'); c.r(x + 1, y + h, w - 2, 1, '#b19e7c')
+    for _ in range(rr.randrange(2, 4)):   # 갈라진 금
         x, y = rr.randrange(T), rr.randrange(T)
-        for i in range(rr.randrange(3, 6)): c.p(x + i, y + (i % 2), '#8a7457')
-    for _ in range(rr.randrange(4, 7)):   # 자갈
-        x, y = rr.randrange(T), rr.randrange(T); c.p(x, y, '#e2d5b8'); c.p(x + 1, y, '#a69273'); c.p(x, y + 1, '#8f7a5e')
-    for _ in range(rr.randrange(2, 4)):   # 이끼·풀 포기
+        for i in range(rr.randrange(3, 7)): c.p(x + i, y + (i // 2) % 2, '#8a7457')
+    for _ in range(rr.randrange(5, 8)):   # 자갈: 밝은 점 + 그늘
+        x, y = rr.randrange(T), rr.randrange(T); c.p(x, y, '#ece2c8'); c.p(x + 1, y, '#b5a383'); c.p(x, y + 1, '#8f7a5e'); c.p(x + 1, y + 1, '#8f7a5e')
+    for _ in range(rr.randrange(1, 3)):   # 이끼·풀포기
         x, y = rr.randrange(T), rr.randrange(T)
-        for dx, dy in [(0, 0), (1, -1), (2, 0)]: c.p(x + dx, y + dy, '#6fa54e')
-        c.p(x + 1, y, '#8fcb63')
-    if rr.random() < .45:                 # 해국 또는 땅채송화 한 송이
+        c.p(x, y, '#5f9a44'); c.p(x - 1, y - 1, '#6fa54e'); c.p(x + 1, y - 1, '#6fa54e'); c.p(x - 1, y - 2, '#9fd27a'); c.p(x + 1, y - 2, '#9fd27a')
+    if rr.random() < .4:                  # 해국 또는 땅채송화 한 송이
         x, y = rr.randrange(2, T - 2), rr.randrange(2, T - 2); col, mid = rr.choice([('#b48ad8', '#f2cf4a'), ('#f2cf4a', '#e09a2a')])
         c.p(x, y - 1, col); c.p(x - 1, y, col); c.p(x + 1, y, col); c.p(x, y + 1, col); c.p(x, y, mid); c.p(x + 2, y + 2, '#6fa54e')
     return c
 
 def path(seed):
+    """v0.66 흙길: 고운 흙에 작은 자갈 무리(밝은 윗점 + 짙은 아랫점)와 발자국 같은 옅은 얼룩."""
     rr = random.Random(seed); c = Cell('#e2c88f')
-    for _ in range(rr.randrange(3, 6)):
-        x, y = rr.randrange(T), rr.randrange(T); c.r(x, y, 2, 2, '#c9aa6d'); c.p(x, y, '#f3dfae')
-    for _ in range(rr.randrange(6, 10)):
+    for _ in range(rr.randrange(2, 4)):   # 옅은 얼룩
+        x, y = rr.randrange(T), rr.randrange(T); c.r(x, y, rr.randrange(3, 6), 1, '#dcc086'); c.r(x + 1, y + 1, rr.randrange(2, 4), 1, '#dcc086')
+    for _ in range(rr.randrange(2, 4)):   # 자갈 무리
+        x, y = rr.randrange(T), rr.randrange(T)
+        for (dx, dy) in rr.sample([(0, 0), (3, 1), (1, 3), (4, 3)], rr.randrange(2, 4)):
+            c.p(x + dx, y + dy, '#f6e6bd'); c.p(x + dx + 1, y + dy, '#c9aa6d'); c.p(x + dx, y + dy + 1, '#b8975c')
+    for _ in range(rr.randrange(5, 9)):
         x, y = rr.randrange(T), rr.randrange(T); c.p(x, y, rr.choice(['#d4b67a', '#eed7a4']))
     return c
 
 def sand(seed):
+    """v0.66 모래: 밝은 모래에 물결 자국(옅은 곡선)과 작은 조개."""
     rr = random.Random(seed); c = Cell('#f4e2ae')
-    for _ in range(rr.randrange(8, 14)):
-        x, y = rr.randrange(T), rr.randrange(T); c.p(x, y, rr.choice(['#e6cd92', '#fff3d0', '#e6cd92']))
+    for _ in range(rr.randrange(1, 3)):   # 바람·물결 자국
+        x, y = rr.randrange(T), rr.randrange(T)
+        for i in range(rr.randrange(5, 9)): c.p(x + i, y + (1 if i in (0, 1) else 0) - (1 if i > 5 else 0), '#ead398')
+    for _ in range(rr.randrange(8, 13)):
+        x, y = rr.randrange(T), rr.randrange(T); c.p(x, y, rr.choice(['#e6cd92', '#fff6da', '#e6cd92']))
     if rr.random() < .3:
         x, y = rr.randrange(T), rr.randrange(T); c.p(x, y, '#ffffff'); c.p(x + 1, y, '#f0c6b0'); c.p(x, y + 1, '#e3a98f')
     return c
 
 def water(seed):
-    rr = random.Random(seed); c = Cell('#4aa9d8')
-    for _ in range(rr.randrange(2, 4)):   # little wave crests: a light arc over a darker trough
-        x, y = rr.randrange(T), rr.randrange(T)
-        for i in range(6): c.p(x + i, y - (1 if 1 <= i <= 4 else 0), '#a6dcf2')
-        c.p(x + 2, y - 2, '#e8f8ff'); c.p(x + 3, y - 2, '#e8f8ff')
-        for i in range(1, 5): c.p(x + i, y + 1, '#3d93c6')
-    for _ in range(rr.randrange(2, 4)):
-        x, y = rr.randrange(T), rr.randrange(T); c.p(x, y, '#3d93c6'); c.p(x + 1, y, '#3d93c6')
+    """v0.66 바다: 짙은 파랑 바탕에 옆으로 긴 물결(밝은 곡선 + 아래 짙은 골)과 반짝이는 점."""
+    rr = random.Random(seed); c = Cell('#3a8ad6')
+    for _ in range(rr.randrange(3, 5)):
+        x, y, w = rr.randrange(T), rr.randrange(T), rr.randrange(6, 11)
+        for i in range(w):
+            lift = 1 if 1 <= i <= w - 2 else 0
+            c.p(x + i, y - lift, '#64aeea')
+            if 2 <= i <= w - 3: c.p(x + i, y + 1, '#3079c4')
+        c.p(x + w // 2 - 1, y - 2, '#a8dcfa'); c.p(x + w // 2, y - 2, '#a8dcfa')
+    for _ in range(rr.randrange(2, 4)):   # 잔물결
+        x, y = rr.randrange(T), rr.randrange(T); c.p(x, y, '#4f9de2'); c.p(x + 1, y, '#4f9de2'); c.p(x + 2, y + 1, '#3079c4')
+    if rr.random() < .5:
+        x, y = rr.randrange(T), rr.randrange(T); c.p(x, y, '#e8f8ff')
     return c
 
 def dock(seed):
@@ -130,5 +145,5 @@ for n, (k, cells) in enumerate(KINDS.items()):
     frames[k] = [fx, fy, 2 * T, 4 * T]
 os.makedirs(os.path.dirname(OUT_PNG), exist_ok=True); sheet.save(OUT_PNG)
 with open(OUT_JS, 'w') as f:
-    f.write('export const TERRAIN_ATLAS=' + json.dumps({'key': 'scenery/terrain-bw-v39', 'width': sheet.width, 'height': sheet.height, 'frames': frames}) + ';\n')
+    f.write('export const TERRAIN_ATLAS=' + json.dumps({'key': 'scenery/terrain-nature-v66', 'width': sheet.width, 'height': sheet.height, 'frames': frames}) + ';\n')
 print('terrain', sheet.size, frames)

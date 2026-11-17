@@ -2,7 +2,7 @@
 
     python scripts/draw-island-art.py        # Pillow 필요
 
-  dist/assets/scenery/island-art-v36.png   그림 모음
+  dist/assets/scenery/island-art-v67.png   그림 모음
   dist/island-atlas.js                     그림마다 자리(rect)
 
 건물은 게임 속 크기 그대로(한 칸 = 32×32 도트, 1도트 = 게임 1픽셀) 위에서 비스듬히 내려다본 3/4 시점으로 그립니다. 건물 칸(가로 5칸 또는 7칸)의 가운데 칸 위에 문이 오도록 해서
@@ -16,7 +16,7 @@ import json, math, os
 from PIL import Image, ImageDraw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT_PNG = os.path.join(ROOT, 'dist', 'assets', 'scenery', 'island-art-v36.png')
+OUT_PNG = os.path.join(ROOT, 'dist', 'assets', 'scenery', 'island-art-v67.png')
 OUT_JS = os.path.join(ROOT, 'dist', 'island-atlas.js')
 INK = (42, 36, 34, 255)
 
@@ -259,10 +259,12 @@ def dokdo_gym():  # 수호관: 경비대 숙소처럼 회백색 2층 콘크리�
     flat_roof(p, 84, 156, 32, '#3a6ea8', depth=8, edge=4, over=2)
     p.r(104, 4, 2, 26, INK); p.r(98, 8, 14, 2, INK); p.r(98, 14, 14, 2, INK)            # antenna
     p.r(200, 0, 3, 74, INK); p.r(199, 0, 5, 2, '#e2b84f')                                # flagpole + 태극기
-    fx, fy = 204, 4; p.r(fx - 1, fy - 1, 32, 22, INK); p.r(fx, fy, 30, 20, '#fbfbf8'); p.r(fx, fy + 16, 30, 4, '#e6e4dc')
-    p.d.pieslice([fx + 9, fy + 4, fx + 21, fy + 16], 180, 360, fill=hexc('#c8323c')); p.d.pieslice([fx + 9, fy + 4, fx + 21, fy + 16], 0, 180, fill=hexc('#1f4fa0'))
-    for (x, y) in [(fx + 2, fy + 2), (fx + 23, fy + 2), (fx + 2, fy + 14), (fx + 23, fy + 14)]:
-        for k in range(3): p.r(x, y + k * 2, 5, 1, INK)
+    # v0.67 태극기: 직접 그리지 않고 정확한 원본(art/tileset-v2/taegeukgi_exact_reference.png)을 줄여 넣어요.
+    # 건(☰) 왼쪽 위 · 감(☵) 오른쪽 위 · 리(☲) 왼쪽 아래 · 곤(☷) 오른쪽 아래, 가운데 태극(위 빨강·아래 파랑).
+    fx, fy, fw, fh = 204, 4, 33, 22
+    p.r(fx - 1, fy - 1, fw + 2, fh + 2, INK)
+    ref = Image.open(os.path.join(ROOT, 'art', 'tileset-v2', 'taegeukgi_exact_reference.png')).convert('RGB').resize((fw, fh), Image.LANCZOS)
+    p.im.paste(ref.convert('RGBA'), (fx, fy))
     return p
 
 def dokdo_shop():  # 쉼터: 서도 주민숙소처럼 바위에 기대어 선 하얀 3층 건물 + 파란 지붕 + 물탱크
@@ -309,41 +311,101 @@ def dokdo_home():  # 집: 바닷가 어업인 집 — 하얀 벽, 청록 지붕,
 def plant_shadow(p, cx=40, base=86, rx=22):
     sh = Image.new('RGBA', p.im.size, (0, 0, 0, 0)); ImageDraw.Draw(sh).ellipse([cx - rx + 6, base - 6, cx + rx + 10, base + 1], fill=SHADOW); p.im.alpha_composite(sh)
 
-def tree_hubak():  # 후박나무: 울릉도에 흔한 늘푸른 넓은잎나무 — 둥글고 짙은 수관
-    p = Pic(80, 88); plant_shadow(p)
-    p.box(34, 52, 12, 36, '#7a5a3a'); p.r(38, 56, 3, 30, '#94704a')
-    for (x, y, rx, ry, c) in [(40, 34, 32, 26, '#2f5f3c'), (26, 40, 16, 13, '#356a42'), (54, 38, 17, 14, '#356a42'), (40, 26, 22, 16, '#3f7a4a')]:
-        p.d.ellipse([x - rx - 2, y - ry - 2, x + rx + 2, y + ry + 2], fill=INK) if c == '#2f5f3c' else None
-        p.d.ellipse([x - rx, y - ry, x + rx, y + ry], fill=hexc(c))
-    for (x, y) in [(28, 22), (46, 18), (58, 30), (34, 34), (50, 42), (22, 44)]: p.r(x, y, 6, 3, '#5fa065'); p.r(x + 1, y - 2, 3, 2, '#7fbf7a')
+# v0.66 식물 다시 그리기: 잎 덩어리를 여러 개 겹쳐(뒤→앞) 그리고, 덩어리마다 짙은 테두리·몸통·왼쪽 위 빛·반짝이 점을 넣어요.
+# 앞 덩어리의 테두리가 뒤 덩어리 위에 겹쳐서, 잎이 층층이 쌓인 입체감이 생겨요.
+def _h(*a):
+    h = 0
+    for v in a: h = (h * 1000003 + int(v) + 7919) & 0xffffffff
+    h ^= h >> 13; h = (h * 1274126177) & 0xffffffff; return (h ^ (h >> 16)) / 4294967296
+
+def shade_mask(p, mask, pal, light=(.33, .28), seed=0):
+    """mask(흑백 그림)에 칠한 모양을 도트로 음영해요: 바깥 테두리는 짙게, 왼쪽 위는 밝게, 오른쪽 아래는 그늘, 잎 무늬 점을 흩뿌려요."""
+    ink, dark, mid, light_c, shine = [hexc(c) for c in pal]
+    bb = mask.getbbox()
+    if not bb: return
+    m = mask.load(); px = p.im.load(); x0, y0, x1, y1 = bb; w, h = max(1, x1 - x0), max(1, y1 - y0)
+    inside = lambda x, y: 0 <= x < p.w and 0 <= y < p.h and m[x, y] > 0
+    for y in range(y0, y1):
+        for x in range(x0, x1):
+            if not inside(x, y): continue
+            if not (inside(x - 1, y) and inside(x + 1, y) and inside(x, y - 1) and inside(x, y + 1)): px[x, y] = ink; continue
+            u, v = (x - x0) / w, (y - y0) / h
+            d = ((u - light[0]) ** 2 + (v - light[1]) ** 2) ** .5
+            band = 3 if d < .2 else 2 if d < .44 else 1 if d < .66 else 0
+            if not inside(x, y + 3) or not inside(x + 3, y + 1): band = min(band, 0 if not inside(x, y + 2) else 1)    # 아래·오른쪽 가장자리 그늘
+            k = _h(x // 2, y, seed)
+            if k < .09: band = max(0, band - 1)                                          # 잎 사이 짙은 틈
+            elif k > .93 and band >= 1: band = min(3, band + 1)                          # 잎끝 밝은 점
+            px[x, y] = (dark, mid, light_c, light_c)[band] if band < 3 else (shine if _h(x, y, seed + 1) < .18 and d < .14 else light_c)
+
+def blob(p, shapes, pal, seed=0, light=(.33, .28)):
+    m = Image.new('L', (p.w, p.h), 0); d = ImageDraw.Draw(m)
+    for kind, *a in shapes:
+        if kind == 'e': d.ellipse(a[0], fill=255)
+        else: d.polygon(a[0], fill=255)
+    shade_mask(p, m, pal, light, seed)
+
+def leaf_clump(p, cx, cy, rx, ry, pal, seed=0):
+    """잎 덩어리: 둥근 몸통 둘레에 작은 혹을 붙여 울퉁불퉁한 테두리를 만들어요."""
+    shapes = [('e', [cx - rx, cy - ry, cx + rx, cy + ry])]
+    n = max(5, (rx + ry) // 3)
+    for i in range(n):
+        a = math.pi * 2 * i / n + _h(cx, cy, i) * .5; r = max(3, min(rx, ry) // 3)
+        bx, by = cx + math.cos(a) * (rx - r * .6), cy + math.sin(a) * (ry - r * .6)
+        shapes.append(('e', [bx - r, by - r, bx + r, by + r]))
+    blob(p, shapes, pal, seed=cx * 31 + cy + seed)
+
+def trunk(p, x, top, base, w=8, c='#7a5634'):
+    p.r(x - 1, top, w + 2, base - top, INK); p.r(x, top, w, base - top - 1, c)
+    p.r(x + 1, top, 2, base - top - 2, tone(c, 1.25)); p.r(x + w - 2, top, 2, base - top - 1, tone(c, .78))
+    p.r(x - 3, base - 3, w + 6, 2, INK); p.r(x - 2, base - 4, w + 4, 2, tone(c, .9))  # 뿌리
+
+HUBAK = ('#17321f', '#235236', '#327347', '#54a263', '#b0e3a0')
+DONG = ('#142a1d', '#1d4630', '#286040', '#428a59', '#9ed6a0')
+PINE = ('#0f342c', '#185444', '#257a5e', '#46a882', '#a8e8c4')
+BUSH = ('#1b3b23', '#2c6338', '#3f874a', '#66b464', '#c0eea2')
+
+def tree_hubak():  # 후박나무: 둥근 수관을 잎 덩어리 여러 개로
+    p = Pic(80, 88); plant_shadow(p); trunk(p, 36, 52, 87)
+    for (x, y, rx, ry) in [(40, 18, 14, 11), (24, 26, 13, 11), (56, 26, 13, 11), (40, 32, 16, 12), (18, 42, 12, 10), (62, 42, 12, 10), (31, 46, 14, 11), (50, 46, 14, 11)]:
+        leaf_clump(p, x, y, rx, ry, HUBAK)
     return p
 
-def tree_dongbaek():  # 동백나무: 울릉도 바닷가의 늘푸른 넓은잎나무 — 반짝이는 잎과 빨간 꽃
-    p = Pic(80, 88); plant_shadow(p, rx=18)
-    p.box(35, 56, 10, 32, '#6f5236'); p.r(38, 60, 3, 26, '#8a6a48')
-    for (x, y, rx, ry) in [(40, 40, 28, 25), (24, 48, 14, 12), (56, 47, 14, 12)]: p.d.ellipse([x - rx - 2, y - ry - 2, x + rx + 2, y + ry + 2], fill=INK)
-    for (x, y, rx, ry, c) in [(40, 40, 28, 25, '#285a36'), (24, 48, 14, 12, '#2f6a3e'), (56, 47, 14, 12, '#2f6a3e'), (40, 32, 18, 14, '#357a46')]:
-        p.d.ellipse([x - rx, y - ry, x + rx, y + ry], fill=hexc(c))
-    for (x, y) in [(30, 24), (48, 22), (58, 38), (22, 44), (40, 46), (52, 54)]: p.r(x, y, 5, 2, '#5a9a5f')
-    for (x, y) in [(26, 34), (44, 28), (56, 46), (34, 52), (20, 54), (48, 40)]:  # red camellia flowers
-        p.r(x, y, 5, 5, '#c8323c'); p.r(x + 1, y - 1, 3, 1, '#e0505a'); p.r(x + 2, y + 2, 1, 1, '#f0d24a')
+def tree_dongbaek():  # 동백나무: 짙은 잎 덩어리에 빨간 꽃
+    p = Pic(80, 88); plant_shadow(p, rx=18); trunk(p, 36, 58, 87, 7, '#6f5236')
+    for (x, y, rx, ry) in [(40, 22, 13, 10), (26, 30, 12, 10), (54, 30, 12, 10), (40, 38, 15, 11), (22, 46, 11, 9), (58, 46, 11, 9), (40, 52, 14, 9)]:
+        leaf_clump(p, x, y, rx, ry, DONG)
+    for (x, y) in [(30, 22), (48, 18), (56, 32), (22, 40), (36, 36), (50, 44), (28, 50), (44, 54), (62, 48)]:  # 동백꽃: 붉은 꽃잎 다섯 점 + 노란 꽃술
+        for (dx, dy) in [(1, -1), (-1, 1), (3, 1), (0, 3), (2, 3)]: p.r(x + dx, y + dy, 2, 2, '#d23a44')
+        p.r(x + 1, y - 1, 1, 1, '#f07078'); p.r(x - 1, y + 1, 1, 1, '#f07078'); p.r(x + 1, y + 1, 2, 2, '#f2d24a'); p.r(x + 1, y + 4, 2, 1, '#7a1e24')
     return p
 
-def shrub_saecheol():  # 사철나무 덤불: 독도의 키 작은 떨기나무(반짝이는 잎)
+def tree_pine():  # 섬잣나무: 울릉도에 자라는 늘푸른 바늘잎나무 — 아래로 둥글게 늘어진 가지가 층층이
+    p = Pic(80, 88); plant_shadow(p, rx=17); trunk(p, 37, 64, 87, 6, '#6a4a2e')
+    tiers = [(72, 27), (60, 24), (48, 20), (37, 16), (27, 12), (18, 8)]   # (아래 끝 y, 반너비) — 아래층부터
+    for n, (by, hw) in enumerate(tiers):
+        top = by - 15 if n < len(tiers) - 1 else by - 13
+        shapes = [('p', [(40, top), (40 + hw - 2, by - 6), (40 - hw + 2, by - 6)])]
+        k = max(3, hw // 5)                                           # 아래 끝: 둥근 가지 끝을 나란히
+        for i in range(k + 1):
+            bx = 40 - hw + 4 + (2 * hw - 8) * i / k; r = 4 if hw > 10 else 3
+            shapes.append(('e', [bx - r, by - 7 - r + 2, bx + r, by - 1]))
+        shapes.append(('e', [40 - hw + 2, by - 11, 40 + hw - 2, by - 3]))
+        blob(p, shapes, PINE, seed=n * 17, light=(.3, .2))
+    return p
+
+def shrub_saecheol():  # 사철나무 덤불: 작은 잎 덩어리를 낮게 겹쳐요
     p = Pic(80, 88); plant_shadow(p, base=88, rx=28)
-    for (x, y, rx, ry) in [(40, 70, 30, 17), (26, 64, 14, 11), (54, 63, 15, 12), (40, 58, 18, 12)]:
-        p.d.ellipse([x - rx - 2, y - ry - 2, x + rx + 2, y + ry + 2], fill=INK)
-    for (x, y, rx, ry, c) in [(40, 70, 30, 17, '#3f7a3c'), (26, 64, 14, 11, '#4a8a44'), (54, 63, 15, 12, '#4a8a44'), (40, 58, 18, 12, '#56984c')]:
-        p.d.ellipse([x - rx, y - ry, x + rx, y + ry], fill=hexc(c))
-    for (x, y) in [(20, 66), (32, 56), (46, 54), (58, 64), (40, 74), (28, 76), (52, 76)]: p.r(x, y, 4, 2, '#8fd07f'); p.r(x + 1, y - 1, 2, 1, '#bfe8a8')
-    for (x, y) in [(36, 62), (50, 70)]: p.r(x, y, 3, 3, '#e8d86a')
+    for (x, y, rx, ry) in [(40, 58, 13, 9), (24, 64, 12, 9), (56, 64, 12, 9), (16, 74, 10, 8), (64, 74, 10, 8), (32, 74, 13, 9), (48, 75, 13, 9)]:
+        leaf_clump(p, x, y, rx, ry, BUSH)
+    for (x, y) in [(30, 60), (52, 70), (20, 72)]: p.r(x, y, 2, 2, '#f2e27a')
     return p
 
-def shrub_haeguk():  # 해국 덤불: 바위틈의 보랏빛 꽃
+def shrub_haeguk():  # 해국 덤불: 보랏빛 꽃이 덮인 낮은 덤불
     p = shrub_saecheol()
-    for (x, y) in [(22, 62), (34, 54), (48, 58), (60, 66), (30, 72), (44, 70)]:
-        for (dx, dy) in [(0, -3), (-3, 0), (3, 0), (0, 3)]: p.r(x + dx, y + dy, 3, 3, '#a98ad8')
-        p.r(x, y, 3, 3, '#f0d24a')
+    for (x, y) in [(22, 60), (34, 52), (48, 56), (60, 64), (28, 70), (44, 68), (14, 70), (56, 76), (38, 78)]:
+        for (dx, dy) in [(0, -2), (-2, 0), (2, 0), (0, 2)]: p.r(x + dx, y + dy, 2, 2, '#b998e6')
+        p.r(x + 1, y + 2, 2, 1, '#8a6ac0'); p.r(x, y, 2, 2, '#f2cf4a')
     return p
 
 def wall_stone():  # 울릉도 돌담: 기와 없이 돌을 쌓은 담 (2칸)
@@ -373,7 +435,7 @@ def record_board():  # 탐험 기록판: 기와 없는 나무 게시판
 ART = {
     'ulleung-home': ulleung_home, 'ulleung-shop': ulleung_shop, 'ulleung-lab': ulleung_lab, 'ulleung-gym': ulleung_gym,
     'dokdo-lab': dokdo_lab, 'dokdo-gym': dokdo_gym, 'dokdo-shop': dokdo_shop, 'dokdo-home': dokdo_home,
-    'tree-hubak': tree_hubak, 'tree-dongbaek': tree_dongbaek, 'shrub-saecheol': shrub_saecheol, 'shrub-haeguk': shrub_haeguk,
+    'tree-hubak': tree_hubak, 'tree-dongbaek': tree_dongbaek, 'tree-pine': tree_pine, 'shrub-saecheol': shrub_saecheol, 'shrub-haeguk': shrub_haeguk,
     'wall-stone': wall_stone, 'rail-wood': rail_wood, 'record-board': record_board
 }
 
@@ -389,7 +451,7 @@ def main():
     os.makedirs(os.path.dirname(OUT_PNG), exist_ok=True); sheet.save(OUT_PNG, optimize=True)
     with open(OUT_JS, 'w', encoding='utf-8') as f:
         f.write('// 울릉도·독도 건물과 식물 (scripts/draw-island-art.py가 만든 그림의 자리). 1픽셀 = 게임 1픽셀.\n')
-        f.write('export const ISLAND_ATLAS=' + json.dumps({'key': 'scenery/island-art-v36', 'width': W, 'height': y + rowh, 'frames': frames}, ensure_ascii=False) + ';\n')
+        f.write('export const ISLAND_ATLAS=' + json.dumps({'key': 'scenery/island-art-v67', 'width': W, 'height': y + rowh, 'frames': frames}, ensure_ascii=False) + ';\n')
     print('saved', OUT_PNG, len(frames), 'pictures')
 
 if __name__ == '__main__':

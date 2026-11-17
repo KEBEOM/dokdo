@@ -35,7 +35,7 @@ import { OPENING, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.65';
+const VERSION = '0.67';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -516,18 +516,6 @@ function paintWind(g, now, K, ox = 0, oy = 0) {
   }
   g.restore();
 }
-// ── 점프 (v0.64) ── 스페이스(터치: 점프 단추). 그림자는 땅에 남고 몸만 폴짝 떠올라요.
-// 공중에서는 걸어 다니는 사나워진 우산몬을 뛰어넘을 수 있어요(그 칸에 내려앉으면 결투). 벽·사람·건물은 넘지 못해요.
-const JUMP = { v: .235, g: .00112 }; // 처음 빠르기(픽셀/ms) · 떨어지는 힘 → 높이 25픽셀쯤, 0.42초
-let jumpZ = 0, jumpV = 0;
-function jump() { if (busy() || battle || transition || jumpZ > 0 || jumpV > 0 || !state.started) return false; jumpV = JUMP.v; sfx('jump'); return true; }
-function jumpFrame(dt) {
-  if (jumpZ <= 0 && jumpV <= 0) return;
-  jumpZ += jumpV * dt; jumpV -= JUMP.g * dt;
-  if (jumpZ > 0) return;
-  jumpZ = 0; jumpV = 0; sfx('land');
-  const wild = !busy() && !battle && roamers.at(state.x, state.y); if (wild && wild.kind !== 'friend') { path = []; pathAction = null; startBattle('wild', wild.species, { roamer: wild.uid }); }
-}
 // ── 자유 걷기 (v0.63, 3D 보기) ── 칸에 얽매이지 않고 보는 방향으로 부드럽게 걸어요.
 // 내 자리는 freePos(칸 단위 소수)로 두고, 반올림한 칸을 state.x·y 로 삼아요. 칸이 바뀌면 landed()가 나가는 길·문·계단을 살펴요.
 // 몸은 반지름 FREE_R 칸의 네모로 보고, 가로·세로를 따로 움직여서 벽을 따라 미끄러져요.
@@ -542,7 +530,6 @@ function freeBlocked(ox, oy, nx, ny, vy, now) {
     if (exitLocked(tx, ty)) { if (!move.warned || now - move.warned > 1500) { toast(lockedMessage()); move.warned = now; } return true; }
     if (vy < -.3 && tx === Math.round(nx)) { const b = buildingDoorAt(tx, ty); if (b) { enterBuilding(b); return true; } }
     const wild = roamers.at(tx, ty); if (wild?.kind === 'friend') return true;
-    if (wild && jumpZ > 6) { if (blocked(map, tx, ty, [])) return true; continue; } // 뛰어넘는 중
     if (wild) { path = []; pathAction = null; startBattle('wild', wild.species, { roamer: wild.uid }); return true; }
     if (blocked(map, tx, ty, people)) return true;
   }
@@ -686,7 +673,7 @@ window.addEventListener('keydown', e => {
   if (['e', 'E', ' ', 'Enter'].includes(e.key) && !e.repeat) {
     if (!$('#modal').classList.contains('hidden')) return;
     if (document.activeElement?.tagName === 'BUTTON' && !dialogueState) return;
-    e.preventDefault(); if (dialogueState) nextTalk(); else if (e.key === ' ') jump(); else interact(); // 스페이스는 점프(v0.64), 대화 중에는 다음 말
+    e.preventDefault(); if (dialogueState) nextTalk(); else interact();
   }
 });
 window.addEventListener('keyup', e => { keys.release(e.key); lookKeys.delete(e.key); }); window.addEventListener('blur', () => { keys.clear(); lookKeys.clear(); });
@@ -695,7 +682,6 @@ const joystick = createJoystick($('#joystick'), dir => { if (dir) { path = []; p
 const lookStick = createLookStick($('#lookStick'));
 window.addEventListener('blur', () => { joystick.reset(); lookStick.reset(); });
 $('#interactBtn').onclick = () => dialogueState ? nextTalk() : interact();
-$('#jumpBtn').addEventListener('pointerdown', e => { e.preventDefault(); jump(); });
 
 function frame(now) {
   let keyDir = null;
@@ -709,12 +695,12 @@ function frame(now) {
   if (moving) { const result = moveView(view, moving, now); walkDistance += result.distance; if (result.complete) { nextStart = Math.max(moving.start + MOVE_DURATION, now - MOVE_DURATION); arrive(); } }
   freeWalking = false;
   if (!moving && !busy()) freeFrame(dt, now); // v0.63: 2D·3D 모두 칸에 얽매이지 않고 걸어요
-  flushLiftedKeys(); jumpFrame(dt);
+  flushLiftedKeys();
   // Render any residual part of the next tile in the same frame, avoiding a pause at tile edges.
   if (moving) { const result = moveView(view, moving, now); walkDistance += result.distance; if (result.complete) arrive(); }
   if (!cutscenes.active() && !battle) {
     const walking = (!!moving || freeWalking) && !busy(), people = liveNPCs();
-    const target = path.length ? { x: path.at(-1)[0], y: path.at(-1)[1] } : null, motion = { walking, distance: walkDistance, jump: Math.max(0, jumpZ) }, K = sceneScale * actorPixelRatio;
+    const target = path.length ? { x: path.at(-1)[0], y: path.at(-1)[1] } : null, motion = { walking, distance: walkDistance }, K = sceneScale * actorPixelRatio;
     actorCtx.setTransform(1, 0, 0, 1, 0, 0); actorCtx.clearRect(0, 0, actorCanvas.width, actorCanvas.height); actorCtx.save();
     if (in3d()) {
       // 3D 보기(v0.62): 카메라 둘레의 땅을 따로 그리고 → 보는 쪽이 위로 가게 돌린 뒤 → 가로줄마다 원근을 주어 눕히고 → 서 있는 것들을 먼 것부터 세워 그려요
@@ -1458,7 +1444,7 @@ function showMenu() {
     $('#menuTutorial').onclick = () => { closeModal(); state.tutorial = { battle: false, walk: 0 }; save(); renderCoachPanel(); startTutorial(); };
     $('#menuAvatar').onclick = () => chooseAvatar(id => { state.avatar = id; save(); updateUI(); toast('탐험대원을 바꿨어요.'); });
     $('#restartBtn').onclick = () => { saved = state.started ? state : saved; startNew(); };
-    $('#menuHelp').onclick = () => openModal(head('천천히, 함께 탐험해요') + '<div class="fact-box">이동: 방향키 / WASD / 조이스틱(터치 화면) / 지도 화면 누르기<br>점프: 스페이스(터치 화면은 점프 단추). 걸어 다니는 사나워진 우산몬을 뛰어넘을 수 있어요<br>3D 보기(◈): 내 캐릭터를 뒤에서 따라가며 봐요. W A S D로 보는 방향으로 칸에 얽매이지 않고 자유롭게 걷고, 마우스(화면을 한 번 눌러요 · Esc로 풀기)·방향키·둘러보기 조이스틱으로 하늘과 땅까지 둘러봐요. 왼손잡이는 메뉴의 ‘조작 손’에서 조이스틱 자리를 바꿔요<br>건물: 문 바로 아래에서 위로 걸으면(또는 건물을 누르면) 들어가요. 계단을 밟으면 위아래 층으로, 문 깔개를 밟으면 밖으로 나가요<br>대화·조사: 가까이에서 E·스페이스 / 대화 버튼<br>자동 안내: 수첩의 목적지 안내<br>다음 지역: 독도 지킴이 인증 후 마을 오른쪽 다리 → 길을 따라 걷기<br>세계 지도: 가 본 마을로 바로 이동<br>결투 명령: 기록 찾기 · 동료 만들기 · 도구 · 동료 · 물러나기 (전설의 우산몬은 형태변환도)<br>기록 찾기: 누르면 독도 문제가 나와요. 맞히면 위쪽 두루마리(검은 기운이 지운 기록)의 빈칸이 채워져요. 문제에 따라 나침반·순서 놓기·근거 카드로 풀고, 검은 기운이 밀려올 때는 ○ ×로 빠르게 판단해요<br>상성(화살표 앞이 뒤에 강해요): 잎→빛→메아리→잎, 파도→바위→바람→파도. 상성이 좋으면 맞혔을 때 1.5배, 틀려도 절반은 닿아요. 상성이 나쁘면 0.75배<br>사나워진 우산몬: 문제를 맞히면 검은 기운을 걷어 내요. 모두 걷히면 평온을 되찾아요<br>상대의 문제: 맞히면 충격이 40% 줄고, 틀리면 그대로 받아요. 독도 지킴이·백무 사장은 가끔 정답도 뚫고 들어와요(관통)<br>동료 만들기: 버튼을 누르면 확률로 동료가 돼요(그 차례엔 공격 못 해요). 검은 기운이 적을수록 잘 되고, 전설의 우산몬은 10%<br>동료 보관함: 함께 다니는 동료는 4마리예요. 화면 아래 ‘동료’ 단추를 누르면 보관함이 열리고, 쉬는 동료와 언제든 바로 바꿔요<br>특성: 우산몬마다 결투에서 저절로 쓰이는 특별한 능력이 하나씩 있어요(30가지). 동료 보관함과 도감에서 볼 수 있어요<br>독도 지킴이와는 인증 결투로 겨뤄요<br>힌트: 문제 아래 기록 힌트 · 학습 기록에 도움 표시<br>대화와 컷신: 클릭·엔터·스페이스로 넘기기</div>' + typeRingHTML() + '<p>길에서는 표지판, 관찰 지점, 기억 비석, 조사 상자, 길에서 만난 사람과 몽땅랜드 직원을 찾아봐요. 사나워진 야생 우산몬은 마을과 마을 사이의 길 위를 걸어 다녀요.</p>');
+    $('#menuHelp').onclick = () => openModal(head('천천히, 함께 탐험해요') + '<div class="fact-box">이동: 방향키 / WASD / 조이스틱(터치 화면) / 지도 화면 누르기<br>3D 보기(◈): 내 캐릭터를 뒤에서 따라가며 봐요. W A S D로 보는 방향으로 칸에 얽매이지 않고 자유롭게 걷고, 마우스(화면을 한 번 눌러요 · Esc로 풀기)·방향키·둘러보기 조이스틱으로 하늘과 땅까지 둘러봐요. 왼손잡이는 메뉴의 ‘조작 손’에서 조이스틱 자리를 바꿔요<br>건물: 문 바로 아래에서 위로 걸으면(또는 건물을 누르면) 들어가요. 계단을 밟으면 위아래 층으로, 문 깔개를 밟으면 밖으로 나가요<br>대화·조사: 가까이에서 E·스페이스 / 대화 버튼<br>자동 안내: 수첩의 목적지 안내<br>다음 지역: 독도 지킴이 인증 후 마을 오른쪽 다리 → 길을 따라 걷기<br>세계 지도: 가 본 마을로 바로 이동<br>결투 명령: 기록 찾기 · 동료 만들기 · 도구 · 동료 · 물러나기 (전설의 우산몬은 형태변환도)<br>기록 찾기: 누르면 독도 문제가 나와요. 맞히면 위쪽 두루마리(검은 기운이 지운 기록)의 빈칸이 채워져요. 문제에 따라 나침반·순서 놓기·근거 카드로 풀고, 검은 기운이 밀려올 때는 ○ ×로 빠르게 판단해요<br>상성(화살표 앞이 뒤에 강해요): 잎→빛→메아리→잎, 파도→바위→바람→파도. 상성이 좋으면 맞혔을 때 1.5배, 틀려도 절반은 닿아요. 상성이 나쁘면 0.75배<br>사나워진 우산몬: 문제를 맞히면 검은 기운을 걷어 내요. 모두 걷히면 평온을 되찾아요<br>상대의 문제: 맞히면 충격이 40% 줄고, 틀리면 그대로 받아요. 독도 지킴이·백무 사장은 가끔 정답도 뚫고 들어와요(관통)<br>동료 만들기: 버튼을 누르면 확률로 동료가 돼요(그 차례엔 공격 못 해요). 검은 기운이 적을수록 잘 되고, 전설의 우산몬은 10%<br>동료 보관함: 함께 다니는 동료는 4마리예요. 화면 아래 ‘동료’ 단추를 누르면 보관함이 열리고, 쉬는 동료와 언제든 바로 바꿔요<br>특성: 우산몬마다 결투에서 저절로 쓰이는 특별한 능력이 하나씩 있어요(30가지). 동료 보관함과 도감에서 볼 수 있어요<br>독도 지킴이와는 인증 결투로 겨뤄요<br>힌트: 문제 아래 기록 힌트 · 학습 기록에 도움 표시<br>대화와 컷신: 클릭·엔터·스페이스로 넘기기</div>' + typeRingHTML() + '<p>길에서는 표지판, 관찰 지점, 기억 비석, 조사 상자, 길에서 만난 사람과 몽땅랜드 직원을 찾아봐요. 사나워진 야생 우산몬은 마을과 마을 사이의 길 위를 걸어 다녀요.</p>');
     $('#importSave').onchange = async e => { const file = e.target.files[0]; if (!file) return; try { if (file.size > 3e6) throw new Error('파일이 너무 커요.'); const parsed = validateSave(JSON.parse(await file.text())); saved = parsed; closeModal(); continueGame(); toast('저장한 모험을 불러왔어요.'); } catch (err) { toast(err.message || '저장 파일을 확인해 주세요.'); } };
   });
 }
@@ -1501,7 +1487,7 @@ function setView3d(on) {
   const b = $('#viewBtn'); b.setAttribute('aria-pressed', String(view3d)); b.title = view3d ? '2D로 보기' : '3D로 보기'; b.setAttribute('aria-label', b.title); b.innerHTML = `◈ <span>${view3d ? '2D 보기' : '3D 보기'}</span>`;
   scene.classList.toggle('view3d', view3d); labelKey = ''; yaw = null; freePos = null; if (!moving && state.started) view = { x: state.x, y: state.y };
 }
-$('#viewBtn').onclick = () => { setView3d(!view3d); sfx('toggle'); if (!view3d && document.pointerLockElement === canvas) document.exitPointerLock?.(); if (view3d) toast(map.kind === 'room' ? '건물 밖으로 나가면 3D로 보여요.' : matchMedia('(pointer:coarse)').matches ? '3D 보기: 이동 조이스틱으로 걷고, 둘러보기 조이스틱이나 화면 끌기로 둘러봐요.' : '3D 보기: W A S D로 보는 쪽으로 걷고, 화면을 누르면 마우스로 둘러봐요(Esc로 풀기). 스페이스는 점프!'); };
+$('#viewBtn').onclick = () => { setView3d(!view3d); sfx('toggle'); if (!view3d && document.pointerLockElement === canvas) document.exitPointerLock?.(); if (view3d) toast(map.kind === 'room' ? '건물 밖으로 나가면 3D로 보여요.' : matchMedia('(pointer:coarse)').matches ? '3D 보기: 이동 조이스틱으로 걷고, 둘러보기 조이스틱이나 화면 끌기로 둘러봐요.' : '3D 보기: W A S D로 보는 쪽으로 걷고, 화면을 누르면 마우스로 둘러봐요(Esc로 풀기).'); };
 setView3d(view3d); setHand(leftHanded);
 $('#soundBtn').onclick = () => { setOn(!isOn()); if (isOn()) sfx('toggle'); updateUI(); };
 window.addEventListener('beforeunload', () => save());
@@ -1525,7 +1511,7 @@ if (typeof location !== 'undefined' && new URLSearchParams(location.search).has(
     get longestQuestion() { return QUESTIONS.reduce((m, q) => (q.prompt.length + q.options.join('').length + q.explanation.length > m.prompt.length + m.options.join('').length + m.explanation.length ? q : m)); },
     set forceQuestion(q) { testQuestion = q; }, questionById: id => QUESTIONS.find(q => q.id === id), closeBattleForTest: () => { if (battle) closeBattle(); },
     screenOf(x, y) { const r = canvas.getBoundingClientRect(), p = toScreen(x * TILE + 16, y * TILE + 16); return { x: r.left + p.x * sceneScale, y: r.top + p.y * sceneScale }; },
-    get view3d() { return view3d; }, setView3d, jump, get jumpZ() { return jumpZ; }, get look() { return { yaw, pitch }; }, setLook(y, p = 0) { yaw = y; pitch = clampPitch(p); }, setHand,
+    get view3d() { return view3d; }, setView3d, get look() { return { yaw, pitch }; }, setLook(y, p = 0) { yaw = y; pitch = clampPitch(p); }, setHand,
     standAtDoor(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b); settleMovement(); freePos = null; state.x = f.x; state.y = f.y; view = { x: f.x, y: f.y }; state.dir = 'up'; return f; },
     goInside(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b), p = pathfind(map, state.x, state.y, f.x, f.y, liveNPCs()); if (state.x === f.x && state.y === f.y) enterBuilding(b); else { path = p; pathAction = () => enterBuilding(b); } return p.length; },
     legendRadio: false, dexDetail, showDex, showQuest, checkLegends, place(x, y, dir = 'right') { settleMovement(); freePos = null; path = []; state.x = x; state.y = y; view = { x, y }; state.dir = dir; },

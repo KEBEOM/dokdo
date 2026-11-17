@@ -224,8 +224,6 @@ export const SFX = {
   cancel: () => { tone('triangle', 660, 0, .05, .1); tone('triangle', 494, 0, .07, .09, .05); },
   door: () => { hiss(.22, .18, 600, 2400); tone('sine', 140, 70, .16, .25, .14); },  // 문 열고 들어가기
   stairs: up => { [0, 1, 2].forEach(i => tone('triangle', N(up ? 67 + i * 5 : 79 - i * 5), 0, .07, .2, i * .06)); },
-  jump: () => tone('triangle', 330, 620, .11, .16),                                  // 폴짝
-  land: () => tone('sine', 150, 90, .06, .2),                                        // 착지
   bump: () => tone('sine', 140, 70, .09, .35),                                      // 벽에 부딪힘
   encounter: () => { hiss(.5, .22, 400, 6000); [0, 1, 2, 3].forEach(i => tone('pulse', N(62 + i * 3), 0, .07, .09, .05 + i * .06)); tone('sine', 160, 50, .35, .5, .3); },
   correct: () => { tone('triangle', N(88), 0, .12, .22); tone('triangle', N(93), 0, .3, .22, .09); tone('sine', N(100), 0, .3, .06, .09); },

@@ -423,15 +423,6 @@ if (await G(() => window.__dokdo.map.kind !== 'room' && !window.__dokdo.busy)) {
     if (!g1.battle) { assert.ok(g1.v.x > g0.x + .4, `→ walks right in 2D (${g0.x} → ${g1.v.x})`); assert.equal(g1.x, Math.round(g1.v.x)); }
   }
 }
-// ── v0.64: 점프 — 스페이스로 폴짝 뛰고 제자리에 내려와요 ──
-if (await G(() => !!window.__dokdo.battle)) await G(() => window.__dokdo.closeBattleForTest());
-await G(() => window.__dokdo.closeModal()); for (let i = 0; i < 8 && await page.$('#dialogue:not(.hidden) #nextTalk'); i++) await page.click('#nextTalk');
-if (await G(() => !window.__dokdo.busy)) {
-  const j0 = await G(() => { document.activeElement?.blur?.(); const s = window.__dokdo.state; return [s.x, s.y]; });
-  await page.keyboard.press(' '); await until(() => window.__dokdo.jumpZ > 8, 3000); await until(() => window.__dokdo.jumpZ === 0, 3000);
-  if (await G(() => !window.__dokdo.battle)) assert.deepEqual(await G(() => { const s = window.__dokdo.state; return [s.x, s.y]; }), j0, 'a jump on the spot lands on the same tile');
-  assert.ok(await page.$('#jumpBtn'), 'touch screens get a jump button');
-}
 assert.deepEqual(errors, [], 'no browser errors after the v0.60–0.64 checks');
 await browser.close(); server.close();
 console.log(`PASS: wild 우산몬 walk on routes (none in towns, bump to battle, gone afterwards), 문제 풀기 asks right away, type advantage, 형태변환 in the menu for legends, 동료 만들기 button, 동료 보관함 swap (4 along), 전설의 우산몬 quest (radio, golden spot, meeting scene, plain win keeps the spot, 10% 동료 만들기, join with 변환폼, dex photo), 백무 사장 reveal/fall/epilogue scenes, 사나워진 우산몬 duels with 검은 기운 gauges, 몽땅랜드 designs in battle, softened hits on correct defence, opening read line by line with the mission choice, starter + guide, key walking, closed bridge, guide, DQ commands (정화하기 with two starting skills, guard skill, item, orb, switch, run), my 우산몬 drawn from behind, 백무단 pictures fading out, explorer drawings in the character choice, 울릉도 도동항 and the ferry to 독도, buildings with floors (door, stairs, dex, books, review desk, rest), 김박사 picture and starter cutscene, 사철나무 purified from 백무 사장 and joining once, practice duel and walking tutorial, clickable picture map, easy words (사나워진 우산몬 · 검은 기운 · 몽땅랜드 컴퍼니), quiz rules (wrong attack = miss, correct defence = light hit), hints, KO recovery, route objects, trainer, memory stone, 8 chapters walked through 7 routes, first-arrival scenes, fast travel, legend, ending, saves and a v0.21 save; ${totalTurns} battle turns.`);
