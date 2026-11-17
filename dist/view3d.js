@@ -12,7 +12,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 export const EYE = 64;        // 카메라 높이(지도 픽셀). 한 칸은 32, 캐릭터 키는 48쯤이에요
 export const BACK = 128;      // 카메라가 내 캐릭터보다 뒤로 물러난 거리(4칸)
-export const DEPTH = 512;     // 카메라에서 보이는 거리(16칸)
+export const DEPTH = 512;     // 또렷하게 그리는 가까운 땅의 거리(16칸)
+export const FAR = 1728;      // 멀리 보이는 땅의 끝(54칸 — 지도 끝에서 끝까지). 먼 땅은 FAR_SCALE 로 줄인 그림으로 그려요
+export const FAR_SCALE = .25;
 export const NEAR_Z = 20;     // 이보다 가까운 것은 그리지 않아요
 export const HORIZON = .36;   // 보통 때 지평선의 높이(화면 높이의 비율)
 export const DIR_ANGLE = { up: 0, right: Math.PI / 2, down: Math.PI, left: -Math.PI / 2 };
@@ -33,6 +35,7 @@ export function makeChase(W, H) {
   const f = Math.min(Math.max(W, H) * .5, H * .9), halfW = Math.ceil(DEPTH * (W / 2) / f);
   return {
     W, H, f, RW: halfW * 2, RH: DEPTH, radius: Math.ceil(Math.hypot(DEPTH, halfW)),
+    FW: Math.ceil(FAR * (W / 2) / f * FAR_SCALE) * 2, FH: Math.ceil(FAR * FAR_SCALE), far: FAR, farScale: FAR_SCALE,
     camera(px, py, yaw, pitch = 0) {
       const s = Math.sin(yaw), c = Math.cos(yaw), p = clampPitch(pitch);
       return { x: px - s * BACK, y: py + c * BACK, fx: s, fy: -c, rx: c, ry: s, yaw, pitch: p, hz: H * (HORIZON + p * (p > 0 ? .8 : .55)) };
@@ -42,7 +45,7 @@ export function makeChase(W, H) {
       const k = f / z; return { x: W / 2 + (dx * cam.rx + dy * cam.ry) * k, y: cam.hz + EYE * k, k, z };
     },
     unproject(cam, sx, sy) {
-      if (sy <= cam.hz + 1) return null; const z = EYE * f / (sy - cam.hz); if (z > DEPTH) return null;
+      if (sy <= cam.hz + 1) return null; const z = EYE * f / (sy - cam.hz); if (z > FAR) return null;
       const l = (sx - W / 2) * z / f; return { x: cam.x + cam.fx * z + cam.rx * l, y: cam.y + cam.fy * z + cam.ry * l };
     },
     rowDepth(cam, y) { return y <= cam.hz ? Infinity : EYE * f / (y - cam.hz); }

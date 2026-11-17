@@ -170,10 +170,10 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
   // A DQ command window. items: [{label, value, sub, disabled}]. Resolves to value, or null on cancel.
   function menu(items, { title = '', prompt = '', cancel = false, layout = '' } = {}) {
     quizState = null; root.classList.remove('quiz-open'); root.classList.add('menu-open');
-    els.message.className = 'dq-window dq-message'; els.extra.innerHTML = ''; els.next.hidden = true;
+    els.message.className = 'dq-window dq-message'; els.extra.innerHTML = ''; els.next.hidden = true; els.extra.classList.remove('is-revealed');
     if (prompt) writer.type(prompt); else writer.clear();
     const all = cancel ? [...items, { label: '돌아가기', value: null, back: true }] : items;
-    els.command.hidden = false; els.command.classList.toggle('cards', layout === 'cards'); // 버튼이 많을 때: 긴 이름은 줄바꿈, 마지막 버튼도 한 칸만
+    els.command.hidden = false; els.command.classList.toggle('slim', !title); els.command.classList.toggle('cards', layout === 'cards'); // 버튼이 많을 때: 긴 이름은 줄바꿈, 마지막 버튼도 한 칸만
     els.command.innerHTML = `${title ? `<div class="dq-command-title">${esc(title)}</div>` : ''}<div class="dq-options">${all.map((it, i) => `<button type="button" class="dq-option ${it.back ? 'back' : ''}" data-index="${i}" ${it.value ? `data-cmd="${esc(it.value)}"` : ''} ${it.disabled ? 'disabled' : ''}><span class="dq-cursor">▶</span><span>${esc(it.label)}</span>${it.sub ? `<small>${esc(it.sub)}</small>` : ''}</button>`).join('')}</div>`;
     all.forEach((it, i) => { if (it.hint) els.command.querySelectorAll('.dq-option')[i].classList.add('coach-pick'); });
     return new Promise(resolve => {
@@ -181,21 +181,26 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
       const choose = i => { if (all[i].disabled) return; const v = all[i].value; hideCommand(); onSelect?.(); resolve(v); };
       buttons.forEach((b, i) => { b.onclick = () => choose(i); b.onmouseenter = () => focus(i); b.onfocus = () => mark(i); });
       const first = all.findIndex(it => !it.disabled);
-      menuState = { buttons, index: first, choose, cancel: cancel ? () => choose(all.length - 1) : null, shownAt: performance.now() };
+      menuState = { buttons, index: first, choose, cancel: cancel ? () => choose(all.length - 1) : null, shownAt: performance.now(), items: all, slim: !title };
       focus(first);
     });
   }
-  function mark(i) { if (!menuState) return; menuState.index = i; menuState.buttons.forEach((b, j) => b.classList.toggle('current', j === i)); }
+  // 명령 단추는 그림과 이름만. 고른 단추의 설명 한 줄은 말 창에 보여요(v0.65).
+  function mark(i) {
+    if (!menuState) return; menuState.index = i; menuState.buttons.forEach((b, j) => b.classList.toggle('current', j === i));
+    const it = menuState.items?.[i]; if (menuState.slim) els.extra.innerHTML = it?.sub ? `<p class="dq-menu-sub"><b>${esc(it.label)}</b>${esc(it.sub)}</p>` : '';
+  }
   function focus(i) { if (!menuState || i < 0) return; mark(i); menuState.buttons[i].focus({ preventScroll: true }); }
 
   // Quiz window: header, question, three choices (shuffled order), hint. Resolves {choice, assisted}.
   // format: choice 고르기 · cards 근거 카드 · compass 나침반 · order 순서 놓기 · ox 빠른 판단 (battle-quiz.js quizFormat)
-  function quiz({ q, order, phase, header, rule, concept, format = 'choice', shown = null }) {
-    hideCommand(); root.classList.add('quiz-open'); els.next.hidden = true;
+  function quiz({ q, order, phase, header, rule = '', badge = '', concept, format = 'choice', shown = null }) {
+    hideCommand(); root.classList.add('quiz-open'); els.next.hidden = true; els.extra.classList.remove('is-revealed');
     els.message.className = `dq-window dq-message dq-quiz ${phase} fmt-${format}`;
     writer.clear();
     const kind = { choice: '', cards: '근거 카드', compass: '나침반', order: '순서 놓기', ox: '빠른 판단' }[format];
-    els.text.innerHTML = `<div class="dq-quiz-head"><span class="phase-chip">${esc(header)}</span><span>${kind ? `${esc(kind)} · ` : ''}${esc(concept)}</span></div><p class="quiz-rule">${esc(rule)}</p><h3 id="battleQuestionTitle">${esc(q.prompt)}</h3>`;
+    // 한눈에(v0.65): 차례 칩 하나 + (있으면) 상성 배지 + 작게 개념. 규칙 문장은 연습 대결에서만 보여요.
+    els.text.innerHTML = `<div class="dq-quiz-head"><span class="phase-chip">${esc(header)}</span>${badge ? `<span class="dq-badge">${esc(badge)}</span>` : ''}<span class="dq-concept">${kind ? `${esc(kind)} · ` : ''}${esc(concept)}</span></div>${rule ? `<p class="quiz-rule">${esc(rule)}</p>` : ''}<h3 id="battleQuestionTitle">${esc(q.prompt)}</h3>`;
     const answerBtn = (idx, inner, cls = '') => `<button type="button" class="dq-option dq-answer ${cls}" data-battle-answer="${idx}">${inner}</button>`;
     let body;
     if (format === 'compass') {
@@ -213,7 +218,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
       body = `<div class="dq-answers${format === 'cards' ? ' dq-cards' : ''}">${order.map((idx, pos) => answerBtn(idx, `<span class="dq-cursor">▶</span><b>${pos + 1}</b><span>${esc(q.options[idx])}</span>`)).join('')}</div>`;
     }
     els.extra.innerHTML = `${body}
-      <div class="dq-hint-row"><button type="button" id="battleHint" class="text-button">✎ 기록 힌트 보기</button></div><div class="dq-hint" hidden></div>`;
+      <div class="dq-hint-row"><button type="button" id="battleHint" class="text-button" aria-label="힌트 보기">💡 힌트</button></div><div class="dq-hint" hidden></div>`;
     return new Promise(resolve => {
       let assisted = false, answered = false, buttons;
       const lock = () => els.extra.querySelectorAll('.dq-option').forEach(b => { b.classList.add('locked'); b.setAttribute('aria-disabled', 'true'); });
@@ -237,7 +242,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
         quizState = { buttons, index: 0, choose: i => buttons[i].click(), shownAt: performance.now() };
       }
       const hint = els.extra.querySelector('#battleHint');
-      hint.onclick = () => { if (answered || assisted) return; assisted = true; hint.disabled = true; hint.textContent = '힌트 사용 중 · 도움받은 답변으로 기록돼요'; const box = els.extra.querySelector('.dq-hint'); box.hidden = false; box.textContent = q.explanation; buttons[quizState?.index || 0]?.focus({ preventScroll: true }); };
+      hint.onclick = () => { if (answered || assisted) return; assisted = true; hint.disabled = true; hint.textContent = '💡 힌트를 봤어요'; const box = els.extra.querySelector('.dq-hint'); box.hidden = false; box.textContent = q.explanation; buttons[quizState?.index || 0]?.focus({ preventScroll: true }); };
       qfocus(0);
     });
   }
@@ -245,6 +250,9 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
   function qfocus(i) { if (!quizState) return; qmark(i); quizState.buttons[i]?.focus({ preventScroll: true }); }
   // After answering: mark the right/wrong buttons in place, then type the result below.
   function reveal(q, choice) {
+    els.extra.querySelector('.dq-answers')?.classList.add('revealed'); els.extra.querySelector('.dq-compass')?.classList.add('revealed'); // 정답과 내가 고른 답만 남겨요
+    els.extra.querySelector('.dq-hint')?.remove();
+    els.extra.classList.add('is-revealed');
     for (const b of els.extra.querySelectorAll('.dq-answer')) {
       const idx = Number(b.dataset.battleAnswer);
       if (idx === q.answer) { b.classList.add('correct'); b.insertAdjacentHTML('beforeend', '<strong>✓ 정답</strong>'); }
@@ -257,10 +265,11 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
   }
 
   // Result of an answer, typed under the marked choices, with the explanation and source.
-  function explain(text, html = '', tone = '') {
+  // badges: 상성·특성 같은 덧붙임을 문장 대신 작은 배지로 보여 줘요(v0.65)
+  function explain(text, html = '', tone = '', badges = []) {
     els.extra.querySelector('.dq-hint-row')?.remove();
     const box = document.createElement('div'); box.className = `dq-result ${tone}`;
-    box.innerHTML = `<p class="dq-result-text"></p><div class="dq-result-more" hidden>${html}</div>`;
+    box.innerHTML = `<p class="dq-result-text"></p><div class="dq-result-more" hidden>${badges.length ? `<p class="dq-result-badges">${badges.map(t => `<span class="dq-badge">${esc(t)}</span>`).join('')}</p>` : ''}${html}</div>`;
     els.extra.append(box);
     const prev = writer; writer = createTypewriter(box.querySelector('p'), { speed: 22, onChar: onBlip });
     return writer.type(text).then(() => {

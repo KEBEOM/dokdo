@@ -1009,3 +1009,27 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
 .left-handed .touch-controls{flex-direction:row-reverse}
 .view3d #world,.view3d canvas{touch-action:none}
 .hand-settings{margin-top:8px}
+
+/* ───────── v0.64: 점프 단추 ───────── */
+.pad-buttons{display:flex;gap:10px;align-items:center;pointer-events:none}.pad-buttons>*{pointer-events:auto}
+.jump-btn{background:#bfe3ffd9;border-color:#eaf6ff;color:#1f4f72;touch-action:none}
+.left-handed .pad-buttons{flex-direction:row-reverse}
+
+/* ───────── v0.65: 결투 아래 창 정보 줄이기 — 한 번에 한 가지, 글 대신 배지 ───────── */
+.dq-quiz-head{justify-content:flex-start;gap:8px}
+.dq-concept{margin-left:auto;font-size:.85em;opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.dq-badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;background:#fff0b8;color:#4a2f08;border:1.5px solid #c99a2e;font-size:13px;font-weight:800;white-space:nowrap;line-height:1.5}
+.dq-result-badges{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:6px 0 2px}
+.dq-result-text{font-size:clamp(19px,2.4vw,26px)!important;letter-spacing:-.2px}
+.dq-result.good .dq-result-text{color:#b8f5c5}.dq-result.bad .dq-result-text{color:#ffd0c4}
+.dq-answers.revealed .dq-answer:not(.correct):not(.wrong),.dq-compass.revealed .dq-answer:not(.correct):not(.wrong){display:none}
+.dq-answers.revealed{grid-template-columns:1fr 1fr}
+.dq-command.slim .dq-option small{display:none!important}
+.dq-menu-sub{margin:10px 0 0;font-size:.82em;color:#e9dcb9;line-height:1.5}
+.dq-menu-sub b{display:inline-block;margin-right:8px;padding:1px 9px;border-radius:999px;background:#ffffff1f;color:#fff;font-size:.9em}
+.dq-hint-row .text-button{font-size:15px;padding:5px 12px;border:1.5px solid #9fd3ff66;border-radius:999px;color:#cfe9ff}
+.dq-result .source-link{font-size:13px;opacity:.8}
+@media (min-width:900px) and (min-height:700px){.dq-badge{font-size:15px}.dq-hint-row .text-button{font-size:16px}}
+.is-revealed .dq-claim{display:none}
+.dq-hint-row{display:flex;justify-content:flex-start}.dq-hint-row .text-button{width:auto;flex:0 0 auto}
+.dq-result-text{text-align:center}

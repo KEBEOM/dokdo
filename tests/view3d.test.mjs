@@ -5,6 +5,7 @@ const near = (a, b, e = 1e-6) => Math.abs(a - b) < e;
 for (const [W, H] of [[640, 400], [390, 760], [1280, 720], [844, 340], [2560, 1300]]) {
   const P = makeChase(W, H);
   assert.ok(P.RH === DEPTH && P.RW >= 2 * DEPTH * (W / 2) / P.f - 1e-6);
+  assert.ok(P.far > DEPTH * 3 && P.FH >= P.far * P.farScale && P.FW >= 2 * P.far * (W / 2) / P.f * P.farScale - 1e-6, '먼 땅은 줄인 그림으로 지도 끝까지');
   for (const dir of Object.keys(DIR_ANGLE)) {
     const cam = P.camera(500, 400, DIR_ANGLE[dir]), [fx, fy] = DIR_VEC[dir];
     assert.ok(near(cam.fx, fx) && near(cam.fy, fy), `${dir}: 보는 쪽`); assert.ok(near(cam.x, 500 - fx * BACK) && near(cam.y, 400 - fy * BACK), '카메라는 내 뒤에');

@@ -110,9 +110,13 @@ export function pathfind(map, sx, sy, tx, ty, people = []) {
 function rect(ctx, x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.floor(x), Math.floor(y), w, h); }
 // 울릉도: 후박나무·동백나무 / 독도: 키 큰 나무 없이 사철나무 덤불과 해국 (소나무는 쓰지 않아요)
 const ulleung = map => map?.def?.island === '울릉도';
-function tree(ctx, x, y, map) {
+// 나무는 바람에 살랑살랑 흔들려요(v0.64): 밑동은 그대로 두고 위로 갈수록 옆으로 기울여요. 나무마다 박자가 조금씩 달라요.
+function tree(ctx, x, y, map, time = 0) {
   const k = ((x / 32) * 7 + (y / 32) * 13) % 3, key = ulleung(map) ? (k === 0 ? 'tree-dongbaek' : 'tree-hubak') : (k === 0 ? 'shrub-haeguk' : 'shrub-saecheol');
+  const sway = Math.sin(time / 760 + x * .045 + y * .03) * .032 + Math.sin(time / 240 + x * .11) * .009, base = y + 30;
+  ctx.save(); ctx.transform(1, 0, sway, 1, -sway * base, 0);
   if (!drawIslandArt(ctx, key, x - 24, y - 56, 80, 88)) drawTreeDefault(ctx, x, y);
+  ctx.restore();
 }
 export function drawTreeDefault(ctx, x, y) {
   const r = (a, b, w, h, c) => rect(ctx, x + a, y + b, w, h, c);
@@ -213,7 +217,9 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
     const list = [];
     for (const n of order) {
       const fx = n.building ? (n.building.x + n.building.w / 2) * TILE : n.x * TILE + (n.w ? n.w * 16 : 16), fy = n.depth, p = project(fx, fy);
-      if (p && p.k > 0) list.push({ n, fx, fy, p });
+      if (!p || p.k <= 0) continue;
+      if (!n.player && project.fadeZ && p.z < project.fadeZ * .7) continue; // 카메라 바로 앞을 가리는 것은 그리지 않아요
+      list.push({ n, fx, fy, p });
     }
     list.sort((a, b) => (b.p.z ?? 0) - (a.p.z ?? 0));
     for (const { n, fx, fy, p } of list) { ctx.save(); if (!n.player && project.fadeZ && p.z < project.fadeZ) ctx.globalAlpha = .22; ctx.setTransform(base.a * p.k, 0, 0, base.d * p.k, base.a * (p.x - fx * p.k), base.d * (p.y - fy * p.k)); drawOne(n); ctx.restore(); }
@@ -232,7 +238,8 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
     }
     else if (n.kind === 'legend') { legendGlow(ctx, n.x, n.y, time); drawMonster(ctx, n.species, n.x * 32 - 10, n.y * 32 - 22 + Math.round(Math.sin(time / 300) * 2), 52, time / 1000); if (!n.used) marker(ctx, n.x, n.y, time, '#ffe9a0'); }
     else if (PROP_KINDS.includes(n.kind)) drawProp(ctx, n.kind, n.x, n.y, { open: n.used, art: n.art, time, water: map[n.y]?.[n.x] === 0 });
-    else if (n.player) { if (!drawExplorer(ctx, state.avatar, fx, fy, CHARACTER_SIZE, seen(state.dir), motion.walking, motion.distance || 0)) drawHuman(ctx, fx, fy, '#418e91', state.dir, 0, 'normal', null, CHARACTER_SIZE); }
+    else if (n.player) { const j = motion.jump || 0; if (j > 0) groundShadow(ctx, n.x * 32 + 16, n.y * 32 + 29, 11, j / 3); // 점프(v0.64): 그림자는 땅에 남고 몸만 떠올라요
+      if (!drawExplorer(ctx, state.avatar, fx, fy - j, CHARACTER_SIZE, seen(state.dir), motion.walking && !j, motion.distance || 0)) drawHuman(ctx, fx, fy - j, '#418e91', state.dir, 0, 'normal', null, CHARACTER_SIZE); }
     else if (n.actor && drawResident(ctx, n.actor, fx, fy, CHARACTER_SIZE, time, seen(n.dir || 'down'), n.walking || false, n.walkDistance || 0)) { /* drawn */ }
     else drawHuman(ctx, fx, fy, n.color || '#a88668', 'down', 0, n.kind, n.sprite, CHARACTER_SIZE);
     if (!n.player && wanted && n.id === wanted) marker(ctx, n.x, n.y, time);
@@ -244,7 +251,7 @@ function drawDecor(ctx, n, map, time) {
   if (n.building) return house(ctx, n.building, false, map);
   if (n.scenery in FURNITURE_DEPTH) return drawFurniture(ctx, n.scenery, n.x, n.y, time);
   switch (n.scenery) {
-    case 'tree': return tree(ctx, n.x * 32, n.y * 32, map);
+    case 'tree': return tree(ctx, n.x * 32, n.y * 32, map, time);
     case 'fence': return drawIslandArt(ctx, ulleung(map) ? 'wall-stone' : 'rail-wood', n.x * 32, n.y * 32 - 6, 64, 36, n.w * 32);
     case 'planter': return propArt(ctx, 'planter', n.x * 32 + 16, n.y * 32 + 29) || drawScenery(ctx, 'planter', n.x * 32 - 4, n.y * 32 + 3, 40, 28);
     case 'monument': { // 두 섬 조형물: 돌 받침대 위의 도트 독도(v0.39)
