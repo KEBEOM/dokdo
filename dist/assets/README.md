@@ -1,14 +1,14 @@
-# 독도 탐험대 그림 파일 (v0.41)
+# 독도 탐험대 그림 파일 (v0.71 정리)
+
+게임이 실제로 쓰는 그림만 남겨 두었어요(v0.71에서 쓰지 않는 그림 189개를 지웠어요).
 
 그림을 바꾼 뒤에는 `node scripts/build-offline.mjs`로 한 파일짜리 게임을 다시 만드세요(오프라인 판에는 그림이 들어 있어요).
 
 ## 우산몬
 - `monsters/001.png`~`100.png`: 우산몬 그림(512×512 투명 PNG, 발끝은 아래에서 12칸 위). 도감·결투·지도에 모두 이 한 장을 써요.
 - `monsters/068-2.png` 등: 전설의 우산몬 변환폼(68 소쩍새, 70 뿔쇠오리, 71 매, 72 황조롱이, 75 고니, 76 흑두루미).
-- 새로 찍은 도트는 `python scripts/import-dots.py <폴더>`로 넣어요(한 도트 10×10 원본, 이름 `NNN.png` · `NNN-1.png` · `NNN-2.png`). 원본은 `monsters-original/`에 보관해요.
+- 새로 찍은 도트는 `python scripts/import-dots.py <폴더>`로 넣어요(한 도트 10×10 원본, 이름 `NNN.png` · `NNN-1.png` · `NNN-2.png`). 원본은 프로젝트의 `art/monsters-original/`에 보관해요(게임에는 들어가지 않아요).
 - 결투에서 바라보는 쪽은 `dist/sprites.js`의 `FACES_RIGHT`(오른쪽) · `FACES_FRONT`(정면)에 적어요. 나머지는 왼쪽을 보는 그림이에요.
-- `monster-contact-sheet.png`: 100종과 변환폼 미리보기(게임 실행에는 쓰지 않아요).
-- `monster-list.csv`: 100종의 번호·이름·기록 확인 · `image-list.csv`, `image-catalog.html`: 그림 파일 목록.
 
 ## 실제 사진 (도감 ‘실제 사진 보기’)
 - `photos/001.jpg`~`100.jpg`: 실제 생물 사진. 원본을 자르거나 고치지 않고 크기만 줄였어요(긴 변 640px).
@@ -16,11 +16,9 @@
 
 ## 사람
 - 주인공·김박사(v0.54~): `characters/sheets/{boy,girl,professor}.png`(걷기 시트 160×120) · `characters/sheets/{boy,girl,professor}-portrait.png`(큰 그림 128×128). Aseprite로 고치는 법: `art/ASEPRITE-가이드.md`.
-- 옛 그림(시트를 만든 원본, 게임에서는 쓰지 않음): `characters/explorers-atlas-v17.png`, `characters/professor-atlas-v33.png`, `characters/*-portrait-v33.png`.
+- 걷기 그림: `characters/explorers-v2-64x72.png`(주인공 5장 걷기), `characters/professor-atlas-v33.png`, 큰 그림 `characters/*-portrait-v33.png`. `characters/explorers-atlas-v17.png`는 시트를 고치지 않았을 때 쓰는 원본이에요.
 - 마을 사람: `characters/{child-boy,child-girl,child-girl-ribbon,man,woman}-atlas-v18.png` (좌표: `dist/npc-atlases.js`).
 - 몽땅랜드: `characters/villain-*-v25.png` (좌표: `dist/villain-atlases.js`), 결투 등장 그림 `characters/baekmudan-{grunt,exec,boss}-portrait.png`.
-- `characters/*-sheet.png`, `*-original.jpg`, `*-game.png`: `scripts/bake-characters.mjs`가 쓰는 원본과 결과물이에요.
-- `npc/`, `player/`: 새 그림을 불러오지 못했을 때만 쓰는 예비 그림이에요.
 
 ## 배경
 - `scenery/terrain-bw-v39.png`(지형 타일), `scenery/props-bw-v39.png`(지도 소품), `scenery/island-art-v36.png`(건물·나무), `scenery/cutscene-art-v47.png`(컷신 배경) 등.

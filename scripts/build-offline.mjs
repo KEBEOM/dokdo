@@ -64,11 +64,6 @@ for (const m of code.matchAll(/["'`]((?:characters|scenery|npc|player|monsters)\
 for (const m of code.matchAll(/"key"\s*:\s*"([^"]+)"/g)) add(m[1]);                       // atlas sheets
 for (let id = 1; id <= 100; id++) { const n = String(id).padStart(3, '0'); add(`monsters/${n}`); add(`monsters/${n}-2`); add(`photos/${n}.jpg`); } // 변환폼 · 도감 실제 사진
 for (const r of ['grunt', 'exec', 'boss']) add(`characters/baekmudan-${r}-portrait`);
-for (const sub of ['npc', 'player']) {
-  const walk = d => fs.readdirSync(path.join(dist, 'assets', d), { withFileTypes: true }).forEach(e => e.isDirectory() ? walk(`${d}/${e.name}`) : /\.png$/.test(e.name) && add(`${d}/${e.name.replace(/\.png$/, '')}`));
-  if (fs.existsSync(path.join(dist, 'assets', sub))) walk(sub);
-}
-
 // ── 3. one HTML file ──
 let html = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
 const css = fs.readFileSync(path.join(dist, 'style.css'), 'utf8');

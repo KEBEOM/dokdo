@@ -20,7 +20,7 @@ import { music, sfx, jingle, setOn, setVolume, isOn, audioPrefs, currentMusic, w
 import { TRACKS } from './music-data.js';
 import { makeChase, cameraStep, seenDir, clampPitch, DIR_ANGLE, BACK } from './view3d.js';
 import { boxPainter, drawFace, drawSlab, SLAB } from './box3d.js';
-import { levelAt, LEVEL_H, cliffWalls, cliffTextures, regionMask } from './heights.js';
+import { levelAt, LEVEL_H, cliffWalls, cliffTextures, regionMask, landMask, shoreWalls, shoreTextures } from './heights.js';
 import { V2_TERRAIN } from './tileset-v2.js';
 import { weatherNow, weatherChoice, setWeather, currentSeason, seasonChoice, setSeason, seasonColor, seasonWind, SEASON_NAME, SEASON_ICON, seasonOfMonth, clockTick, setClock, gameClock, daylight, isNight, clockLabel, dayNightChoice, setDayNight, DAY_MS } from './season.js';
 import { whenNote, timeTalk } from './roamers.js';
@@ -40,7 +40,7 @@ import { OPENING, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.71';
+const VERSION = '0.72';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -57,9 +57,17 @@ let yaw = null, pitch = 0, lookDrag = null; const lookKeys = new Set();
 const LOOK = { mouse: .0035, drag: .006, stick: .0026, keys: .0022 }; // 돌리는 빠르기(픽셀당 · 밀리초당 라디안)
 // v0.70: 언덕 위에 서면 카메라도 한 층 올라가요(계단을 오르내릴 때 부드럽게)
 let camLift = 0, camLiftMap = null;
+// v0.71 바닷속 3D(마크처럼): 잠수하면 땅은 한 단(64) 위로 올라가 물가가 흙벽으로 보이고, 머리 위엔 물낯, 멀수록 푸른 안개
+let diveT = 0; const DIVE_LAND = 64, FOG = '#0e4f73', FOG_RGB = '14,79,115';
+const fogA = d => diveT > .01 ? Math.max(0, Math.min(.95, (d - 110) / 420)) * diveT : 0; // 4칸까지는 또렷, 16칸쯤이면 거의 안 보여요
+function liftAt(wx, wy) {
+  const tx = Math.round((wx - 16) / TILE), ty = Math.round((wy - 28) / TILE), lv = map.level ? levelAt(map, tx, ty) : 0;
+  if (diveT < .01) return lv * LEVEL_H;
+  return map[ty]?.[tx] === 0 ? 10 * diveT : DIVE_LAND * diveT + lv * LEVEL_H;
+}
 function fpCamera() {
   if (yaw === null) { yaw = DIR_ANGLE[state.dir] ?? Math.PI; pitch = 0; }
-  const want = levelAt(map, view.x, view.y) * LEVEL_H; if (camLiftMap !== map.id) { camLiftMap = map.id; camLift = want; } else camLift += (want - camLift) * .12;
+  const want = map.diving ? -8 : levelAt(map, view.x, view.y) * LEVEL_H; if (camLiftMap !== map.id) { camLiftMap = map.id; camLift = want; } else camLift += (want - camLift) * .12;
   return projection().camera(view.x * TILE + 16, view.y * TILE + 28, yaw, pitch, camLift);
 }
 function lookBy(dx, dy, k) { if (yaw === null) fpCamera(); yaw += dx * k; if (yaw > Math.PI * 2) yaw -= Math.PI * 2; if (yaw < -Math.PI * 2) yaw += Math.PI * 2; pitch = clampPitch(pitch - dy * k * 1.1); }
@@ -559,6 +567,7 @@ function paintUnderwater(g, K, now) {
   const t = now / 1000, w = sceneWidth, h = sceneHeight;
   g.save(); g.setTransform(K, 0, 0, K, 0, 0);
   g.fillStyle = 'rgba(14,92,138,.36)'; g.fillRect(0, 0, w, h);
+  if (!in3d() && lamp) { const r0 = 3 * TILE, r1 = 9 * TILE, gr = g.createRadialGradient(lamp.x, lamp.y, r0, lamp.x, lamp.y, r1); gr.addColorStop(0, 'rgba(8,46,74,0)'); gr.addColorStop(1, 'rgba(8,46,74,.9)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); } // 2D: 물속에선 멀리 안 보여요
   for (let i = 0; i < 5; i++) { const x = ((i * 211 + t * 14) % (w + 200)) - 100, gr = g.createLinearGradient(x, 0, x + 60, h); gr.addColorStop(0, 'rgba(210,245,255,.16)'); gr.addColorStop(1, 'rgba(210,245,255,0)'); g.fillStyle = gr; g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 34, 0); g.lineTo(x + 110, h); g.lineTo(x + 50, h); g.closePath(); g.fill(); } // 빛줄기
   g.fillStyle = 'rgba(220,250,255,.09)'; // 일렁이는 빛무늬
   for (let i = 0; i < 46; i++) { const cx = ((i * 97) % w) + Math.sin(t * 1.3 + i) * 12, cy = ((i * 53) % h) + Math.cos(t * 1.1 + i * 1.7) * 9, r = 10 + (i % 5) * 4; g.beginPath(); g.ellipse(cx, cy, r, r * .45, Math.sin(t + i) * .5, 0, Math.PI * 2); g.fill(); }
@@ -775,6 +784,7 @@ function frame(now) {
   let keyDir = null;
   const dt = Math.max(0, Math.min(now - lastTick, 100)); lastTick = now;
   if (state.started && !document.hidden) state.playMs += dt;
+  diveT += ((map.diving ? 1 : 0) - diveT) * Math.min(1, dt / 220); if (diveT < .005) diveT = 0;
   { const d = isDiving(); if (d !== !!map.diving) { map.diving = d; if (d && !frame.dived) { frame.dived = true; toast('🫧 바닷속으로 잠수했어요! 물고기 우산몬이 헤엄치고 있어요.'); } frame.clockText = ''; } } // v0.71 잠수
   // v0.69 게임 시계: 결투·컷신·타이틀 화면에서는 멈춰요. 계절이 바뀌면 알려 주고, 시각은 위치 칸에 보여요.
   if (state.started && !document.hidden && !battle && !cutscenes.active() && titleEl.classList.contains('hidden')) {
@@ -816,7 +826,7 @@ function frame(now) {
       fr.setTransform(1, 0, 0, 1, 0, 0); fr.fillStyle = seasonColor(z().color); fr.fillRect(0, 0, P.FW, P.FH); fr.imageSmoothingEnabled = true;
       fr.setTransform(cs * fs, -sn * fs, sn * fs, cs * fs, P.FW / 2 - (cs * ux + sn * uy) * fs, P.FH - (-sn * ux + cs * uy) * fs); fr.drawImage(ground3d, 0, 0);
       // 하늘: 위로 볼수록 짙은 파랑, 지평선 쪽은 옅게. 구름은 보는 방향에 따라 흘러가요.
-      const sky = ctx.createLinearGradient(0, hz - sceneHeight * 1.4, 0, hz), sc = map.diving ? ['#0b3f60', '#17668a', '#2b8bac'] : skyColors(); sky.addColorStop(0, sc[0]); sky.addColorStop(.55, sc[1]); sky.addColorStop(1, sc[2]); ctx.fillStyle = sky; ctx.fillRect(0, 0, sceneWidth, sceneHeight);
+      const sky = ctx.createLinearGradient(0, hz - sceneHeight * 1.4, 0, hz), sc = map.diving ? ['#7fd6ec', '#2c8db5', FOG] : skyColors(); sky.addColorStop(0, sc[0]); sky.addColorStop(.55, sc[1]); sky.addColorStop(1, sc[2]); ctx.fillStyle = sky; ctx.fillRect(0, 0, sceneWidth, sceneHeight);
       const u = sceneHeight / 100; ctx.fillStyle = '#ffffffd9';
       for (let i = 0; i < (map.diving ? 0 : 9); i++) {
         let a = (i * .7 + .35 - yaw + now * .000016) % (Math.PI * 2); // 구름은 바람을 타고 천천히 흘러가요 if (a > Math.PI) a -= Math.PI * 2; if (a < -Math.PI) a += Math.PI * 2; if (Math.abs(a) > 1.3) continue;
@@ -832,24 +842,34 @@ function frame(now) {
         const k = P.f / ((d0 + d1) / 2), hw = sceneWidth / 2 / k;
         if (d0 <= P.RH) { const sx = Math.max(0, P.RW / 2 - hw), sw = Math.min(P.RW, P.RW / 2 + hw) - sx; actorCtx.drawImage(rot3d, sx, P.RH - d0, sw, Math.max(.5, d0 - d1), sceneWidth / 2 + (sx - P.RW / 2) * k, y, sw * k, 1.03); }
         else { const sx = Math.max(0, P.FW / 2 - hw * fs), sw = Math.min(P.FW, P.FW / 2 + hw * fs) - sx; actorCtx.drawImage(far3d, sx, Math.max(0, P.FH - d0 * fs), sw, Math.max(.5, (d0 - d1) * fs), sceneWidth / 2 + (sx - P.FW / 2) / fs * k, y, sw / fs * k, 1.03); }
+        if (diveT > .01) { actorCtx.fillStyle = `rgba(${FOG_RGB},${fogA((d0 + d1) / 2).toFixed(3)})`; actorCtx.fillRect(0, y, sceneWidth, 1.03); } // 바닷속 안개
       }
-      if (map.cliff) { // v0.70 언덕 위 땅: 언덕 칸만 오려 내어 한 층 높이의 땅으로 다시 눕혀요(가까운 16칸)
+      if (map.cliff || diveT > .01) { // v0.70 언덕 위 땅(v0.71 바닷속에선 물 밖 땅 전체가 한 단 위)
+        const UP = diveT > .01 ? DIVE_LAND * diveT : LEVEL_H; // 언덕 칸만 오려 내어 한 층 높이의 땅으로 다시 눕혀요(가까운 16칸)
         elev3d ||= document.createElement('canvas'); if (elev3d.width !== gw || elev3d.height !== gh) { elev3d.width = gw; elev3d.height = gh; }
-        const e = elev3d.getContext('2d'); e.globalCompositeOperation = 'source-over'; e.clearRect(0, 0, gw, gh); e.drawImage(ground3d, 0, 0); e.globalCompositeOperation = 'destination-in'; e.drawImage(regionMask(map), 0, 0); e.globalCompositeOperation = 'source-over';
+        const e = elev3d.getContext('2d'); e.globalCompositeOperation = 'source-over'; e.clearRect(0, 0, gw, gh); e.drawImage(ground3d, 0, 0); e.globalCompositeOperation = 'destination-in'; e.drawImage(diveT > .01 ? landMask(map) : regionMask(map), 0, 0); e.globalCompositeOperation = 'source-over';
         rotElev ||= document.createElement('canvas'); if (rotElev.width !== P.RW || rotElev.height !== P.RH) { rotElev.width = P.RW; rotElev.height = P.RH; }
         const re = rotElev.getContext('2d'); re.setTransform(1, 0, 0, 1, 0, 0); re.clearRect(0, 0, P.RW, P.RH); re.imageSmoothingEnabled = false;
         re.setTransform(cs, -sn, sn, cs, P.RW / 2 - (cs * ux + sn * uy), P.RH - (-sn * ux + cs * uy)); re.drawImage(elev3d, 0, 0);
         for (let y = Math.max(0, Math.floor(hz) + 1); y < sceneHeight; y++) {
-          const d0 = P.rowDepth(cam, y, LEVEL_H), d1 = P.rowDepth(cam, y + 1, LEVEL_H); if (d0 > P.RH || d1 < 2) continue;
+          const d0 = P.rowDepth(cam, y, UP), d1 = P.rowDepth(cam, y + 1, UP); if (d0 > P.RH || d1 < 2 || d0 < 0) continue;
           const k = P.f / ((d0 + d1) / 2), hw = sceneWidth / 2 / k, sx = Math.max(0, P.RW / 2 - hw), sw = Math.min(P.RW, P.RW / 2 + hw) - sx;
           actorCtx.drawImage(rotElev, sx, P.RH - d0, sw, Math.max(.5, d0 - d1), sceneWidth / 2 + (sx - P.RW / 2) * k, y, sw * k, 1.03);
+          if (diveT > .01) { actorCtx.fillStyle = `rgba(${FOG_RGB},${fogA((d0 + d1) / 2).toFixed(3)})`; actorCtx.fillRect(0, y, sceneWidth, 1.03); }
         }
       }
       const haze = actorCtx.createLinearGradient(0, hz, 0, hz + sceneHeight * .06); haze.addColorStop(0, '#e4f4f6'); haze.addColorStop(1, '#e4f4f600'); actorCtx.fillStyle = haze; actorCtx.fillRect(0, hz, sceneWidth, sceneHeight * .06);
-      const project = (wx, wy) => { const p = P.project(cam, wx, wy), lv = map.level ? levelAt(map, (wx - 16) / TILE, (wy - 28) / TILE) : 0; if (p && lv) p.y -= lv * LEVEL_H * p.k; return p; }; // v0.70 언덕 위는 한 층 높이
-      { const img = map.cliff && assetImage(V2_TERRAIN.key); if (img) { const tex = cliffTextures(img); project.walls = cliffWalls(map).map(w => { const mx = (w.x0 + w.x1) / 2, my = (w.y0 + w.y1) / 2; return { ...w, z: (mx - cam.x) * cam.fx + (my - cam.y) * cam.fy, facing: (cam.x - mx) * w.n[0] + (cam.y - my) * w.n[1] }; }).filter(w => w.facing > 0 && w.z > -40 && w.z < P.RH * 1.6); project.drawWall = (g, w) => drawFace(g, P, cam, { tex: w.ladder ? tex.ladder : tex.plain, v: [[w.x0, w.y0, 0, 0, 32], [w.x1, w.y1, 0, 32, 32], [w.x1, w.y1, LEVEL_H, 32, 0], [w.x0, w.y0, LEVEL_H, 0, 0]] }); } }
-      project.slab = { has: k => k in SLAB, draw: (g, n, kind, fx, fy, render) => drawSlab(g, P, cam, `${kind}|${n.art || ''}|${n.w || ''}|${n.used ? 1 : 0}|${n.species || ''}`, fx, fy, kind === 'fence' ? 4 : SLAB[kind], render, (map.level ? levelAt(map, (fx - 16) / TILE, (fy - 28) / TILE) : 0) * LEVEL_H) };
-      project.fadeZ = BACK - 6; project.seen = d => seenDir(yaw, d); project.box = boxPainter(P, cam, b => buildingArt(map, b)); // v0.68: 건물은 앞·뒤·옆이 있는 상자로
+      const project = (wx, wy) => { const p = P.project(cam, wx, wy), h = liftAt(wx, wy); if (p && h) p.y -= h * p.k; return p; }; // v0.70 언덕 위는 한 층 높이 · v0.71 바닷속에선 땅이 한 단 위
+      if (diveT > .01) project.fog = fogA;
+      { // 3D 벽: 언덕 둘레 바위벽(+ 바닷속에선 물가 흙벽). 카메라 쪽을 보는 것만, 가까운 것부터 정렬돼요
+        const img = assetImage(V2_TERRAIN.key), ctex = map.cliff && img ? cliffTextures(img) : null, stex = shoreTextures(), up = DIVE_LAND * diveT, list = [];
+        if (ctex) for (const w of cliffWalls(map)) list.push({ ...w, h: LEVEL_H, lift: up, tex: w.ladder ? ctex.ladder : ctex.plain, th: 32 });
+        if (diveT > .01) for (const w of shoreWalls(map)) list.push({ ...w, h: up, lift: 0, tex: w.sand ? stex.sand : stex.soil, th: 64 });
+        project.walls = list.map(w => { const mx = (w.x0 + w.x1) / 2, my = (w.y0 + w.y1) / 2; return { ...w, z: (mx - cam.x) * cam.fx + (my - cam.y) * cam.fy, facing: (cam.x - mx) * w.n[0] + (cam.y - my) * w.n[1] }; }).filter(w => w.facing > 0 && w.z > -40 && w.z < P.RH * 1.6);
+        project.drawWall = (g, w) => drawFace(g, P, cam, { tex: w.tex, lift: w.lift, v: [[w.x0, w.y0, 0, 0, w.th], [w.x1, w.y1, 0, 32, w.th], [w.x1, w.y1, w.h, 32, 0], [w.x0, w.y0, w.h, 0, 0]] });
+      }
+      project.slab = { has: k => k in SLAB, draw: (g, n, kind, fx, fy, render) => drawSlab(g, P, cam, `${kind}|${n.art || ''}|${n.w || ''}|${n.used ? 1 : 0}|${n.species || ''}`, fx, fy, kind === 'fence' ? 4 : SLAB[kind], render, liftAt(fx, fy)) };
+      project.fadeZ = BACK - 6; project.seen = d => seenDir(yaw, d); project.box = boxPainter(P, cam, b => buildingArt(map, b), () => DIVE_LAND * diveT); // v0.68: 건물은 앞·뒤·옆이 있는 상자로
       drawActors(actorCtx, state, view, now, motion, people, map, project);
       { const lp = P.project(cam, view.x * TILE + 16, view.y * TILE + 28); lamp = lp ? { x: lp.x, y: lp.y - 22 * lp.k, r: 120 * lp.k } : null; }
       paintMiniMap(now, people); if (!scene.classList.contains('look-on')) scene.classList.add('look-on');

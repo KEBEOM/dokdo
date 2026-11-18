@@ -236,7 +236,7 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
     for (const n of order) {
       if (n.scenery === 'boat') continue; // v0.68: 배는 위에서 본 그림이라 3D에서는 물 위에 눕혀 그려요(drawFlatDecor)
       const slabKind = project.slab && (n.kind === 'board' ? 'board' : PROP_KINDS.includes(n.kind) ? n.kind : n.scenery); // v0.71 납작한 물건은 앞·뒤·옆이 있는 판으로
-      if (project.slab && project.slab.has(slabKind) && !n.player) { const fx = n.x * TILE + (n.w ? n.w * 16 : 16), fy = n.depth, p = project(fx, fy); if (p && p.k > 0 && !(project.fadeZ && p.z < project.fadeZ * .7)) list.push({ n, fx, fy, p, slab: slabKind }); continue; }
+      if (project.slab && project.slab.has(slabKind) && !n.player) { const fx = n.x * TILE + (n.w ? n.w * 16 : 16), fy = n.depth, p = project(fx, fy); if (p && p.k > 0 && !(project.fadeZ && p.z < project.fadeZ * .85)) list.push({ n, fx, fy, p, slab: slabKind }); continue; }
       if (n.building && project.box) { const z = project.box.depth(n.building); if (z != null) { list.push({ n, box: true, p: { z } }); continue; } } // v0.68: 입체 건물(box3d.js)
       const fx = n.building ? (n.building.x + n.building.w / 2) * TILE : n.x * TILE + (n.w ? n.w * 16 : 16), fy = n.depth, p = project(fx, fy);
       if (!p || p.k <= 0) continue;
@@ -245,7 +245,7 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
     }
     for (const w of project.walls || []) list.push({ wall: w, p: { z: w.z } }); // v0.70 언덕 둘레 바위벽
     list.sort((a, b) => (b.p.z ?? 0) - (a.p.z ?? 0));
-    for (const { n, fx, fy, p, box, wall, slab } of list) { if (slab) { ctx.save(); ctx.setTransform(base); if (project.fadeZ && p.z < project.fadeZ) ctx.globalAlpha = .3; project.slab.draw(ctx, n, slab, fx, fy, g => { const keep = ctx; ctx = g; drawOne(n); ctx = keep; }); ctx.restore(); continue; } if (wall) { ctx.save(); ctx.setTransform(base); project.drawWall(ctx, wall); ctx.restore(); continue; } if (box) { ctx.save(); ctx.setTransform(base); project.box.draw(ctx, n.building); ctx.restore(); continue; } ctx.save(); if (!n.player && project.fadeZ && p.z < project.fadeZ) ctx.globalAlpha = .22; ctx.setTransform(base.a * p.k, 0, 0, base.d * p.k, base.a * (p.x - fx * p.k), base.d * (p.y - fy * p.k)); drawOne(n); ctx.restore(); }
+    for (const { n, fx, fy, p, box, wall, slab } of list) { const fa = project.fog && !n?.player ? 1 - project.fog(p.z ?? 0) : 1; if (fa < .04) continue; ctx.save(); ctx.globalAlpha *= fa; drawItem(); ctx.restore(); function drawItem() { if (slab) { ctx.save(); ctx.setTransform(base); if (project.fadeZ && p.z < project.fadeZ) ctx.globalAlpha *= .3; project.slab.draw(ctx, n, slab, fx, fy, g => { const keep = ctx; ctx = g; drawOne(n); ctx = keep; }); ctx.restore(); return; } if (wall) { ctx.save(); ctx.setTransform(base); project.drawWall(ctx, wall); ctx.restore(); return; } if (box) { ctx.save(); ctx.setTransform(base); project.box.draw(ctx, n.building); ctx.restore(); return; } ctx.save(); if (!n.player && project.fadeZ && p.z < project.fadeZ) ctx.globalAlpha *= .22; ctx.setTransform(base.a * p.k, 0, 0, base.d * p.k, base.a * (p.x - fx * p.k), base.d * (p.y - fy * p.k)); drawOne(n); ctx.restore(); } } // v0.71 바닷속 안개: 멀수록 흐리게
   }
   function drawOne(n) {
     if (n.scenery) { drawDecor(ctx, n, map, time); return; }

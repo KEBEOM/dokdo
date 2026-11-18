@@ -95,7 +95,8 @@ export function boxDepth(box, cam) {
 
 // 면 하나를 세로줄로 잘라 그려요. P: makeChase()가 만든 투영, cam: 카메라
 export function drawFace(ctx, P, cam, face) {
-  const pts = face.v.map(([x, y, z, u, v]) => { const dx = x - cam.x, dy = y - cam.y; return { l: dx * cam.rx + dy * cam.ry, z: dx * cam.fx + dy * cam.fy, h: z, u, v }; });
+  const L = face.lift || 0; // v0.71: 바닷속에서 땅 위 건물·물건은 한 단 위
+  const pts = face.v.map(([x, y, z, u, v]) => { const dx = x - cam.x, dy = y - cam.y; return { l: dx * cam.rx + dy * cam.ry, z: dx * cam.fx + dy * cam.fy, h: z + L, u, v }; });
   let lo = Infinity, hi = -Infinity, behind = false;
   for (const p of pts) { if (p.z < NEAR_Z) { behind = true; continue; } const sx = P.W / 2 + p.l * P.f / p.z; lo = Math.min(lo, sx); hi = Math.max(hi, sx); }
   if (behind) { lo = 0; hi = P.W; } if (lo === Infinity) return;
@@ -118,7 +119,7 @@ export function drawFace(ctx, P, cam, face) {
 }
 
 // game.js가 3D 보기에서 drawActors에 넘겨 주는 도우미
-export function boxPainter(P, cam, keyOf) {
+export function boxPainter(P, cam, keyOf, liftOf = () => 0) {
   return {
     box(b) { const key = keyOf(b), kit = buildingKit(key, b); return kit ? buildingBox(b, kit) : null; },
     depth(b) { const bx = this.box(b); return bx ? boxDepth(bx, cam) : null; },
@@ -128,7 +129,7 @@ export function boxPainter(P, cam, keyOf) {
       // 카메라와 내 캐릭터 사이를 가리면 비쳐 보이게(다른 물건과 같은 규칙)
       let hides = false; for (let i = 1; i < 12 && !hides; i++) { const t = i / 12, x = cam.x + cam.fx * BACK * t, y = cam.y + cam.fy * BACK * t; hides = x > bx.x0 && x < bx.x1 && y > bx.yB && y < bx.yF; }
       const alpha = ctx.globalAlpha; if (hides) ctx.globalAlpha = alpha * .3;
-      for (const f of faces(bx, kit, cam)) drawFace(ctx, P, cam, f);
+      const lift = liftOf(b); for (const f of faces(bx, kit, cam)) drawFace(ctx, P, cam, { ...f, lift });
       ctx.globalAlpha = alpha;
       return true;
     }
@@ -148,9 +149,9 @@ function slabTextures(key, render, fx, fy) {
   if (r < l) { slabCache.set(id, null); return null; }
   const w = r - l + 1, h = foot - t, front = canvas(w, h); front.getContext('2d').drawImage(c, l, t, w, h, 0, 0, w, h);
   const back = canvas(w, h), bg = back.getContext('2d'); bg.translate(w, 0); bg.scale(-1, 1); bg.drawImage(front, 0, 0); bg.setTransform(1, 0, 0, 1, 0, 0);
-  bg.globalCompositeOperation = 'source-atop'; bg.fillStyle = 'rgba(58,42,30,.62)'; bg.fillRect(0, 0, w, h);
+  bg.globalCompositeOperation = 'source-atop'; bg.fillStyle = 'rgba(70,52,36,.32)'; bg.fillRect(0, 0, w, h); // 뒷면: 같은 그림을 뒤집어 조금 어둡게
   const side = canvas(2, h), sg = side.getContext('2d'), fd = front.getContext('2d').getImageData(0, 0, w, h).data;
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (y * w + x) * 4; if (fd[i + 3] > 40) { sg.fillStyle = `rgb(${fd[i] * .55 | 0},${fd[i + 1] * .55 | 0},${fd[i + 2] * .55 | 0})`; sg.fillRect(0, y, 2, 1); break; } }
+  for (let y = 0; y < h; y++) { let r = 0, g2 = 0, b = 0, n = 0; for (let x = 0; x < w; x++) { const i = (y * w + x) * 4; if (fd[i + 3] > 40 && fd[i] + fd[i + 1] + fd[i + 2] > 120) { r += fd[i]; g2 += fd[i + 1]; b += fd[i + 2]; n++; } } if (n) { sg.fillStyle = `rgb(${r / n * .8 | 0},${g2 / n * .8 | 0},${b / n * .8 | 0})`; sg.fillRect(0, y, 2, 1); } } // v0.71: 옆면은 그 줄의 평균 색(검게 칠하지 않아요)
   const tex = { front, back, side, w, h, ax: l - S / 2 }; slabCache.set(id, tex); return tex;
 }
 // t: 두께(지도 픽셀) · lift: 언덕 위 높이

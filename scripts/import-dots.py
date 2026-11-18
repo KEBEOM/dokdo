@@ -1,6 +1,6 @@
 """우산몬 도트 그림 가져오기 (v0.41)
 
-    python scripts/import-dots.py                  # dist/assets/monsters-original/ 의 원본으로 모두 다시 만들기
+    python scripts/import-dots.py                  # art/monsters-original/ 의 원본으로 모두 다시 만들기
     python scripts/import-dots.py <그림 폴더>        # 새로 찍은 그림 넣기 (Pillow 필요)
 
 그림 파일 이름: 'NNN.png' (예: 024.png). 전설의 우산몬은 'NNN-1.png'(노멀폼), 'NNN-2.png'(변환폼).
@@ -9,7 +9,7 @@
   1. 도트마다 가운데 색을 읽어 원래 도트 크기로 줄여요(번짐 없음).
   2. 정수배로만 키워 512×512 칸에 넣어요. 가로 400·세로 470 안에서 가장 크게, 발끝은 아래에서 12칸 위(500).
   3. dist/assets/monsters/NNN.png (노멀폼) · NNN-2.png (변환폼)으로 저장해요.
-     새 폴더에서 가져오면 원본을 dist/assets/monsters-original/ 에도 복사해 둬요.
+     새 폴더에서 가져오면 원본을 art/monsters-original/ 에도 복사해 둬요.
 
 그림이 바라보는 쪽(오른쪽·정면·왼쪽)은 dist/sprites.js 의 FACES_RIGHT · FACES_FRONT 에 맞춰 주세요.
 """
@@ -17,7 +17,7 @@ import os, re, shutil, sys
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(ROOT, 'dist', 'assets', 'monsters-original')
+SRC = os.path.join(ROOT, 'art', 'monsters-original')
 OUT = os.path.join(ROOT, 'dist', 'assets', 'monsters')
 DOT = 10
 

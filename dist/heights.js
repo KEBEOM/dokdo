@@ -101,3 +101,34 @@ export function cliffTextures(img) {
     if (withLadder) ladder(g, 0, 0); return tintCanvas(c, 'ground', season); };
   wallTex = { img, season, plain: mk(false), ladder: mk(true) }; return wallTex;
 }
+
+// ── v0.71 바닷속 3D: 땅(물이 아닌 칸)은 한 단 위, 물가 둘레는 흙벽 ─────────────────────────────
+export function landMask(map) {
+  if (map._land) return map._land; const c = document.createElement('canvas'); c.width = map[0].length * T; c.height = map.length * T;
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; for (let y = 0; y < map.length; y++) for (let x = 0; x < map[0].length; x++) if (map[y][x] !== 0) g.fillRect(x * T, y * T, T, T);
+  return (map._land = c);
+}
+export function shoreWalls(map) {
+  if (map._shore) return map._shore; const out = [], land = (x, y) => map[y]?.[x] !== undefined && map[y][x] !== 0;
+  for (let y = 0; y < map.length; y++) for (let x = 0; x < map[0].length; x++) {
+    if (!land(x, y)) continue; const sand = map[y][x] === 4;
+    if (map[y + 1]?.[x] === 0) out.push({ x0: x * T, y0: (y + 1) * T, x1: (x + 1) * T, y1: (y + 1) * T, n: [0, 1], sand });
+    if (map[y - 1]?.[x] === 0) out.push({ x0: (x + 1) * T, y0: y * T, x1: x * T, y1: y * T, n: [0, -1], sand });
+    if (map[y]?.[x - 1] === 0) out.push({ x0: x * T, y0: y * T, x1: x * T, y1: (y + 1) * T, n: [-1, 0], sand });
+    if (map[y]?.[x + 1] === 0) out.push({ x0: (x + 1) * T, y0: (y + 1) * T, x1: (x + 1) * T, y1: y * T, n: [1, 0], sand });
+  }
+  return (map._shore = out);
+}
+// 물속에서 본 땅 옆면(흙·모래 단면, 위는 풀 또는 모래 턱)
+let shoreTex = null;
+export function shoreTextures() {
+  if (shoreTex) return shoreTex;
+  const mk = sand => { const c = document.createElement('canvas'); c.width = T; c.height = 64; const g = c.getContext('2d');
+    g.fillStyle = sand ? '#c8b07a' : '#7a5a3a'; g.fillRect(0, 0, T, 64);
+    for (let i = 0; i < 40; i++) { const x = (i * 13) % T, y = (i * 29) % 60 + 4; g.fillStyle = i % 3 ? (sand ? '#b39a66' : '#6a4c30') : (sand ? '#e0cb96' : '#8f6c48'); g.fillRect(x, y, 3, 2); }
+    for (let i = 0; i < 4; i++) { g.fillStyle = '#8b8f96'; g.fillRect((i * 9 + 3) % 26, 20 + i * 11, 6, 4); g.fillStyle = '#5c6068'; g.fillRect((i * 9 + 3) % 26, 24 + i * 11, 6, 1); }
+    g.fillStyle = sand ? '#e6d29e' : '#5aa543'; g.fillRect(0, 0, T, 5); g.fillStyle = sand ? '#cdb47c' : '#3f8a35'; g.fillRect(0, 5, T, 2);
+    g.fillStyle = 'rgba(40,90,60,.55)'; for (let i = 0; i < 6; i++) g.fillRect(i * 6 + 1, 64 - 6 - (i % 3) * 3, 2, 6 + (i % 3) * 3); // 밑동의 해초
+    return c; };
+  shoreTex = { soil: mk(false), sand: mk(true) }; return shoreTex;
+}
