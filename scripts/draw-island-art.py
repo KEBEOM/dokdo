@@ -432,11 +432,238 @@ def record_board():  # 탐험 기록판: 기와 없는 나무 게시판
     p.poly([(0, 8), (8, 0), (40, 0), (48, 8)], '#7a4a28', INK)
     return p
 
+# ───────────────────────── v0.74 실사 참고(art/실사-참고표.md) ─────────────────────────
+def glass_band(p, x0, x1, y0, y1, glass='#6f9fb8', mull='#d8dde0', step=14):
+    p.r(x0, y0, x1 - x0, y1 - y0, INK)
+    for yy in range(y0 + 2, y1 - 2): p.r(x0 + 2, yy, x1 - x0 - 4, 1, tone(glass, 1.15 - .4 * (yy - y0) / max(1, y1 - y0)))
+    for i in range(x0 + 2, x1 - 2, step): p.r(i, y0 + 2, 2, y1 - y0 - 4, mull)
+    for k in range(0, x1 - x0 - 30, 46):  # sky reflections running diagonally
+        for j in range(min(12, y1 - y0 - 6)): p.px(x0 + 10 + k + j, y1 - 4 - j, tone(glass, 1.6))
+
+def ulleung_terminal():  # 도동항 여객선터미널(U01·U02): 바다 쪽 유리벽 2층, 기둥 위로 들린 아래층, 지붕 전망 데크, 둥근 탑
+    W, H = 240, 190; p = Pic(W, H); x0, x1, cx = 8, 232, 120
+    ground_shadow(p, x0, x1, H, reach=14)
+    wall(p, x0 + 2, x1 - 2, 74, H - 4, '#e3e6e8')
+    glass_band(p, x0 + 8, x1 - 8, 82, 122)                                     # 위층 유리벽
+    p.r(x0 + 4, 122, x1 - x0 - 8, 9, INK); p.r(x0 + 5, 123, x1 - x0 - 10, 7, '#eceef0'); p.r(x0 + 5, 129, x1 - x0 - 10, 1, '#a9adb1')   # 층 사이 띠
+    p.r(x0 + 6, 131, x1 - x0 - 12, H - 6 - 131, '#3b424a')                    # 아래층: 기둥 사이 그늘
+    for i in range(x0 + 10, x1 - 12, 30): p.r(i, 131, 9, H - 6 - 131, '#d6d9dc'); p.r(i, 131, 2, H - 6 - 131, '#f3f5f6'); p.r(i + 7, 131, 2, H - 6 - 131, '#9ea3a8')
+    for x in (34, 186): glass_band(p, x, x + 22, 140, H - 10, step=11)
+    door3d(p, cx, H, w=34, h=42, glass=True)
+    p.r(cx - 30, 136, 60, 9, INK); p.r(cx - 29, 137, 58, 7, '#2f6aa3'); p.r(cx - 20, 140, 40, 1, '#e8f4ff')   # 파란 안내판(글자 없이)
+    flat_roof(p, x0, x1, 66, '#a7aeb3', depth=12)
+    for i in range(x0 + 2, x1 + 6, 6): p.r(i + (i - x0) * 0 , 46, 1, 10, '#6c7178')        # 전망 데크 난간
+    p.r(x0 + 2, 45, x1 - x0 + 4, 2, '#6c7178'); p.r(x0 + 2, 50, x1 - x0 + 4, 1, '#9aa0a6')
+    # 둥근 탑(왼쪽): 원통 + 유리 띠 + 지붕 + 철골 기둥
+    tx, tw = 46, 30
+    for y in range(12, 70):
+        xl = tx - tw // 2; p.r(xl - 1, y, tw + 2, 1, INK)
+        for k in range(tw): p.px(xl + k, y, tone('#eef0f1', 1.05 - .38 * (k / tw) ** 1.4))
+    for y in range(30, 46): p.r(tx - tw // 2 + 2, y, tw - 4, 1, tone('#6f9fb8', 1.1 - .3 * (y - 30) / 16))
+    for k in (-8, 0, 8): p.r(tx + k, 30, 1, 16, '#d8dde0')
+    p.d.ellipse([tx - tw // 2 - 2, 6, tx + tw // 2 + 2, 18], fill=INK); p.d.ellipse([tx - tw // 2, 7, tx + tw // 2, 16], fill=hexc('#c9ced2'))
+    p.r(tx + 10, 0, 2, 10, INK); p.r(tx + 6, 2, 10, 1, INK)
+    # 오른쪽 끝 둥근 전망부(바다 쪽으로 내민 반원 데크)
+    p.d.pieslice([x1 - 46, 52, x1 + 6, 84], 180, 360, fill=INK); p.d.pieslice([x1 - 44, 54, x1 + 4, 82], 180, 360, fill=hexc('#d9dee1'))
+    for i in range(x1 - 40, x1 + 2, 5): p.r(i, 56 + abs(i - (x1 - 20)) // 4, 1, 10, '#6c7178')
+    return p
+
+def ulleung_house(roof, wallc, floors, shop=False, stripe=None, W=112, sign=None):  # 도동 시가지(U08·U03·U06): 골짜기에 촘촘한 2~5층 콘크리트 건물, 색칠한 평지붕
+    top = 42; H = top + floors * 32 + 10; p = Pic(W, H); x0, x1, cx = 8, W - 8, W // 2
+    ground_shadow(p, x0, x1, H)
+    wall(p, x0 + 2, x1 - 2, top, H - 4, wallc)
+    for f in range(floors):
+        y = top + 8 + f * 32
+        if f == floors - 1 and shop: break
+        for x in range(16, W - 30, 28 if W > 112 else 29): window3d(p, x, y, 20, 18, bars=False)
+        if f: p.r(x0 + 4, y - 7, x1 - x0 - 8, 2, tone(wallc, .82))
+    if stripe: p.r(x0 + 4, top + 2, x1 - x0 - 8, 4, stripe)
+    if shop:  # 1층 가게: 넓은 유리 + 차양
+        y = H - 34; p.r(x0 + 8, y, x1 - x0 - 16, 26, INK)
+        for yy in range(y + 2, y + 24): p.r(x0 + 10, yy, x1 - x0 - 20, 1, tone('#6fb8cc', 1.1 - .3 * (yy - y) / 24))
+        p.r(x0 + 4, y - 6, x1 - x0 - 8, 6, INK); p.r(x0 + 5, y - 5, x1 - x0 - 10, 2, tone(roof, 1.25)); p.r(x0 + 5, y - 3, x1 - x0 - 10, 2, tone(roof, .9))
+    else: door3d(p, cx, H, w=18, h=28)
+    flat_roof(p, x0, x1, top - 8, roof, depth=14)
+    eave_shadow(p, x0 + 2, x1 - 2, top, 4)
+    p.r(W - 32, top - 26, 14, 12, INK); p.r(W - 31, top - 25, 12, 10, '#d7dde0'); p.r(W - 31, top - 25, 12, 3, '#eef2f4')   # 물탱크
+    if sign: p.r(x0 + 10, top + 4, 14, floors * 32 - 40, INK); p.r(x0 + 11, top + 5, 12, floors * 32 - 42, sign); p.r(x0 + 13, top + 9, 8, floors * 32 - 50, tone(sign, 1.4))  # 세로 간판(글자 없이)
+    return p
+
+def tetrapods():  # 소파블록(U01·U02·U05): 다리 넷 달린 회색 콘크리트 덩어리를 쌓은 더미
+    p = Pic(40, 40)
+    def one(cx, cy, s):
+        legs = [(0, -10), (-9, 5), (9, 5), (2, 9)]
+        for dx, dy in legs: p.d.line([(cx, cy), (cx + dx * s, cy + dy * s)], fill=INK, width=round(8 * s) + 2)
+        for i, (dx, dy) in enumerate(legs): p.d.line([(cx, cy), (cx + dx * s, cy + dy * s)], fill=hexc(['#d3d0c7', '#b9b6ad', '#a19e96', '#c6c3ba'][i]), width=round(8 * s))
+        for dx, dy in legs[:3]: ex, ey = cx + dx * s, cy + dy * s; p.d.ellipse([ex - 3 * s, ey - 2 * s, ex + 3 * s, ey + 2 * s], fill=hexc('#e6e3da'))
+        p.r(round(cx - 2), round(cy - 2), 4, 3, '#ebe8df')
+    one(12, 26, .9); one(29, 27, .9); one(20, 16, 1.0)
+    return p
+
+def rail_steel():  # 해안산책로·보행교 쇠 난간(H03·H04·U06): 은색 기둥과 두 줄 난간 (2칸)
+    p = Pic(64, 36)
+    for x in (2, 30, 58):
+        p.r(x - 1, 8, 6, 28, INK); p.r(x, 9, 4, 26, '#c3c9ce'); p.r(x, 9, 1, 26, '#eef2f4'); p.r(x + 3, 9, 1, 26, '#8b939a'); p.r(x - 1, 7, 6, 3, '#e3c25a')
+    for y in (12, 22):
+        p.r(0, y - 1, 64, 4, INK); p.r(0, y, 64, 2, '#b2b9bf'); p.r(0, y, 64, 1, '#e6ebee')
+    return p
+
+def rail_steel_v():  # 같은 난간이 위아래로 이어질 때(위에서 본 모습): 칸 가운데 기둥 + 위로 이어진 손잡이 줄
+    p = Pic(32, 44)
+    p.r(14, 0, 4, 40, INK); p.r(15, 0, 2, 40, '#c3c9ce'); p.r(15, 0, 1, 40, '#eef2f4')
+    p.r(12, 14, 8, 26, INK); p.r(13, 15, 6, 24, '#c3c9ce'); p.r(13, 15, 2, 24, '#eef2f4'); p.r(12, 13, 8, 3, '#e3c25a')
+    return p
+
+def dome_lighthouse(p, x, base, top):  # 독도 등대(D30): 흰 원통 + 난간 두른 전망대 + 유리 등실 + 흰 돔과 공 모양 꼭지
+    w = 26
+    for y in range(top, base):
+        xl = x - w // 2; p.r(xl - 1, y, w + 2, 1, INK)
+        for k in range(w): p.px(xl + k, y, tone('#f7f6f2', 1.04 - .3 * (k / w) ** 1.6))
+    for y in range(top + 16, base - 16, 24): p.r(x - 3, y, 6, 8, INK); p.r(x - 2, y + 1, 4, 6, '#5f9fb0')
+    p.r(x - 19, top - 4, 38, 6, INK); p.r(x - 18, top - 3, 36, 3, '#eceae3'); p.r(x - 18, top, 36, 1, '#9a978e')          # 전망대 바닥
+    for i in range(x - 18, x + 19, 4): p.r(i, top - 12, 1, 8, '#4f545a')                                                   # 난간 기둥
+    p.r(x - 18, top - 13, 37, 1, '#4f545a'); p.r(x - 18, top - 9, 37, 1, '#8a8e94')
+    p.r(x - 11, top - 25, 22, 21, INK)
+    for yy in range(top - 24, top - 5): p.r(x - 10, yy, 20, 1, tone('#86b9cc', 1.12 - .32 * (yy - top + 24) / 19))
+    for i in (x - 5, x, x + 5): p.r(i, top - 24, 1, 19, '#e8ecee')
+    p.d.pieslice([x - 13, top - 38, x + 13, top - 12], 180, 360, fill=INK)
+    p.d.pieslice([x - 11, top - 36, x + 11, top - 14], 180, 360, fill=hexc('#f4f3ee')); p.d.pieslice([x - 11, top - 36, x + 11, top - 14], 290, 360, fill=hexc('#d6d4cc'))
+    p.d.ellipse([x - 4, top - 44, x + 4, top - 36], fill=INK); p.d.ellipse([x - 3, top - 43, x + 3, top - 37], fill=hexc('#f4f3ee'))
+
+def lattice_mast(p, x, base, top, w=12):  # 쇠 격자 안테나 탑(D30·D40)
+    for y in range(top, base, 2):
+        t = (y - top) / max(1, base - top); half = round(w / 2 * (.5 + .5 * t))
+        p.px(x - half, y, '#5a6068'); p.px(x + half, y, '#5a6068')
+    for y in range(top, base - 6, 8):
+        t = (y - top) / max(1, base - top); half = round(w / 2 * (.5 + .5 * t))
+        p.d.line([(x - half, y), (x + half, y + 8)], fill=hexc('#7a8088')); p.d.line([(x + half, y), (x - half, y + 8)], fill=hexc('#7a8088'))
+    p.r(x - 1, top - 10, 2, 10, '#5a6068'); p.r(x - 5, top - 6, 10, 1, '#5a6068')
+
+def solar_field(p, x0, x1, y):  # 바닥에 기울여 놓은 태양광 판(D30)
+    for x in range(x0, x1 - 18, 22):
+        p.d.polygon([(x, y), (x + 20, y), (x + 23, y - 9), (x + 3, y - 9)], fill=INK)
+        p.d.polygon([(x + 1, y - 1), (x + 19, y - 1), (x + 22, y - 8), (x + 4, y - 8)], fill=hexc('#2f4f8f'))
+        for k in (6, 12): p.r(x + 2 + k, y - 8, 1, 7, '#6c88c8')
+        p.r(x + 4, y - 5, 16, 1, '#6c88c8'); p.r(x + 4, y + 1, 2, 4, '#55595f'); p.r(x + 16, y + 1, 2, 4, '#55595f')
+
+def dokdo_east_lab():  # 동도 연구소: 하얀 2층 관측소 + 돔 지붕 독도 등대 + 격자 안테나 + 태양광 판 (D30·D40)
+    W, H = 176, 176; p = Pic(W, H); x0, x1, cx = 8, 168, 88
+    ground_shadow(p, x0, x1, H)
+    wall(p, x0 + 2, 124, 92, H - 6, '#f4f2ec')
+    p.r(x0 + 4, 128, 124 - x0 - 6, 4, '#3f7fb0')
+    for x in (18, 94): window3d(p, x, 100, 20, 18); window3d(p, x, 140, 20, 20)
+    base3d(p, x0 + 2, 124, H)
+    door3d(p, cx - 18, H, w=22, h=36, glass=True)
+    flat_roof(p, x0, 124, 84, '#d6d2c8', depth=12)
+    solar_field(p, 14, 116, 82)
+    lattice_mast(p, 30, 72, 22, w=10)
+    dome_lighthouse(p, 148, H - 4, 58)
+    p.r(128, H - 8, 44, 8, INK); p.r(129, H - 7, 42, 3, '#c9c4b8'); p.r(129, H - 4, 42, 3, '#9a958a')
+    return p
+
+def dokdo_east_gym():  # 동도 수호관: 독도경비대 건물처럼 짙은 회색 돌판 벽 3층 + 파란 띠 + 철골 구조물 (D37·D40, 글자는 넣지 않아요)
+    W, H = 240, 204; p = Pic(W, H); x0, x1, cx = 8, 232, 120
+    ground_shadow(p, x0, x1, H, reach=14)
+    stone = '#76746f'
+    wall(p, x0 + 8, x1 - 8, 76, H - 6, stone)
+    for y in range(80, H - 10, 14): p.r(x0 + 10, y, x1 - x0 - 20, 1, tone(stone, .8))       # 돌판 줄눈
+    for i, y in enumerate(range(80, H - 10, 14)):
+        for x in range(x0 + 10 + (i % 2) * 18, x1 - 10, 36): p.r(x, y, 1, 14, tone(stone, .82)); p.r(x + 1, y + 1, 16, 1, tone(stone, 1.08))
+    p.r(x0 + 30, 86, 150, 14, INK); p.r(x0 + 31, 87, 148, 12, '#f1f2f4')                      # 간판 바탕(글자 대신 파란 무늬)
+    for x in range(x0 + 36, x0 + 176, 9): p.r(x, 89, 6, 8, '#2346a8')
+    for x in range(26, 222, 22):
+        if abs(x + 6 - cx) > 22: window3d(p, x, 110, 12, 30, frame='#eef0f2', glass='#7aa6c0', bars=False); window3d(p, x, 156, 12, 30, frame='#eef0f2', glass='#7aa6c0', bars=False)
+    base3d(p, x0 + 8, x1 - 8, H, c='#9a978f')
+    door3d(p, cx, H, w=28, h=42, glass=True)
+    flat_roof(p, x0 + 4, x1 - 4, 68, '#8c8a85', depth=12)
+    for i in range(x0 + 6, x1 + 2, 6): p.r(i, 50, 1, 10, '#9a9fa6')                           # 옥상 난간
+    p.r(x0 + 6, 49, x1 - x0 - 2, 2, '#9a9fa6')
+    lattice_mast(p, 206, 48, 8, w=10); lattice_mast(p, 40, 48, 18, w=8)
+    return p
+
+def dokdo_east_shop():  # 동도 쉼터: 실물 대응 없는 창작 — 낮은 흰 단층 건물 + 회색 평지붕 + 태양광 판(서도 숙소와 다르게)
+    W, H = 176, 168; p = Pic(W, H); x0, x1, cx = 8, 168, 88
+    ground_shadow(p, x0, x1, H)
+    wall(p, x0 + 6, x1 - 6, 96, H - 6, '#f2f1ec')
+    p.r(x0 + 8, 100, x1 - x0 - 16, 4, '#4a8ac0')
+    for x in (22, 124): window3d(p, x, 110, 28, 24)
+    base3d(p, x0 + 6, x1 - 6, H)
+    door3d(p, cx, H, w=26, h=40, glass=True)
+    flat_roof(p, x0 + 2, x1 - 2, 88, '#b8b6ae', depth=14)
+    solar_field(p, 26, 150, 86)
+    return p
+
+def dokdo_west_shop():  # 서도 쉼터: 주민숙소(D50·D51)처럼 큰 절벽 아래 짙은 회색 벽돌 3층 + 파란 지붕 + 흰 바닥 벽 + 태양광 판
+    W, H = 176, 176; p = Pic(W, H); x0, x1, cx = 8, 168, 88
+    p.d.polygon([(0, H), (0, 30), (14, 8), (34, 0), (52, 16), (58, H)], fill=INK)              # 기대어 선 절벽
+    p.d.polygon([(2, H - 2), (2, 32), (15, 11), (33, 3), (49, 18), (55, H - 2)], fill=hexc('#7d746c'))
+    p.d.polygon([(2, H - 2), (2, 34), (15, 13), (24, 9), (20, H - 2)], fill=hexc('#958c82'))
+    for (x, y, w) in [(8, 50, 18), (20, 84, 22), (6, 118, 16), (14, 34, 12)]: p.r(x, y, w, 2, '#5f5850'); p.r(x + 2, y - 2, w - 6, 1, '#b9b0a4')
+    ground_shadow(p, 44, x1, H)
+    brick = '#4b4d53'
+    wall(p, 44, x1 - 2, 54, H - 30, brick)
+    for i, y in enumerate(range(58, H - 34, 5)):
+        for x in range(46 + (i % 2) * 6, x1 - 4, 12): p.r(x, y, 1, 5, tone(brick, .78))
+        p.r(46, y, x1 - 50, 1, tone(brick, .8))
+    for y in (62, 94):
+        for x in (52, 84, 116, 144): window3d(p, x, y, 16, 18, frame='#e8ecee', glass='#5fa8b0', bars=False)
+    p.r(52, 62, 16, 52, INK); p.r(53, 63, 14, 50, '#3fa0b8'); p.r(53, 63, 4, 50, '#7fd0e0')            # 청록 계단실 창
+    p.r(40, H - 30, x1 - 38, 26, INK); p.r(41, H - 29, x1 - 40, 24, '#ecebe6')                          # 흰 바닥 벽(방파벽)
+    for x in (58, 92, 118, 150): p.r(x, H - 28, 2, 12 + x % 7, '#b5784a')                               # 녹물 자국
+    door3d(p, cx + 14, H - 4, w=20, h=24)
+    hip_roof(p, 44, x1 - 2, 56, 30, '#5a8fc8', rows=4, overhang=4)
+    hip_roof(p, 60, 130, 32, 14, '#5a8fc8', rows=3, overhang=3)
+    p.d.polygon([(70, 30), (100, 30), (104, 22), (74, 22)], fill=INK); p.d.polygon([(71, 29), (99, 29), (102, 23), (75, 23)], fill=hexc('#2f4f8f'))   # 태양광 판
+    for fx in (138, 150): p.r(fx, 0, 2, 30, INK)
+    return p
+
+def dokdo_west_lab():  # 서도 연구소: 등대 없는(서도에는 등대가 없어요) 하얀 관측소 + 태양광 판 + 격자 기상 안테나 (창작)
+    W, H = 176, 168; p = Pic(W, H); x0, x1, cx = 8, 168, 88
+    ground_shadow(p, x0, x1, H)
+    wall(p, x0 + 2, x1 - 2, 78, H - 6, '#f4f2ec')
+    p.r(x0 + 4, 116, x1 - x0 - 8, 5, '#3f7fb0'); p.r(x0 + 4, 116, x1 - x0 - 8, 1, '#7fb0d8')
+    for x in (20, 126): window3d(p, x, 88, 22, 20); window3d(p, x, 128, 22, 22)
+    window3d(p, 62, 88, 22, 20); window3d(p, 96, 88, 22, 20)
+    base3d(p, x0 + 2, x1 - 2, H)
+    door3d(p, cx, H, w=24, h=38, glass=True)
+    flat_roof(p, x0, x1, 70, '#d6d2c8', depth=14)
+    solar_field(p, 16, 120, 66)
+    lattice_mast(p, 146, 62, 8, w=12)
+    return p
+
+def ferry():  # 여객선(U01·D41·D42), 위에서 본 모습: 뱃머리가 아래(바다 쪽). 흰 쌍동선 + 파란 창 띠 + 위층 갑판
+    W, H = 92, 208; p = Pic(W, H); cx = 46
+    hull = [(8, 10), (84, 10), (86, 150), (74, 186), (cx, 204), (18, 186), (6, 150)]
+    p.poly([(x, y) for x, y in hull], '#f4f5f6', INK)
+    p.poly([(10, 12), (20, 12), (18, 186), (cx, 202), (14, 184), (8, 150)], '#d9dde0')         # 왼쪽 그늘(빛은 왼쪽 위)
+    p.r(8, 10, 76, 6, '#c2453a'); p.r(8, 16, 76, 2, INK)                                          # 고물 빨간 띠
+    p.r(14, 22, 64, 128, INK); p.r(16, 24, 60, 124, '#e9ecee')                                   # 객실 지붕
+    for y in range(30, 146, 10): p.r(16, y, 4, 6, '#2f5f96'); p.r(72, y, 4, 6, '#2f5f96')         # 옆 창
+    p.r(24, 40, 44, 70, INK); p.r(26, 42, 40, 66, '#f7f8f9'); p.r(26, 42, 40, 3, '#ffffff')      # 위층 갑판
+    p.r(30, 112, 32, 22, INK); p.r(32, 114, 28, 18, '#3b6e9e'); p.r(32, 114, 28, 4, '#7fb0d8')   # 조타실 창
+    for x in (34, 52): p.r(x, 52, 6, 10, '#c9ced2'); p.r(x, 52, 6, 2, '#9aa0a6')                   # 환기구
+    p.r(40, 70, 12, 12, '#c2453a'); p.r(42, 72, 8, 8, '#f4f5f6')                                   # 표시
+    p.r(18, 150, 56, 3, '#b8bec3'); p.r(cx - 1, 160, 2, 30, '#b8bec3')
+    return p
+
 ART = {
+    'ferry': ferry,
     'ulleung-home': ulleung_home, 'ulleung-shop': ulleung_shop, 'ulleung-lab': ulleung_lab, 'ulleung-gym': ulleung_gym,
     'dokdo-lab': dokdo_lab, 'dokdo-gym': dokdo_gym, 'dokdo-shop': dokdo_shop, 'dokdo-home': dokdo_home,
     'tree-hubak': tree_hubak, 'tree-dongbaek': tree_dongbaek, 'tree-pine': tree_pine, 'shrub-saecheol': shrub_saecheol, 'shrub-haeguk': shrub_haeguk,
-    'wall-stone': wall_stone, 'rail-wood': rail_wood, 'record-board': record_board
+    'wall-stone': wall_stone, 'rail-wood': rail_wood, 'record-board': record_board,
+    # v0.74
+    'ulleung-terminal': ulleung_terminal,
+    'ulleung-house1': lambda: ulleung_house('#3f8f5a', '#efe9dc', 3, shop=True),
+    'ulleung-house2': lambda: ulleung_house('#3d6fa8', '#e8e4d8', 2),
+    'ulleung-house3': lambda: ulleung_house('#b0563f', '#f2efe6', 3, stripe='#d8c39a'),
+    'ulleung-house4': lambda: ulleung_house('#4a9a8a', '#dcd6c8', 2, shop=True),
+    'ulleung-block1': lambda: ulleung_house('#2f6aa3', '#f1f2f0', 5, shop=True, W=176, sign='#c2453a'),
+    'ulleung-block2': lambda: ulleung_house('#7a8a5a', '#e6ddcc', 4, shop=True, W=176, sign='#2f8a7a', stripe='#c9b28a'),
+    'ulleung-block3': lambda: ulleung_house('#9a4a3a', '#eef0f2', 4, W=176, sign='#e0a030'),
+    'tetrapods': tetrapods, 'rail-steel': rail_steel, 'rail-steel-v': rail_steel_v,
+    'dokdo-east-lab': dokdo_east_lab, 'dokdo-east-gym': dokdo_east_gym, 'dokdo-east-shop': dokdo_east_shop,
+    'dokdo-west-lab': dokdo_west_lab, 'dokdo-west-shop': dokdo_west_shop
 }
 
 def main():

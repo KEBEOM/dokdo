@@ -16,7 +16,11 @@ import { assetImage, assetTintTag } from './assets.js';
 import { EYE, NEAR_Z, BACK } from './view3d.js';
 
 // 그림 맨 위에서 앞벽이 시작하는 줄(처마) — 그림마다 직접 재었어요
-export const EAVE = { 'ulleung-home': 100, 'ulleung-shop': 66, 'ulleung-lab': 70, 'ulleung-gym': 110, 'dokdo-lab': 78, 'dokdo-gym': 82, 'dokdo-shop': 50, 'dokdo-home': 98 };
+export const EAVE = { 'ulleung-home': 100, 'ulleung-shop': 66, 'ulleung-lab': 70, 'ulleung-gym': 110, 'dokdo-lab': 78, 'dokdo-gym': 82, 'dokdo-shop': 50, 'dokdo-home': 98,
+  // v0.74: 0 = 그림 전체를 앞벽으로(지붕 위 탑·등대까지 세워 보여요) · 지붕은 거의 평평하게
+  'ulleung-terminal': 0, 'ulleung-house1': 42, 'ulleung-house2': 42, 'ulleung-house3': 42, 'ulleung-house4': 42, 'ulleung-block1': 42, 'ulleung-block2': 42, 'ulleung-block3': 42,
+  'dokdo-east-lab': 0, 'dokdo-east-gym': 76, 'dokdo-east-shop': 96, 'dokdo-west-lab': 78, 'dokdo-west-shop': 56 };
+const FLAT = new Set(['ulleung-terminal', 'dokdo-east-lab', 'ulleung-house1', 'ulleung-house2', 'ulleung-house3', 'ulleung-house4', 'ulleung-block1', 'ulleung-block2', 'ulleung-block3', 'dokdo-east-gym', 'dokdo-east-shop', 'dokdo-west-lab']);
 const TILE = 32;
 const SHADE = { front: 1, back: .86, west: .78, east: .72, roofFront: 1, roofBack: .8 };
 
@@ -39,7 +43,7 @@ export function buildingKit(key, b) {
   // 앞벽의 좌우 끝(불투명한 열), 지붕 맨 윗줄(가운데 열들 기준)
   let u0 = sw, u1 = 0; for (let x = 0; x < sw; x++) for (let y = eave + 4; y < sh - 6; y++) if (op(x, y)) { u0 = Math.min(u0, x); u1 = Math.max(u1, x); break; }
   let top = eave; for (let y = 0; y < eave; y++) { let hit = false; for (let x = Math.round(sw * .3); x < sw * .7; x++) if (op(x, y)) { hit = true; break; } if (hit) { top = y; break; } }
-  const wallW = u1 - u0 + 1, wallH = sh - eave, depth = b.h * TILE - 16, rise = Math.max(20, Math.min(56, Math.round(depth * .34)));
+  const wallW = u1 - u0 + 1, wallH = sh - eave, depth = b.h * TILE - 16, rise = FLAT.has(key) ? 6 : Math.max(20, Math.min(56, Math.round(depth * .34)));
   const front = canvas(wallW, wallH); front.getContext('2d').drawImage(art, u0, eave, wallW, wallH, 0, 0, wallW, wallH);
   // 뒷벽: 문과 그 위 간판(문에 이어 붙은 무늬 덩어리)을 지우고 그 자리를 ‘줄마다 가장 흔한 색’(맨벽)으로 채워요
   const fd = front.getContext('2d').getImageData(0, 0, wallW, wallH).data, at = (x, y) => (y * wallW + x) * 4;
@@ -57,7 +61,8 @@ export function buildingKit(key, b) {
   sg.fillStyle = hex(mode[Math.round(wallH * .4)]); sg.fillRect(0, 0, depth, rise + 2);
   sg.drawImage(back, cut, 0, Math.min(depth, wallW), wallH, 0, rise, depth, wallH);
   sg.fillStyle = '#2a2422'; sg.fillRect(0, rise - 1, depth, 2); // 처마선
-  const roof = canvas(wallW, Math.max(4, eave - top)); roof.getContext('2d').drawImage(art, u0, top, wallW, eave - top, 0, 0, wallW, eave - top);
+  const roof = canvas(wallW, Math.max(4, eave - top)); if (eave - top > 0) roof.getContext('2d').drawImage(art, u0, top, wallW, eave - top, 0, 0, wallW, eave - top);
+  else { const rg = roof.getContext('2d'); rg.fillStyle = '#9aa0a4'; rg.fillRect(0, 0, wallW, 4); } // 그림 전체가 앞벽이면 지붕은 회색 평지붕
   const kit = {
     u0, wallW, wallH, depth, rise, sw,
     tex: { front: shaded(front, SHADE.front), back: shaded(back, SHADE.back), west: shaded(side, SHADE.west), east: shaded(side, SHADE.east), roofFront: shaded(roof, SHADE.roofFront), roofBack: shaded(roof, SHADE.roofBack) }
@@ -144,7 +149,7 @@ export function boxPainter(P, cam, keyOf, liftOf = () => 0) {
 // ── v0.71 납작한 물건(표지판·안내판·기록판·비석·상자·울타리·가림막·화분)을 세계에 고정된 얇은 판으로 ─────────
 // 세운 그림(빌보드)은 어느 쪽에서 봐도 앞모습이라, 뒤로 돌아가도 글씨 면이 보였어요.
 // 이제 앞(남쪽)은 2D 그림, 뒤(북쪽)는 어둡게 칠한 뒷판, 옆은 그 두께만큼의 옆면으로 보여요. 나무·바위처럼 둥근 것은 그대로 세운 그림이에요.
-export const SLAB = { sign: 4, landmark: 6, stone: 10, box: 22, board: 6, fence: 4, barrier: 6, planter: 24, monument: 40 }; // monument: 두 섬 조형물(받침대가 있는 두꺼운 판)
+export const SLAB = { sign: 4, landmark: 6, stone: 10, box: 22, board: 6, fence: 4, barrier: 6, planter: 24, monument: 40, rail: 4, railv: 4 }; // monument: 두 섬 조형물(받침대가 있는 두꺼운 판)
 const slabCache = new Map();
 function slabTextures(key, render, fx, fy) {
   const id = `${key}:${assetTintTag()}`; if (slabCache.has(id)) return slabCache.get(id);
@@ -160,8 +165,14 @@ function slabTextures(key, render, fx, fy) {
   const tex = { front, back, side, w, h, ax: l - S / 2 }; slabCache.set(id, tex); return tex;
 }
 // t: 두께(지도 픽셀) · lift: 언덕 위 높이
-export function drawSlab(ctx, P, cam, key, fx, fy, t, render, lift = 0) {
+export function drawSlab(ctx, P, cam, key, fx, fy, t, render, lift = 0, vertical = false) {
   const T = slabTextures(key, render, fx, fy); if (!T) return false;
+  if (vertical) { // v0.74 위아래로 이어진 난간: 판이 남북으로 서요(칸 가운데)
+    const c = fy - 12, y0 = c - T.w / 2, y1 = c + T.w / 2, xE = fx + t / 2, xW = fx - t / 2, z0 = lift, z1 = lift + T.h, W = T.w, H = T.h; ctx.imageSmoothingEnabled = false;
+    if (cam.x > xE) drawFace(ctx, P, cam, { tex: T.front, v: [[xE, y1, z0, 0, H], [xE, y0, z0, W, H], [xE, y0, z1, W, 0], [xE, y1, z1, 0, 0]] });
+    if (cam.x < xW) drawFace(ctx, P, cam, { tex: T.back, v: [[xW, y0, z0, 0, H], [xW, y1, z0, W, H], [xW, y1, z1, W, 0], [xW, y0, z1, 0, 0]] });
+    return true;
+  }
   const x0 = fx + T.ax, x1 = x0 + T.w, yF = fy + t / 2, yB = fy - t / 2, z0 = lift, z1 = lift + T.h, W = T.w, H = T.h;
   ctx.imageSmoothingEnabled = false;
   if (cam.y > yF) drawFace(ctx, P, cam, { tex: T.front, v: [[x0, yF, z0, 0, H], [x1, yF, z0, W, H], [x1, yF, z1, W, 0], [x0, yF, z1, 0, 0]] });

@@ -25,12 +25,12 @@ export function createMap(ref = 0) {
   const map = Object.assign(grid, {
     id: def.id, def, zone: def.zone, kind: def.kind, name: def.name,
     solid: parsed.solid, exits: parsed.exits, spawns: parsed.spawns,
-    buildings: parsed.buildings, decor: parsed.decor, ground: parsed.ground || [], rockTiles: parsed.rockTiles, keepClear, parsed,
+    buildings: parsed.buildings, structures: parsed.structures || [], decor: parsed.decor, ground: parsed.ground || [], rockTiles: parsed.rockTiles, keepClear, parsed,
     doors: parsed.doors || [], stairs: parsed.stairs || [], focus: parsed.focus || null,
     level: parsed.level || null, cliff: parsed.cliff || null // v0.70 높낮이(언덕·절벽·계단·사다리)
   });
   // v0.71 얕은 물: 걸을 수 있는 땅(풀·길·풀숲·모래·부두)에 맞닿은 물 칸
-  map.shallow = new Set(); if (map.kind !== 'room') for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (map[y][x] === 0 && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => [1, 2, 3, 4, 6].includes(map[y + b]?.[x + a]) && !map.solid.has(`${x + a},${y + b}`))) map.shallow.add(`${x},${y}`);
+  map.shallow = new Set(); if (map.kind !== 'room') for (let y = 0; y < grid.length; y++) for (let x = 0; x < grid[0].length; x++) if (map[y][x] === 0 && !map.solid.has(`${x},${y}`) && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => [1, 2, 3, 4, 6].includes(map[y + b]?.[x + a]) && !map.solid.has(`${x + a},${y + b}`))) map.shallow.add(`${x},${y}`);
   map.decor = [...map.decor, ...flowerTiles(map).map(([x, y, common]) => ({ kind: 'flower', x, y, common }))]; // v0.68: 세워 그리는 들꽃(3D에서도 서 있어요)
   return map;
 }
@@ -91,8 +91,9 @@ export function npcs(ref = 0, progress = {}, flags = {}) {
 
 // v0.71 물: 땅에 맞닿은 얕은 물은 첨벙첨벙 걷고, 그보다 깊은 물에선 잠수해요(바닷속). 마을 사람들은 물에 들어가지 않아요(wade = false).
 export function blocked(map, x, y, people = [], ignorePeople = false, wade = true) {
-  if (x < 0 || y < 0 || x >= W || y >= H) return true;
+  if (x < 0 || y < 0 || y >= map.length || x >= map[0].length) return true;
   const t = map[y][x];
+  if (map.solid?.has(`${x},${y}`)) return true; // v0.74 물 위에 놓인 소파블록·바위도 막혀요
   if (t === 0 && wade && map.kind !== 'room') return !ignorePeople && people.some(n => (n.occupied || [n]).some(p => p.x === x && p.y === y)); // v0.71 물속까지(얕은 물은 걷고, 깊은 물은 잠수)
   if (t === 0 || t === 5 || t === 7 || t === 8 || t === 9 || map.solid?.has(`${x},${y}`)) return true;
   return !ignorePeople && people.some(n => (n.occupied || [n]).some(p => p.x === x && p.y === y));
@@ -120,7 +121,13 @@ export function pathfind(map, sx, sy, tx, ty, people = []) {
 function rect(ctx, x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.floor(x), Math.floor(y), w, h); }
 // 울릉도: 후박나무·동백나무 / 독도: 키 큰 나무 없이 사철나무 덤불과 해국 (소나무는 쓰지 않아요)
 const ulleung = map => map?.def?.island === '울릉도';
-export const buildingArt = (map, b) => `${ulleung(map) ? 'ulleung' : 'dokdo'}-${b.kind}`; // 건물 그림 이름(2D·3D 같이 써요)
+// 건물 그림 이름(2D·3D 같이 써요). v0.74: 동도(등대·경비대)와 서도(주민숙소)를 나눠 그려요(art/실사-참고표.md)
+export const buildingArt = (map, b) => {
+  if (b.kind === 'terminal') return 'ulleung-terminal'; if (b.kind === 'house') return `ulleung-house${b.v || 1}`; if (b.kind === 'block') return `ulleung-block${(b.v || 1) % 3 + 1}`;
+  if (ulleung(map)) return `ulleung-${b.kind}`;
+  const west = (map?.def?.island || '').includes('서도');
+  return b.kind === 'home' ? 'dokdo-home' : b.kind === 'gym' && west ? 'dokdo-gym' : `dokdo-${west ? 'west' : 'east'}-${b.kind}`;
+};
 // v0.67 타일셋 v2의 물건 그림(나무·덤불·바위). 그림이 아직 없으면 false를 돌려줘서 예전 그림으로 그려요.
 function drawV2(ctx, name, dx, dy) {
   const img = assetImage(V2_OBJECTS.key), r = V2_OBJECTS.sprites[name]; if (!img || !r) return false;
@@ -158,7 +165,7 @@ export function drawHouseDefault(ctx, b, labels = true) {
 
 // Inside a building (focus = the room): a room smaller than the screen sits in the middle,
 // a bigger one scrolls but never shows more than a tile of darkness beyond its walls.
-export function cameraFor(view, width = 768, height = 480, focus = null) {
+export function cameraFor(view, width = 768, height = 480, focus = null, dims = { w: W, h: H }) {
   const axis = (p, size, lo, len, total) => {
     if (!focus) return Math.max(0, Math.min(total - size, p * TILE - size / 2 + 16));
     const a = lo * TILE, span = len * TILE;
@@ -166,13 +173,13 @@ export function cameraFor(view, width = 768, height = 480, focus = null) {
     return Math.max(a - TILE, Math.min(a + span + TILE - size, p * TILE - size / 2 + 16));
   };
   return {
-    x: Math.floor(axis(view.x, width, focus?.x, focus?.w, W * TILE)),
-    y: Math.floor(axis(view.y, height, focus?.y, focus?.h, H * TILE))
+    x: Math.floor(axis(view.x, width, focus?.x, focus?.w, dims.w * TILE)),
+    y: Math.floor(axis(view.y, height, focus?.y, focus?.h, dims.h * TILE))
   };
 }
 
 export function drawWorld(ctx, map, state, view, time, target = null, motion = { walking: false, distance: 0 }, viewport = { width: 768, height: 480, labels: true }, people = npcs(map, state.progress[state.zone], state.flags)) {
-  const z = ZONES[state.zone], { width, height } = viewport, room = map.kind === 'room', { x: camX, y: camY } = cameraFor(view, width, height, room ? map.focus : null);
+  const z = ZONES[state.zone], { width, height } = viewport, room = map.kind === 'room', { x: camX, y: camY } = cameraFor(view, width, height, room ? map.focus : null, { w: map[0].length, h: map.length });
   ctx.clearRect(0, 0, width, height); ctx.fillStyle = room ? '#0e1418' : seasonColor(z.color); ctx.fillRect(0, 0, width, height);
   ctx.save(); ctx.translate(-camX, -camY);
   if (room) drawInterior(ctx, map, time, { x: camX, y: camY, width, height });
@@ -235,7 +242,7 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
     // 3D 보기(v0.62): 먼 것부터 가까운 것 순서로 세워 그려요. 카메라와 내 캐릭터 사이에 있는 것은 비쳐 보이게 해요.
     const list = [];
     for (const n of order) {
-      if (n.scenery === 'boat') continue; // v0.68: 배는 위에서 본 그림이라 3D에서는 물 위에 눕혀 그려요(drawFlatDecor)
+      if (n.scenery === 'boat' || n.scenery === 'ferry') continue; // v0.68: 배는 위에서 본 그림이라 3D에서는 물 위에 눕혀 그려요(drawFlatDecor)
       const slabKind = project.slab && (n.kind === 'board' ? 'board' : PROP_KINDS.includes(n.kind) ? n.kind : n.scenery); // v0.71 납작한 물건은 앞·뒤·옆이 있는 판으로
       if (project.slab && project.slab.has(slabKind) && !n.player) { const fx = n.x * TILE + (n.w ? n.w * 16 : 16), fy = n.depth, p = project(fx, fy); if (p && p.k > 0 && !(project.fadeZ && p.z < project.fadeZ * .85)) list.push({ n, fx, fy, p, slab: slabKind }); continue; }
       if (n.building && project.box) { const z = project.box.depth(n.building); if (z != null) { list.push({ n, box: true, p: { z } }); continue; } } // v0.68: 입체 건물(box3d.js)
@@ -263,7 +270,7 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
       }
     }
     list.sort((a, b) => (b.key ?? b.p.z ?? 0) - (a.key ?? a.p.z ?? 0));
-    for (const { n, fx, fy, p, box, wall, slab } of list) { const fa = project.fog && !n?.player ? 1 - project.fog(p.z ?? 0) : 1; if (fa < .04) continue; ctx.save(); ctx.globalAlpha *= fa; drawItem(); ctx.restore(); function drawItem() { if (slab) { ctx.save(); ctx.setTransform(base); if (project.fadeZ && p.z < project.fadeZ) ctx.globalAlpha *= .3; project.slab.draw(ctx, n, slab, fx, fy, g => { const keep = ctx; ctx = g; drawOne(n); ctx = keep; }); ctx.restore(); return; } if (wall) { ctx.save(); ctx.setTransform(base); project.drawWall(ctx, wall); ctx.restore(); return; } if (box) { ctx.save(); ctx.setTransform(base); project.box.draw(ctx, n.building); ctx.restore(); return; } ctx.save(); if (!n.player && project.fadeZ && p.z < project.fadeZ) ctx.globalAlpha *= .22; ctx.setTransform(base.a * p.k, 0, 0, base.d * p.k, base.a * (p.x - fx * p.k), base.d * (p.y - fy * p.k)); drawOne(n); ctx.restore(); } } // v0.71 바닷속 안개: 멀수록 흐리게
+    for (const { n, fx, fy, p, box, wall, slab } of list) { const fa = project.fog && !n?.player ? 1 - project.fog(p.z ?? 0) : 1; if (fa < .04) continue; ctx.save(); ctx.globalAlpha *= fa; drawItem(); ctx.restore(); function drawItem() { if (slab) { ctx.save(); ctx.setTransform(base); if (project.fadeZ && p.z < project.fadeZ) ctx.globalAlpha *= .3; project.slab.draw(ctx, n, slab, fx, fy, g => { const keep = ctx; ctx = g; drawOne(slab === 'railv' ? { ...n, scenery: 'rail', w: 1 } : n); ctx = keep; }); ctx.restore(); return; } if (wall) { ctx.save(); ctx.setTransform(base); project.drawWall(ctx, wall); ctx.restore(); return; } if (box) { ctx.save(); ctx.setTransform(base); project.box.draw(ctx, n.building); ctx.restore(); return; } ctx.save(); if (!n.player && project.fadeZ && p.z < project.fadeZ) ctx.globalAlpha *= .22; ctx.setTransform(base.a * p.k, 0, 0, base.d * p.k, base.a * (p.x - fx * p.k), base.d * (p.y - fy * p.k)); drawOne(n); ctx.restore(); } } // v0.71 바닷속 안개: 멀수록 흐리게
   }
   function drawOne(n) {
     if (n.scenery) { drawDecor(ctx, n, map, time); return; }
@@ -318,7 +325,7 @@ function wildFlowers(ctx, tx, ty, time, common = true) {
 }
 // v0.68 3D 보기: 위에서 내려다본 그림(배)은 세우지 않고 땅 그림 위에 눕혀 그려요. 물결 따라 살짝 흔들려요.
 export function drawFlatDecor(ctx, map, time) {
-  for (const d of map.decor) if (d.kind === 'boat') { const bob = Math.round(Math.sin(time / 650 + d.x) * 1.5); ctx.save(); ctx.translate(0, bob); drawDecor(ctx, { scenery: 'boat', x: d.x, y: d.y }, map, time); ctx.restore(); }
+  for (const d of map.decor) if (d.kind === 'boat' || d.kind === 'ferry') { const bob = Math.round(Math.sin(time / 650 + d.x) * 1.5); ctx.save(); ctx.translate(0, bob); drawDecor(ctx, { scenery: d.kind, x: d.x, y: d.y }, map, time); ctx.restore(); }
 }
 function drawDecor(ctx, n, map, time) {
   if (n.building) return house(ctx, n.building, false, map);
@@ -327,6 +334,9 @@ function drawDecor(ctx, n, map, time) {
     case 'tree': return tree(ctx, n.x * 32, n.y * 32, map, time);
     case 'flower': return wildFlowers(ctx, n.x, n.y, time, n.common);
     case 'fence': return drawIslandArt(ctx, ulleung(map) ? 'wall-stone' : 'rail-wood', n.x * 32, n.y * 32 - 6, 64, 36, n.w * 32);
+    case 'rail': return drawIslandArt(ctx, 'rail-steel', n.x * 32, n.y * 32 - 6, 64, 36, n.w * 32); // v0.74 쇠 난간(해안산책로·보행교·선착장)
+    case 'railv': return drawIslandArt(ctx, 'rail-steel-v', n.x * 32, n.y * 32 - 8, 32, 44);
+    case 'tetrapods': return drawIslandArt(ctx, 'tetrapods', n.x * 32 - 4, n.y * 32 - 6, 40, 40); // v0.74 소파블록
     case 'planter': return propArt(ctx, 'planter', n.x * 32 + 16, n.y * 32 + 29) || drawScenery(ctx, 'planter', n.x * 32 - 4, n.y * 32 + 3, 40, 28);
     case 'monument': { // 두 섬 조형물: 돌 받침대 위의 도트 독도(v0.39)
       const pics = assetImage(CUTSCENE_ATLAS.key), f = CUTSCENE_ATLAS.frames['dokdo-224'];
@@ -334,6 +344,7 @@ function drawDecor(ctx, n, map, time) {
       return drawScenery(ctx, 'monument', n.x * 32, (n.y + 1) * 32 - 80, 96, 80);
     }
     case 'boat': return drawScenery(ctx, 'boat', n.x * 32 - 16, n.y * 32 - 30, 64, 100);
+    case 'ferry': return drawIslandArt(ctx, 'ferry', n.x * 32 - 30, n.y * 32 - 16, 92, 208); // v0.74 여객선(위에서 본 모습, 3D에서도 물 위에 눕혀요)
     case 'rock': return drawV2(ctx, 'dd_small_boulder', n.x * 32, n.y * 32) || drawProp(ctx, 'rock', n.x, n.y, { water: map[n.y]?.[n.x] === 0, time }); // v0.67: 타일셋 v2 바위
     case 'crag': return drawProp(ctx, 'crag', n.x, n.y, { w: n.w, h: n.h });
     case 'beacon': return drawProp(ctx, 'beacon', n.x, n.y, { time });
@@ -346,9 +357,10 @@ export function sceneDrawOrder(people, view, map = createMap(0)) {
   const items = people.map(n => ({ ...n, x: n.drawX ?? n.x, y: n.drawY ?? n.y, depth: (n.drawY ?? n.y) * TILE + 28, player: false }));
   items.push({ x: view.x, y: view.y, depth: view.y * TILE + 28, player: true });
   for (const b of map.buildings) items.push({ scenery: b.kind, building: b, depth: (b.y + b.h) * TILE });
+  for (const b of map.structures || []) items.push({ scenery: b.kind, building: b, depth: (b.y + b.h) * TILE }); // v0.74 터미널·시가지 집
   for (const d of map.decor) {
-    if (d.kind === 'fence') { for (let i = 0; i < d.len; i += 2) items.push({ scenery: 'fence', x: d.x + i, y: d.y, w: Math.min(2, d.len - i), depth: d.y * TILE + 27 }); continue; }
-    const depth = { flower: 22, tree: 24, beacon: 28, barrier: 27, planter: 29, monument: 32, boat: 70, rock: 26, crag: 30, ...FURNITURE_DEPTH }[d.kind] ?? 24;
+    if (d.kind === 'fence' || d.kind === 'rail') { for (let i = 0; i < d.len; i += 2) items.push({ scenery: d.kind, x: d.x + i, y: d.y, w: Math.min(2, d.len - i), depth: d.y * TILE + 27 }); continue; }
+    const depth = { flower: 22, tree: 24, beacon: 28, barrier: 27, planter: 29, monument: 32, boat: 70, ferry: -40, rock: 26, crag: 30, tetrapods: 26, railv: 28, ...FURNITURE_DEPTH }[d.kind] ?? 24;
     items.push({ scenery: d.kind, x: d.x, y: d.y, w: d.w, h: d.h, common: d.common, depth: d.y * TILE + depth });
   }
   return items.sort((a, b) => a.depth - b.depth);

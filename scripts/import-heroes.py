@@ -1,5 +1,5 @@
 """주인공·김박사 큰 그림 가져오기 (v0.33)
-※ v0.54부터 게임은 dist/assets/characters/sheets/*-portrait.png(128×128)를 써요. 큰 그림은 Aseprite로 그 파일을 고치세요(art/ASEPRITE-가이드.md).
+※ v0.72: 게임은 아래 세 파일을 큰 그림으로 그대로 써요(art/ASEPRITE-가이드.md).
 
     python scripts/import-heroes.py 여학생.png 남학생.png 김박사.png      # Pillow, numpy 필요
 

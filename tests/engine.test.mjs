@@ -23,7 +23,7 @@ test('every map: people on land, arrivals free, everyone and every exit reachabl
   const sides=[[1,0],[-1,0],[0,1],[0,-1]];
   for(const def of MAPS)for(const won of [false,true]){
     const map=createMap(def.id),people=npcs(map,{enemy:won},{});
-    assert.equal(map.length,H);assert.ok(map.every(r=>r.length===W));
+    assert.ok(map.length>=H&&map[0].length>=W);assert.ok(map.every(r=>r.length===map[0].length)); // v0.74 지도마다 크기가 달라도 돼요
     for(const key of ['a','z']){const p=map.spawns[key];assert.ok(!blocked(map,p.x,p.y,people),`${def.id}: arrival ${key} is blocked`);}
     assert.equal(new Set(people.map(n=>`${n.x},${n.y}`)).size,people.length,'nobody overlaps');
     for(const n of people)assert.ok(!blocked(map,n.x,n.y,[],true),`${def.id}: ${n.name} must stand on land`);

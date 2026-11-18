@@ -198,6 +198,16 @@ export const FERRY_AGAIN = to => ({
   }]
 });
 
+// v0.74 동도 ↔ 서도: 두 섬은 다리나 땅으로 이어져 있지 않아요(D01·D02). 작은 배를 타고 좁은 바다를 건너요.
+export const ISLAND_BOAT = to => ({
+  id: 'ferry',
+  scenes: [{
+    bg: 'sea', caption: to === 'west' ? '서도로 건너가는 작은 배' : '동도로 건너가는 작은 배',
+    cast: [{ id: 'player', who: 'player', x: 182, y: 117, dir: to === 'west' ? 'left' : 'right', size: 40 }],
+    lines: [{ who: '뱃사공', text: to === 'west' ? '동도와 서도 사이는 다리가 없어서 배로 건너야 해. 금방 서도 선착장이야!' : '서도에서 동도 선착장까지 금방이야. 꽉 잡아!' }]
+  }]
+});
+
 // 처음 도착한 마을에서 보여 주는 짧은 지역 소개(0번 마을은 오프닝이 대신합니다).
 export const ARRIVALS = [
   null,

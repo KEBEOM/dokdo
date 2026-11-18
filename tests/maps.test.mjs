@@ -18,12 +18,12 @@ const shapes = new Set(towns.map(t => t.art.map(r => r.replace(/[^~]/g, '#')).jo
 assert.equal(shapes.size, 8, 'eight different coastlines');
 
 for (const def of MAPS) {
-  assert.equal(def.art.length, MAP_H); def.art.forEach(r => assert.equal(r.length, MAP_W, `${def.id} row width`));
+  const MW = def.art[0].length; assert.ok(def.art.length >= MAP_H && MW >= MAP_W); def.art.forEach(r => assert.equal(r.length, MW, `${def.id} row width`)); // v0.74 지도마다 크기가 달라도 돼요
   const p = parseMap(def.id), map = createMap(def.id);
   // exits sit on the map edges and lead to the neighbouring map
   for (const [k, dir] of p.exits) {
     const [x] = k.split(',').map(Number);
-    assert.equal(x, dir === 'prev' ? 0 : MAP_W - 1, `${def.id}: ${dir} exit on its edge`);
+    assert.equal(x, dir === 'prev' ? 0 : MW - 1, `${def.id}: ${dir} exit on its edge`);
     assert.ok(dir === 'prev' ? prevMapId(def.id) : nextMapId(def.id), `${def.id}: ${dir} exit has a destination`);
   }
   const dirs = new Set(p.exits.values());

@@ -26,6 +26,7 @@ const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]], N8 = [...N4, [1, 1], [1, -1], [-1
 // 그 사는 곳에 맞는 칸인지(막힘·사람은 따로 봐요)
 export function habitatTile(map, x, y, hab) {
   const t = map[y]?.[x]; if (t === undefined) return false;
+  if (map.solid?.has(`${x},${y}`)) return false; // v0.74 소파블록·물 위 바위 칸에는 살지 않아요
   if ((hab === 'sea' || hab === 'surface') && map.shallow) return t === 0; // v0.71: 얕은 물(걸어서)과 깊은 물(잠수해서) 모두 — 나도 들어가서 만날 수 있어요
   if (hab === 'sea' || hab === 'surface') return t === 0 && N4.some(([a, b]) => { const n = map[y + b]?.[x + a]; return n !== undefined && n !== 0 && !map.solid?.has(`${x + a},${y + b}`); }); // 물가에서 한 칸 안쪽 물(부딪혀 만날 수 있게)
   if (hab === 'shore') return (t === 4 || t === 1 || t === 3) && N8.some(([a, b]) => map[y + b]?.[x + a] === 0);

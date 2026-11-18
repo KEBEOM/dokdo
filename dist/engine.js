@@ -96,7 +96,7 @@ export function validateSave(value){
   v.flags={};for(const [k,f] of Object.entries(value.flags||{})){if(typeof k!=='string'||k.length>40||typeof f!=='boolean')fail();if(f)v.flags[k]=true;}
   if(Object.keys(v.flags).length>500)fail();
   const legacyPlace=!def;
-  v.x=Number.isFinite(v.x)&&!legacyPlace?Math.max(0,Math.min(MAP_W-1,Math.round(v.x))):parseMap(v.map).spawns.a.x;
-  v.y=Number.isFinite(v.y)&&!legacyPlace?Math.max(0,Math.min(MAP_H-1,Math.round(v.y))):parseMap(v.map).spawns.a.y;
+  const mg=parseMap(v.map).grid;v.x=Number.isFinite(v.x)&&!legacyPlace?Math.max(0,Math.min((mg[0]?.length||MAP_W)-1,Math.round(v.x))):parseMap(v.map).spawns.a.x;
+  v.y=Number.isFinite(v.y)&&!legacyPlace?Math.max(0,Math.min((mg.length||MAP_H)-1,Math.round(v.y))):parseMap(v.map).spawns.a.y;
   v.active=Math.max(0,Math.min(v.party.length-1,Math.floor(v.active)||0));v.sessionId=Date.now().toString(36);v.started=!!v.started;v.dir=['up','down','left','right'].includes(v.dir)?v.dir:'down';return v;
 }

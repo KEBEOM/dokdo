@@ -36,11 +36,11 @@ import { pickRecord } from './records.js';
 import { createMap, npcs, blocked, pathfind, drawWorld, drawActors, drawFlatDecor, TILE, W, H, wantedRole, VILLAIN_BY_ZONE, ROLE_ACTOR, buildingArt } from './world.js';
 import { MAPS, getMapDef, townId, nextMapId, prevMapId } from './maps.js';
 import { createCutscenePlayer } from './cutscene.js';
-import { OPENING, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_FALL, TREE_JOINS, EPILOGUE, FERRY, FERRY_AGAIN } from './story.js';
+import { OPENING, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_FALL, TREE_JOINS, EPILOGUE, FERRY, FERRY_AGAIN, ISLAND_BOAT } from './story.js';
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.73';
+const VERSION = '0.74';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -48,7 +48,7 @@ const KEY = 'dokdomon-save-v1';
 
 let state = newState(), saved = null, map = createMap('town0');
 // 입체 시점(v0.59): ‘3D’ 단추로 지도 화면을 바꿔요(건물 안은 늘 2D). view3d.js가 계산하고, 이 기기에 기억해요.
-let rot3d = null, far3d = null, elev3d = null, rotElev = null, view3d = false; try { view3d = localStorage.getItem('dokdo-view3d') === '1'; } catch { /* 기본 2D */ }
+const elevCache = { tag: '', list: [] }; let rot3d = null, far3d = null, elev3d = null, rotElev = null, view3d = false; try { view3d = localStorage.getItem('dokdo-view3d') === '1'; } catch { /* 기본 2D */ }
 let proj3d = null, ground3d = null;
 const in3d = () => view3d && map.kind !== 'room';
 function projection() { if (!proj3d || proj3d.W !== sceneWidth || proj3d.H !== sceneHeight) proj3d = makeChase(sceneWidth, sceneHeight); return proj3d; }
@@ -128,7 +128,7 @@ function exitLabels() {
     const tiles = [...map.exits].filter(([, d]) => d === dir).map(([k]) => k.split(',').map(Number)); if (!tiles.length) continue;
     const target = getMapDef(dir === 'next' ? nextMapId(map.id) : prevMapId(map.id)), locked = dir === 'next' && map.kind === 'town' && !state.badges.includes(state.zone);
     const x = tiles[0][0] + (dir === 'next' ? -1.2 : 1.6), y = Math.min(...tiles.map(t => t[1]));
-    const boat = crossesSea(map.id, target.id), label = boat ? (target.island === '울릉도' ? '울릉도행 배' : '독도행 배') : target.name;
+    const boat = crossesSea(map.id, target.id), label = boat ? boatLabel(map.id, target.id) : target.name;
     out.push({ name: dir === 'next' ? `${label} →${locked ? ' (인증 후)' : ''}` : `← ${label}`, x: x * TILE + 16, y: y * TILE - 10, exit: true, locked });
   }
   return out;
@@ -362,12 +362,16 @@ function showPlaceBanner(def) {
 }
 
 // ── who to go to next ──────────────────────────────────────────────────────────
-function exitTile(dir = 'next') { const k = [...map.exits].find(([, d]) => d === dir)?.[0]; if (!k) return null; const [x, y] = k.split(',').map(Number); const to = getMapDef(dir === 'next' ? nextMapId(map.id) : prevMapId(map.id)); return { exit: dir, x, y, name: crossesSea(map.id, to.id) ? (to.island === '울릉도' ? '울릉도행 배' : '독도행 배') : to.name }; }
+function exitTile(dir = 'next') { const k = [...map.exits].find(([, d]) => d === dir)?.[0]; if (!k) return null; const [x, y] = k.split(',').map(Number); const to = getMapDef(dir === 'next' ? nextMapId(map.id) : prevMapId(map.id)); return { exit: dir, x, y, name: crossesSea(map.id, to.id) ? boatLabel(map.id, to.id) : to.name }; }
 // 울릉도(1장 도동항)와 독도 사이는 걸어갈 수 없어요: 부두 끝에서 여객선을 타요.
-function crossesSea(from, to) { return !!to && (getMapDef(from).island === '울릉도') !== (getMapDef(to).island === '울릉도'); }
+// v0.74 동도와 서도 사이도 걸어갈 수 없어요(다리가 없어요): 선착장에서 작은 배를 타요.
+const sideOf = id => { const i = getMapDef(id).island || ''; return i === '울릉도' ? 'ulleung' : i.includes('서도') ? 'west' : 'east'; };
+function crossesSea(from, to) { return !!to && sideOf(from) !== sideOf(to); }
+function boatLabel(from, to) { const a = sideOf(from), b = sideOf(to); return b === 'ulleung' ? '울릉도행 배' : a === 'ulleung' ? '독도행 배' : b === 'west' ? '서도행 배' : '동도행 배'; }
 async function takeFerry(to, spawnKey) {
   const toDokdo = getMapDef(to).island !== '울릉도';
   settleMovement(); path = []; pathAction = null; keys.clear();
+  if (sideOf(map.def.town || map.id) !== 'ulleung' && toDokdo) { await playStory(ISLAND_BOAT(sideOf(to))); await changeMap(to, spawnKey); return; }
   if (toDokdo && !state.flags.ferry) { state.flags.ferry = true; await playStory(FERRY); }
   else await playStory(FERRY_AGAIN(toDokdo ? 'dokdo' : 'ulleung'));
   await changeMap(to, spawnKey);
@@ -820,7 +824,7 @@ function frame(now) {
         if (lk) lookBy(lk.x * Math.abs(lk.x) * dt, lk.y * Math.abs(lk.y) * dt * .7, LOOK.stick);
         if (lookKeys.size) lookBy(((lookKeys.has('ArrowRight') ? 1 : 0) - (lookKeys.has('ArrowLeft') ? 1 : 0)) * dt, ((lookKeys.has('ArrowDown') ? 1 : 0) - (lookKeys.has('ArrowUp') ? 1 : 0)) * dt * .6, LOOK.keys);
       } else if (document.pointerLockElement === canvas) document.exitPointerLock?.();
-      const cam = fpCamera(), gw = W * TILE, gh = H * TILE, hz = cam.hz; // 땅은 지도 전체를 그려 두고, 가까운 곳은 또렷하게·먼 곳은 줄여서 지도 끝까지 보여요(v0.64)
+      const cam = fpCamera(), gw = map[0].length * TILE, gh = map.length * TILE, hz = cam.hz; // 땅은 지도 전체를 그려 두고, 가까운 곳은 또렷하게·먼 곳은 줄여서 지도 끝까지 보여요(v0.64)
       ground3d ||= document.createElement('canvas'); if (ground3d.width !== gw || ground3d.height !== gh) { ground3d.width = gw; ground3d.height = gh; }
       const g = ground3d.getContext('2d'); g.imageSmoothingEnabled = false;
       camera = drawWorld(g, map, state, { x: (cam.x - 16) / TILE, y: (cam.y - 16) / TILE }, now, target, motion, { width: gw, height: gh, labels: false, actors: false, seabed: map.diving }, people);
@@ -851,18 +855,27 @@ function frame(now) {
         else { const sx = Math.max(0, P.FW / 2 - hw * fs), sw = Math.min(P.FW, P.FW / 2 + hw * fs) - sx; actorCtx.drawImage(far3d, sx, Math.max(0, P.FH - d0 * fs), sw, Math.max(.5, (d0 - d1) * fs), sceneWidth / 2 + (sx - P.FW / 2) / fs * k, y, sw / fs * k, 1.03); }
         if (diveT > .01) { actorCtx.fillStyle = `rgba(${FOG_RGB},${fogA((d0 + d1) / 2).toFixed(3)})`; actorCtx.fillRect(0, y, sceneWidth, 1.03); } // 바닷속 안개
       }
-      if (map.cliff || diveT > .01) { // v0.70 언덕 위 땅(v0.71 바닷속에선 물 밖 땅 전체가 한 단 위)
-        const UP = diveT > .01 ? DIVE_LAND * diveT : LEVEL_H; // 언덕 칸만 오려 내어 한 층 높이의 땅으로 다시 눕혀요(가까운 16칸)
+      if (map.cliff || diveT > .01) { // v0.70 언덕 위 땅(v0.71 바닷속에선 물 밖 땅 전체가 한 단 위 · v0.74 층마다 따로: 낮은 층부터 차례로)
+        const dive = DIVE_LAND * diveT, layers = []; // 층 칸만 오려 내어 그 높이의 땅으로 다시 눕혀요(가까운 16칸)
+        if (diveT > .01) layers.push({ mask: landMask(map), up: dive });
+        for (let v = 1; v <= (map.cliff?.top || 0); v++) layers.push({ mask: regionMask(map, v), up: v * LEVEL_H + dive });
         elev3d ||= document.createElement('canvas'); if (elev3d.width !== gw || elev3d.height !== gh) { elev3d.width = gw; elev3d.height = gh; }
-        const e = elev3d.getContext('2d'); e.globalCompositeOperation = 'source-over'; e.clearRect(0, 0, gw, gh); e.drawImage(ground3d, 0, 0); e.globalCompositeOperation = 'destination-in'; e.drawImage(diveT > .01 ? landMask(map) : regionMask(map), 0, 0); e.globalCompositeOperation = 'source-over';
         rotElev ||= document.createElement('canvas'); if (rotElev.width !== P.RW || rotElev.height !== P.RH) { rotElev.width = P.RW; rotElev.height = P.RH; }
-        const re = rotElev.getContext('2d'); re.setTransform(1, 0, 0, 1, 0, 0); re.clearRect(0, 0, P.RW, P.RH); re.imageSmoothingEnabled = false;
-        re.setTransform(cs, -sn, sn, cs, P.RW / 2 - (cs * ux + sn * uy), P.RH - (-sn * ux + cs * uy)); re.drawImage(elev3d, 0, 0);
-        for (let y = Math.max(0, Math.floor(hz) + 1); y < sceneHeight; y++) {
-          const d0 = P.rowDepth(cam, y, UP), d1 = P.rowDepth(cam, y + 1, UP); if (d0 > P.RH || d1 < 2 || d0 < 0) continue;
-          const k = P.f / ((d0 + d1) / 2), hw = sceneWidth / 2 / k, sx = Math.max(0, P.RW / 2 - hw), sw = Math.min(P.RW, P.RW / 2 + hw) - sx;
-          actorCtx.drawImage(rotElev, sx, P.RH - d0, sw, Math.max(.5, d0 - d1), sceneWidth / 2 + (sx - P.RW / 2) * k, y, sw * k, 1.03);
-          if (diveT > .01) { actorCtx.fillStyle = `rgba(${FOG_RGB},${fogA((d0 + d1) / 2).toFixed(3)})`; actorCtx.fillRect(0, y, sceneWidth, 1.03); }
+        // v0.74 층마다 오려 낸 땅 그림은 잠깐(0.6초) 모아 두고 다시 써요. 층이 많아도 매 장면마다 다시 오리지 않아요.
+        const tag = `${map.id}|${gw}|${seasonColor(z().color)}|${Math.floor(now / 600)}|${map.diving ? 1 : 0}`; if (elevCache.tag !== tag) { elevCache.tag = tag; elevCache.list = []; }
+        layers.forEach((L, i) => {
+          let c = elevCache.list[i]; if (!c || c.mask !== L.mask) { c = elevCache.list[i] = { mask: L.mask, cv: elevCache.list[i]?.cv || document.createElement('canvas') }; c.cv.width = gw; c.cv.height = gh; const e = c.cv.getContext('2d'); e.drawImage(ground3d, 0, 0); e.globalCompositeOperation = 'destination-in'; e.drawImage(L.mask, 0, 0); e.globalCompositeOperation = 'source-over'; }
+          L.cv = c.cv;
+        });
+        for (const { cv, up: UP } of layers) {
+          const re = rotElev.getContext('2d'); re.setTransform(1, 0, 0, 1, 0, 0); re.clearRect(0, 0, P.RW, P.RH); re.imageSmoothingEnabled = false;
+          re.setTransform(cs, -sn, sn, cs, P.RW / 2 - (cs * ux + sn * uy), P.RH - (-sn * ux + cs * uy)); re.drawImage(cv, 0, 0);
+          for (let y = Math.max(0, Math.floor(hz) + 1); y < sceneHeight; y++) {
+            const d0 = P.rowDepth(cam, y, UP), d1 = P.rowDepth(cam, y + 1, UP); if (d0 > P.RH || d1 < 2 || d0 < 0) continue;
+            const k = P.f / ((d0 + d1) / 2), hw = sceneWidth / 2 / k, sx = Math.max(0, P.RW / 2 - hw), sw = Math.min(P.RW, P.RW / 2 + hw) - sx;
+            actorCtx.drawImage(rotElev, sx, P.RH - d0, sw, Math.max(.5, d0 - d1), sceneWidth / 2 + (sx - P.RW / 2) * k, y, sw * k, 1.03);
+            if (diveT > .01) { actorCtx.fillStyle = `rgba(${FOG_RGB},${fogA((d0 + d1) / 2).toFixed(3)})`; actorCtx.fillRect(0, y, sceneWidth, 1.03); }
+          }
         }
       }
       const haze = actorCtx.createLinearGradient(0, hz, 0, hz + sceneHeight * .06); haze.addColorStop(0, '#e4f4f6'); haze.addColorStop(1, '#e4f4f600'); actorCtx.fillStyle = haze; actorCtx.fillRect(0, hz, sceneWidth, sceneHeight * .06);
@@ -870,12 +883,12 @@ function frame(now) {
       if (diveT > .01) project.fog = fogA;
       { // 3D 벽: 언덕 둘레 바위벽(+ 바닷속에선 물가 흙벽). 카메라 쪽을 보는 것만, 가까운 것부터 정렬돼요
         const img = assetImage(V2_TERRAIN.key), ctex = map.cliff && img ? cliffTextures(img) : null, stex = shoreTextures(), up = DIVE_LAND * diveT, list = [];
-        if (ctex) for (const w of cliffWalls(map)) list.push({ ...w, h: LEVEL_H, lift: up, tex: w.ladder ? ctex.ladder : ctex.plain, th: 32 });
+        if (ctex) for (const w of cliffWalls(map)) list.push({ ...w, h: LEVEL_H, lift: up + (w.lift0 || 0), tex: w.ladder ? ctex.ladder : w.top === false ? ctex.rock : ctex.plain, th: 32 });
         if (diveT > .01) for (const w of shoreWalls(map)) list.push({ ...w, h: up, lift: 0, tex: w.sand ? stex.sand : stex.soil, th: 64 });
         project.walls = list.map(w => { const mx = (w.x0 + w.x1) / 2, my = (w.y0 + w.y1) / 2; return { ...w, z: (mx - cam.x) * cam.fx + (my - cam.y) * cam.fy, facing: (cam.x - mx) * w.n[0] + (cam.y - my) * w.n[1] }; }).filter(w => w.facing > 0 && w.z > -40 && w.z < P.RH * 1.6);
         project.drawWall = (g, w) => drawFace(g, P, cam, { tex: w.tex, lift: w.lift, v: [[w.x0, w.y0, 0, 0, w.th], [w.x1, w.y1, 0, 32, w.th], [w.x1, w.y1, w.h, 32, 0], [w.x0, w.y0, w.h, 0, 0]] });
       }
-      project.slab = { has: k => k in SLAB, draw: (g, n, kind, fx, fy, render) => drawSlab(g, P, cam, `${kind}|${n.art || ''}|${n.w || ''}|${n.used ? 1 : 0}|${n.species || ''}`, fx, fy, kind === 'fence' ? 4 : SLAB[kind], render, liftAt(fx, fy)) };
+      project.slab = { has: k => k in SLAB, draw: (g, n, kind, fx, fy, render) => drawSlab(g, P, cam, `${kind}|${n.art || ''}|${n.w || ''}|${n.used ? 1 : 0}|${n.species || ''}`, fx, fy, kind === 'fence' ? 4 : SLAB[kind], render, liftAt(fx, fy), kind === 'railv') };
       project.fadeZ = BACK - 6; project.cam = cam; // v0.73 그리는 순서(가림) 판단용 project.seen = d => seenDir(yaw, d); project.box = boxPainter(P, cam, b => buildingArt(map, b), () => DIVE_LAND * diveT); // v0.68: 건물은 앞·뒤·옆이 있는 상자로
       drawActors(actorCtx, state, view, now, motion, people, map, project);
       { const lp = P.project(cam, view.x * TILE + 16, view.y * TILE + 28); lamp = lp ? { x: lp.x, y: lp.y - 22 * lp.k, r: 120 * lp.k } : null; }
@@ -1620,7 +1633,7 @@ function paintMiniMap(now, people) {
   const g = miniMap.getContext('2d'), N = 15, S = 8, cx = Math.round(view.x), cy = Math.round(view.y);
   g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, 120, 120);
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-    const x = cx - 7 + i, y = cy - 7 + j, out = x < 0 || y < 0 || x >= W || y >= H, t = out ? 0 : map[y][x];
+    const x = cx - 7 + i, y = cy - 7 + j, out = x < 0 || y < 0 || x >= map[0].length || y >= map.length, t = out ? 0 : map[y][x];
     g.fillStyle = out || t === 0 ? '#4a9fbd' : blocked(map, x, y, [], true) ? '#5c7a4c' : '#efe6c4'; g.fillRect(i * S, j * S, S, S);
   }
   for (const n of people) { const x = Math.round(n.drawX ?? n.x) - cx + 7, y = Math.round(n.drawY ?? n.y) - cy + 7; if (x < 0 || y < 0 || x >= N || y >= N || n.scenery || n.player) continue; g.fillStyle = n.kind === 'wild' || n.kind === 'friend' || n.kind === 'legend' ? '#7a3fb0' : n.actor ? '#e2702a' : '#8a6a3c'; g.fillRect(x * S + 2, y * S + 2, S - 4, S - 4); }

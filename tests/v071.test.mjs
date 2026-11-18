@@ -8,7 +8,7 @@ for (const def of [...MAPS, STARTER_MEADOW]) {
   if (def.kind === 'room') continue; const map = createMap(def.id);
   for (const k of map.shallow) { const [x, y] = k.split(',').map(Number); assert.equal(map[y][x], 0); assert.ok(!blocked(map, x, y, [], true), `${def.id} ${k}: 나는 걸어 들어가요`); assert.ok(blocked(map, x, y, [], true, false), `${def.id} ${k}: 마을 사람은 못 들어가요`); }
   // 물고기가 사는 칸(얕은 물·깊은 물)은 모두 내가 들어갈 수 있어요(얕은 물은 걷고 깊은 물은 잠수)
-  for (let y = 0; y < 30; y++) for (let x = 0; x < 42; x++) if (habitatTile(map, x, y, 'sea')) assert.ok(!blocked(map, x, y, [], true), `${def.id} ${K(x, y)}`);
+  for (let y = 0; y < map.length; y++) for (let x = 0; x < map[0].length; x++) if (habitatTile(map, x, y, 'sea')) assert.ok(!blocked(map, x, y, [], true), `${def.id} ${K(x, y)}`);
 }
 // 초원 연못: 처음 자리에서 연못 속 물고기 자리까지 걸어갈 수 있어요
 const meadow = createMap('meadow0'), s = meadow.spawns.a;

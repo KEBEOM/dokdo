@@ -187,10 +187,10 @@ export function v2Tile(map,x,y,depth){
 export function flowerTiles(map){
  if(map.kind==='room')return [];
  const busy=new Set(map.keepClear||[]);for(const k of map.solid||[])busy.add(k);
- for(const b of map.buildings||[])for(let y=b.y-1;y<=b.y+b.h;y++)for(let x=b.x-1;x<=b.x+b.w;x++)busy.add(`${x},${y}`);
+ for(const b of [...(map.buildings||[]),...(map.parsed?.structures||map.structures||[])])for(let y=b.y-1;y<=b.y+b.h;y++)for(let x=b.x-1;x<=b.x+b.w;x++)busy.add(`${x},${y}`);
  for(const d of map.decor||[])busy.add(`${d.x},${d.y}`);for(const g of map.ground||[])busy.add(`${g.x},${g.y}`);
  const out=[];
- for(let y=1;y<map.length-1;y++)for(let x=1;x<map[0].length-1;x++){const k=at(map,x,y);if([0,2,3,4,6].includes(k)||map.rockTiles?.has(`${x},${y}`)||busy.has(`${x},${y}`))continue;const r=hash(x,y,17);if(r<.13)out.push([x,y,r<.06]);} // r<.06: 늘 피는 자리 · 나머지는 봄에만 더 피어요
+ for(let y=1;y<map.length-1;y++)for(let x=1;x<map[0].length-1;x++){const k=at(map,x,y);if([0,2,3,4,5,6,7].includes(k)||map.cliff?.face.has(`${x},${y}`)||map.rockTiles?.has(`${x},${y}`)||busy.has(`${x},${y}`))continue;const r=hash(x,y,17);if(r<.13)out.push([x,y,r<.06]);} // r<.06: 늘 피는 자리 · 나머지는 봄에만 더 피어요
  return out;
 }
 // 넘을 수 없는 바위 덩어리: 윗줄은 풀이 덮인 절벽 위, 아랫줄은 절벽 아래, 옆은 절벽 옆, 안쪽은 바위벽

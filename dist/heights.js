@@ -19,8 +19,8 @@ function tile(ctx, img, id, x, y) { if (!img || id == null) return false; const 
 export function paintCliffs(ctx, map, img) {
   const c = map.cliff; if (!c) return;
   ctx.save(); ctx.imageSmoothingEnabled = false;
-  // 언덕 위: 햇빛을 더 받아 살짝 밝게
-  ctx.fillStyle = 'rgba(255,248,200,.16)'; for (const k of c.region) { const [x, y] = k.split(',').map(Number); if (!c.rim.has(k) || c.stairs.has(k)) ctx.fillRect(x * T, y * T, T, T); }
+  // 언덕 위: 햇빛을 더 받아 살짝 밝게(v0.74 높은 층일수록 조금 더)
+  for (const k of c.region) { const [x, y] = k.split(',').map(Number); if ((c.rim.has(k) && !c.stairs.has(k)) || map.rockTiles?.has(k)) continue; ctx.fillStyle = `rgba(255,248,200,${Math.min(.3, .1 + .06 * (map.level.get(k) || 1)).toFixed(2)})`; ctx.fillRect(x * T, y * T, T, T); }
   // 바위 턱(북·동·서): 칸 바깥쪽 10도트만 바위 턱(안쪽은 풀 그대로), 맨 바깥은 어두운 선, 언덕 아래 땅에 그늘
   const lip = (x, y, w, h, side) => { // 밝은 바위 턱 + 바깥 어두운 선
     ctx.fillStyle = '#a3a8ae'; ctx.fillRect(x, y, w, h); ctx.fillStyle = '#c9ccd0'; if (side === 'n') ctx.fillRect(x, y + 2, w, 2); else ctx.fillRect(x, y, w, 2);
@@ -32,6 +32,7 @@ export function paintCliffs(ctx, map, img) {
   };
   for (const [k, sides] of c.rim) {
     if (c.stairs.has(k)) continue; const [x, y] = k.split(',').map(Number), px = x * T, py = y * T;
+    if (map.rockTiles?.has(k)) continue; // v0.74 맨바위 산: 턱 선 없이 바위 결 그대로(미로처럼 보이지 않게)
     if (sides.includes('n')) lip(px, py, T, 6, 'n');
     if (sides.includes('w')) { lip(px, py, 6, T, 'w'); sideFace(px - 8, py + 6); }
     if (sides.includes('e')) { lip(px + T - 6, py, 6, T, 'e'); sideFace(px + T, py + 6); }
@@ -43,6 +44,8 @@ export function paintCliffs(ctx, map, img) {
     const [x, y] = k.split(',').map(Number);
     if (c.stairs.has(k)) continue;
     if (!tile(ctx, img, V.cliff_top, x, y)) { ctx.fillStyle = '#4c5260'; ctx.fillRect(x * T, y * T, T, T); ctx.fillStyle = '#7cbf4a'; ctx.fillRect(x * T, y * T, T, 6); }
+    const drop = (c.faceTop?.get(k) || 1) - (map.level.get(k) || 0); // v0.74 두 층 이상 높은 절벽: 바위 결을 더 넣고 더 어둡게
+    if (drop > 1) { ctx.fillStyle = 'rgba(30,26,34,.18)'; ctx.fillRect(x * T, y * T + 6, T, T - 6); for (let i = 0; i < drop + 1; i++) { const yy = y * T + 9 + Math.floor(hash(x, y, i) * 20); ctx.fillStyle = 'rgba(20,18,24,.45)'; ctx.fillRect(x * T + 2, yy, T - 4 - Math.floor(hash(x, i, 3) * 10), 1); ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(x * T + 2, yy - 1, T - 8, 1); } }
     const sh = ctx.createLinearGradient(0, y * T + 6, 0, (y + 1) * T); sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,.3)'); ctx.fillStyle = sh; ctx.fillRect(x * T, y * T + 6, T, T - 6);
     ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fillRect(x * T, y * T + 6, T, 1);
     const g = ctx.createLinearGradient(0, (y + 1) * T, 0, (y + 1) * T + 12); g.addColorStop(0, 'rgba(10,20,10,.4)'); g.addColorStop(1, 'rgba(10,20,10,0)'); ctx.fillStyle = g; ctx.fillRect(x * T, (y + 1) * T, T, 12);
@@ -71,35 +74,38 @@ function ladder(ctx, x, y) { // 바위벽에 기댄 나무 사다리
 
 // ── 3D: 언덕 둘레의 바위벽 조각(한 칸 너비씩). 카메라 쪽을 보는 것만 box3d.drawFace 로 그려요 ──────────
 // 벽: { x0, y0, x1, y1 } 바닥선(지도 픽셀), 높이 LEVEL_H, 바깥쪽 법선 n
-// 언덕 칸만 하얗게 칠한 가림 그림(3D에서 언덕 위 땅만 따로 높이 그릴 때)
-export function regionMask(map) {
-  if (map._mask) return map._mask; const c = document.createElement('canvas'); c.width = map[0].length * T; c.height = map.length * T;
-  const g = c.getContext('2d'); g.fillStyle = '#fff'; for (const k of map.cliff?.region || []) { const [x, y] = k.split(',').map(Number); g.fillRect(x * T, y * T, T, T); }
-  return (map._mask = c);
+// 층(1~4)마다 그 층 땅 칸만 하얗게 칠한 가림 그림(3D에서 층마다 땅을 따로 높이 그릴 때)
+export function regionMask(map, v = 1) {
+  map._masks ||= {}; if (map._masks[v]) return map._masks[v]; const c = document.createElement('canvas'); c.width = map[0].length * T; c.height = map.length * T;
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; for (const [k, L] of map.cliff?.base || []) { if (L !== v) continue; const [x, y] = k.split(',').map(Number); g.fillRect(x * T, y * T, T, T); }
+  return (map._masks[v] = c);
 }
+// 3D 바위벽 조각: 한 칸 너비 × 한 층 높이씩. 두 층 이상 높은 절벽은 조각을 쌓아요(맨 위 조각만 풀 턱).
 export function cliffWalls(map) {
   if (map._walls) return map._walls; const c = map.cliff, out = []; if (!c) return (map._walls = out);
-  const R = c.region, open = k => c.stairs.has(k) || c.ladders.has(k);
-  for (const k of R) {
-    const [x, y] = k.split(',').map(Number), K = (a, b) => `${a},${b}`;
-    if (!R.has(K(x, y + 1)) && !open(K(x, y + 1))) out.push({ x0: x * T, y0: (y + 1) * T, x1: (x + 1) * T, y1: (y + 1) * T, n: [0, 1], ladder: false });
-    if (!R.has(K(x, y + 1)) && c.ladders.has(K(x, y + 1))) out.push({ x0: x * T, y0: (y + 1) * T, x1: (x + 1) * T, y1: (y + 1) * T, n: [0, 1], ladder: true });
-    if (open(k)) continue; // 바위 턱 계단 자리는 열어 둬요
-    if (!R.has(K(x, y - 1))) out.push({ x0: (x + 1) * T, y0: y * T, x1: x * T, y1: y * T, n: [0, -1] });
-    if (!R.has(K(x - 1, y))) out.push({ x0: x * T, y0: y * T, x1: x * T, y1: (y + 1) * T, n: [-1, 0] });
-    if (!R.has(K(x + 1, y))) out.push({ x0: (x + 1) * T, y0: (y + 1) * T, x1: (x + 1) * T, y1: y * T, n: [1, 0] });
+  const K = (a, b) => `${a},${b}`, lvOf = (a, b) => c.base.get(K(a, b)) || 0;
+  const push = (w, base, top, ladder = false) => { for (let s = base; s < top; s++) out.push({ ...w, lift0: s * LEVEL_H, top: s === top - 1, ladder: ladder && s === top - 1 }); };
+  for (const k of c.region) {
+    const [x, y] = k.split(',').map(Number), v = lvOf(x, y), S = K(x, y + 1), below = lvOf(x, y + 1);
+    if (below < v && !c.stairs.has(S)) push({ x0: x * T, y0: (y + 1) * T, x1: (x + 1) * T, y1: (y + 1) * T, n: [0, 1] }, below, v, c.ladders.has(S));
+    if (c.stairs.has(k)) continue; // 바위 턱 계단 자리는 열어 둬요
+    const n = lvOf(x, y - 1), w = lvOf(x - 1, y), e = lvOf(x + 1, y);
+    if (n < v) push({ x0: (x + 1) * T, y0: y * T, x1: x * T, y1: y * T, n: [0, -1] }, n, v);
+    if (w < v) push({ x0: x * T, y0: y * T, x1: x * T, y1: (y + 1) * T, n: [-1, 0] }, w, v);
+    if (e < v) push({ x0: (x + 1) * T, y0: (y + 1) * T, x1: (x + 1) * T, y1: y * T, n: [1, 0] }, e, v);
   }
   return (map._walls = out);
 }
-// 바위벽 그림(한 칸 32×32): 절벽 면 타일, 사다리 칸은 사다리를 얹어서
+// 바위벽 그림(한 칸 32×32): 절벽 면 타일, 사다리 칸은 사다리를 얹어서. rock: 풀 턱 없는 아래쪽 조각
 let wallTex = null;
 export function cliffTextures(img) {
   const season = currentSeason(); if (wallTex?.img === img && wallTex.season === season) return wallTex;
-  const mk = withLadder => { const c = document.createElement('canvas'); c.width = T; c.height = T; const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
-    if (!tile(g, img, V.rockface_0, 0, 0)) { g.fillStyle = '#4c5260'; g.fillRect(0, 0, T, T); }
-    g.fillStyle = '#7cbf4a'; g.fillRect(0, 0, T, 3); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, T - 3, T, 3);
+  const mk = (withLadder, grass = true) => { const c = document.createElement('canvas'); c.width = T; c.height = T; const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+    if (!tile(g, img, grass ? V.rockface_0 : V.rockface_1 ?? V.rockface_0, 0, 0)) { g.fillStyle = '#4c5260'; g.fillRect(0, 0, T, T); }
+    if (grass) { g.fillStyle = '#7cbf4a'; g.fillRect(0, 0, T, 3); } else { g.fillStyle = 'rgba(20,18,24,.35)'; g.fillRect(0, 9, T - 6, 1); g.fillRect(4, 22, T - 9, 1); g.fillStyle = 'rgba(255,255,255,.1)'; g.fillRect(0, 8, T - 8, 1); }
+    g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, T - 3, T, 3);
     if (withLadder) ladder(g, 0, 0); return tintCanvas(c, 'ground', season); };
-  wallTex = { img, season, plain: mk(false), ladder: mk(true) }; return wallTex;
+  wallTex = { img, season, plain: mk(false), ladder: mk(true), rock: mk(false, false) }; return wallTex;
 }
 
 // ── v0.71 바닷속 3D: 땅(물이 아닌 칸)은 한 단 위, 물가 둘레는 흙벽 ─────────────────────────────

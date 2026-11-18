@@ -18,12 +18,13 @@ for (const def of MAPS.filter(m => m.kind === 'route')) {
   assert.ok(c.stairs.size >= 2, `${def.id}: 계단으로 오르고 내려요`); assert.equal(c.ladders.size, 1, `${def.id}: 사다리 하나`);
   for (const k of c.face) assert.equal(map.solid.has(k), !c.stairs.has(k) && !c.ladders.has(k), `${def.id} ${k}: 절벽 면은 계단·사다리만 지나가요`);
   for (const k of c.rim.keys()) assert.equal(map.solid.has(k), !c.stairs.has(k), `${def.id} ${k}: 바위 턱은 계단만 지나가요`);
-  for (const k of c.stairs) assert.equal(map.level.get(k), .5, '계단은 반 층');
+  for (const k of c.stairs) assert.equal(map.level.get(k) % 1, .5, '계단은 반 층(v0.74 여러 층: 0.5 · 1.5 · 2.5 …)');
   const R = reach(map);
   for (const k of map.exits.keys()) assert.ok(R.has(k), `${def.id}: 출구 ${k}에 닿아요`);
   for (const o of [...map.parsed.objects, ...LEGENDS.filter(l => l.map === def.id)]) assert.ok([[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => R.has(K(o.x + a, o.y + b))), `${def.id}: ${o.name || o.key} 곁에 갈 수 있어요`);
   for (const k of c.region) if (!map.solid.has(k) && !blocked(map, ...k.split(',').map(Number), [], true)) assert.ok(R.has(k), `${def.id}: 언덕 위 ${k}에 갈 수 있어요`);
-  for (const k of [...c.ladders, ...[...c.stairs].filter(k => c.face.has(k))]) { const [x, y] = k.split(',').map(Number); assert.ok(R.has(K(x, y - 1)) && R.has(K(x, y + 1)), `${def.id} ${k}: 위아래가 이어져요`); }
+  for (const k of c.ladders) { const [x, y] = k.split(',').map(Number); assert.ok(R.has(K(x, y - 1)) && R.has(K(x, y + 1)), `${def.id} ${k}: 위아래가 이어져요`); }
+  for (const k of c.stairs) assert.ok(R.has(k), `${def.id} ${k}: 계단에 갈 수 있어요`); // v0.74 지그재그 계단은 절벽 면을 옆으로도 지나가요
 }
 assert.equal(hills, 7);
 
