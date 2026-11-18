@@ -64,6 +64,24 @@ export const TRACKS = {
     pluck: { pattern: '.35.35.35.35', oct: 4 },
     drums: 'D..T..K.TT..', fills: 'D..T..K.TRTT'
   },
+  // 밤 마을·초원 (v0.69) — 느린 세마치 9칸, 계면조(A). 별을 세며 쉬는 밤
+  night: {
+    name: '별 헤는 밤', bar: 9, speed: 2.6, vol: .7,
+    chords: ['Am', 'Am', 'Dm', 'Am', 'C', 'G', 'Am', 'Am'],
+    lead: { inst: 'gayageum', notes: 'E5:3 A5:3 C6:3 | B5:6 A5:3 | G5:3 E5:3 D5:3 | E5:9 | C5:3 D5:3 E5:3 | G5:6 E5:3 | D5:3 C5:3 A4:3 | A4:9' },
+    bass: { pattern: 'R........', oct: 2 },
+    pluck: { pattern: '....5....', oct: 4 },
+    pad: { pattern: 'P........', oct: 3 }
+  },
+  // 밤 바닷길·독도 (v0.69) — 느린 12칸, 계면조(E). 달빛이 내려앉은 밤바다
+  nightsea: {
+    name: '달빛 밤바다', bar: 12, speed: 2.8, vol: .72,
+    chords: ['Em', 'C', 'D', 'Em', 'Am', 'Em', 'D', 'Em'],
+    lead: { inst: 'flute', vib: 1.6, notes: 'B4:6 E5:6 | G5:6 E5:3 D5:3 | A5:9 G5:3 | E5:12 | D5:3 E5:3 G5:6 | A5:6 B5:3 A5:3 | G5:3 E5:3 D5:6 | E5:12' },
+    bass: { pattern: 'R...........', oct: 2 },
+    pad: { pattern: 'P...........', oct: 3 },
+    drums: 'K...........'
+  },
   // 건물 안 — 조용한 세마치, 평조(C)
   room: {
     name: '쉼터의 오후', bar: 9, speed: 3.6, vol: .7,

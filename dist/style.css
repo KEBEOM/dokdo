@@ -995,7 +995,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
 
 /* ───────── v0.61: 1인칭 시점의 작은 지도 ───────── */
 .mini-map{display:none;position:absolute;left:14px;top:94px;width:120px;height:120px;z-index:6;border:3px solid #f6f3e6;border-radius:8px;box-shadow:0 0 0 2px #1a2030,0 3px 0 2px #0006;image-rendering:pixelated;pointer-events:none;opacity:.92}
-.view3d .mini-map{display:block}
+.mini-map{display:block}
 .battling .mini-map,.in-room .mini-map{display:none!important}
 @media (max-width:600px),(max-height:460px){.mini-map{width:84px;height:84px;top:64px;left:8px}}
 .mini-map[hidden],.battling .mini-map,.story .mini-map{display:none!important}
@@ -1028,3 +1028,4 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
 .is-revealed .dq-claim{display:none}
 .dq-hint-row{display:flex;justify-content:flex-start}.dq-hint-row .text-button{width:auto;flex:0 0 auto}
 .dq-result-text{text-align:center}
+.when-note{margin:.5em 0 0;padding:6px 10px;border-radius:8px;background:#eef3e6;color:#3d5a4a;font-size:12px;line-height:1.5}

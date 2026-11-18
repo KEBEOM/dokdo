@@ -36,18 +36,18 @@ export function makeChase(W, H) {
   return {
     W, H, f, RW: halfW * 2, RH: DEPTH, radius: Math.ceil(Math.hypot(DEPTH, halfW)),
     FW: Math.ceil(FAR * (W / 2) / f * FAR_SCALE) * 2, FH: Math.ceil(FAR * FAR_SCALE), far: FAR, farScale: FAR_SCALE,
-    camera(px, py, yaw, pitch = 0) {
+    camera(px, py, yaw, pitch = 0, lift = 0) { // lift(v0.70): 언덕 위에 서 있으면 카메라도 그만큼 높아요
       const s = Math.sin(yaw), c = Math.cos(yaw), p = clampPitch(pitch);
-      return { x: px - s * BACK, y: py + c * BACK, fx: s, fy: -c, rx: c, ry: s, yaw, pitch: p, hz: H * (HORIZON + p * (p > 0 ? .8 : .55)) };
+      return { x: px - s * BACK, y: py + c * BACK, fx: s, fy: -c, rx: c, ry: s, yaw, pitch: p, eye: EYE + lift, hz: H * (HORIZON + p * (p > 0 ? .8 : .55)) };
     },
     project(cam, wx, wy) {
       const dx = wx - cam.x, dy = wy - cam.y, z = dx * cam.fx + dy * cam.fy; if (z < NEAR_Z) return null;
-      const k = f / z; return { x: W / 2 + (dx * cam.rx + dy * cam.ry) * k, y: cam.hz + EYE * k, k, z };
+      const k = f / z; return { x: W / 2 + (dx * cam.rx + dy * cam.ry) * k, y: cam.hz + (cam.eye ?? EYE) * k, k, z };
     },
     unproject(cam, sx, sy) {
-      if (sy <= cam.hz + 1) return null; const z = EYE * f / (sy - cam.hz); if (z > FAR) return null;
+      if (sy <= cam.hz + 1) return null; const z = (cam.eye ?? EYE) * f / (sy - cam.hz); if (z > FAR) return null;
       const l = (sx - W / 2) * z / f; return { x: cam.x + cam.fx * z + cam.rx * l, y: cam.y + cam.fy * z + cam.ry * l };
     },
-    rowDepth(cam, y) { return y <= cam.hz ? Infinity : EYE * f / (y - cam.hz); }
+    rowDepth(cam, y, h = 0) { return y <= cam.hz ? Infinity : ((cam.eye ?? EYE) - h) * f / (y - cam.hz); } // h: 그 높이의 땅(언덕 위)
   };
 }

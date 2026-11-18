@@ -80,7 +80,8 @@ export const MAPS = [
     }
   },
   {
-    id: 'route0', kind: 'route', zone: 0, name: '숫돌바위 길', island: '동도',
+    id: 'route0', heights: [{ x0: 18, y0: 13, x1: 30, y1: 19 }], ladders: [[26, 20]], // v0.70 언덕(계단·사다리로 오르내려요)
+    kind: 'route', zone: 0, name: '숫돌바위 길', island: '동도',
     art: [
    '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
    '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
@@ -165,7 +166,8 @@ export const MAPS = [
     }
   },
   {
-    id: 'route1', kind: 'route', zone: 1, name: '천장굴 길', island: '동도',
+    id: 'route1', heights: [{ x0: 23, y0: 17, x1: 35, y1: 23 }], ladders: [[31, 24]], // v0.70 언덕(계단·사다리로 오르내려요)
+    kind: 'route', zone: 1, name: '천장굴 길', island: '동도',
     art: [
    '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
    '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
@@ -249,7 +251,8 @@ export const MAPS = [
     }
   },
   {
-    id: 'route2', kind: 'route', zone: 2, name: '독립문바위 바닷길', island: '동도 → 서도',
+    id: 'route2', heights: [{ x0: 2, y0: 10, x1: 12, y1: 16 }], ladders: [[7, 17]], // v0.70 언덕(계단·사다리로 오르내려요)
+    kind: 'route', zone: 2, name: '독립문바위 바닷길', island: '동도 → 서도',
     art: [
    '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
    '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
@@ -333,7 +336,8 @@ export const MAPS = [
     }
   },
   {
-    id: 'route3', kind: 'route', zone: 3, name: '촛대바위 해안', island: '서도',
+    id: 'route3', heights: [{ x0: 2, y0: 11, x1: 14, y1: 17 }], ladders: [[8, 18]], // v0.70 언덕(계단·사다리로 오르내려요)
+    kind: 'route', zone: 3, name: '촛대바위 해안', island: '서도',
     art: [
    '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
    '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
@@ -417,7 +421,8 @@ export const MAPS = [
     }
   },
   {
-    id: 'route4', kind: 'route', zone: 4, name: '보찰바위 갯바위', island: '서도',
+    id: 'route4', heights: [{ x0: 9, y0: 15, x1: 21, y1: 21 }], ladders: [[13, 22]], // v0.70 언덕(계단·사다리로 오르내려요)
+    kind: 'route', zone: 4, name: '보찰바위 갯바위', island: '서도',
     art: [
    '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
    '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
@@ -501,7 +506,8 @@ export const MAPS = [
     }
   },
   {
-    id: 'route5', kind: 'route', zone: 5, name: '삼형제굴바위 해안', island: '서도',
+    id: 'route5', heights: [{ x0: 29, y0: 18, x1: 39, y1: 24 }], ladders: [[36, 25]], // v0.70 언덕(계단·사다리로 오르내려요)
+    kind: 'route', zone: 5, name: '삼형제굴바위 해안', island: '서도',
     art: [
    '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
    '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
@@ -586,7 +592,8 @@ export const MAPS = [
     }
   },
   {
-    id: 'route6', kind: 'route', zone: 6, name: '상장군바위 오르막', island: '서도',
+    id: 'route6', heights: [{ x0: 11, y0: 14, x1: 23, y1: 20 }], ladders: [[19, 21]], // v0.70 언덕(계단·사다리로 오르내려요)
+    kind: 'route', zone: 6, name: '상장군바위 오르막', island: '서도',
     art: [
    '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
    '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~',
@@ -679,29 +686,29 @@ export const STARTER_MEADOW = {
   art: [
    'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
    'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
-   'TTTT...T....T....T....T....T....T....TTTTT',
-   'TTTT..................................TTTT',
-   'TT............................~~~~~....TTT',
-   'TT......................rr...~~~~~~~....TT',
-   'TT...........TT..............~~~~~~~....TT',
-   'TTT..........T................~~~~~.....TT',
-   'TT....................=.................TT',
-   'TT...T................=................TTT',
-   'TT................p...=.................TT',
-   'TT....................=.................TT',
-   'TTT...................=...p.............TT',
-   'TT....r...............=............TT...TT',
-   'TT....................=................TTT',
-   'TT....................=.................TT',
+   'TTTT...T....T....T....T....T...:T:...TTTTT',
+   'TTTT.......................:::::::::::TTTT',
+   'TT.."""""................::::~~~~~~~:::TTT',
+   'TT.."""""...............rr:~~~~~~~~~~~::TT',
+   'TT...........TT.........::~~~~~~~~~~~~~:TT',
+   'TTT..........T.........:::~~~~~~~~~~~~~:TT',
+   'TT....................=.::~~~~~~~~~~~~~:TT',
+   'TT...T................=.:::~~~~~~~~~~~:TTT',
+   'TT................p...=..::::~~~~~~~::::TT',
+   'TT............""""....=....::::::~::::..TT',
+   'TTT...........""""....=...p....::~:.....TT',
+   'TT....r...............=.........:~:TT...TT',
+   'TT....................=.........:~:....TTT',
+   'TT....................=........:~:......TT',
    'TT...================================...TT',
-   'TTT......=..............................TT',
-   'TT.......=.....................p........TT',
-   'TT.......=..p..........................TTT',
-   'TT.......=..........p................p..TT',
-   'TT.......=..............................TT',
-   'TTT......=.................TT...........TT',
-   'TT.......=1......T..........T...........TT',
-   'TT.......=.............................TTT',
+   'TTT......=.....................:~:......TT',
+   'TT...""".=.....................p~:......TT',
+   'TT...""".=..p..............:::::~:::...TTT',
+   'TT...""".=..........p.....::~~~~~~~::p..TT',
+   'TT.......=...............::~~~~~~~~~::..TT',
+   'TTT......=.."""".........::TT~~~~~~~::..TT',
+   'TT.......=1."""".T........::T~~~~~~::...TT',
+   'TT.......=.................:::::::::...TTT',
    'TT......a=.2....................rr......TT',
    'TTTT..................................TTTT',
    'TTTT...T....T....T....T....T....T....TTTTT',
@@ -743,6 +750,31 @@ function inferBase(rows, x, y) {
 }
 
 const parsed = new Map();
+export function forgetParsed(id) { parsed.delete(id); } // 검사·도구용: 지도 정의를 바꾼 뒤 다시 읽어요
+
+// v0.70 높낮이: def.heights 의 네모 칸들이 한 층 높은 언덕(층 1)이에요.
+//   언덕 남쪽 아래 한 줄 = 절벽 면(face) · 언덕 안쪽의 북·동·서 가장자리 = 바위 턱(rim). 둘 다 지나갈 수 없어요.
+//   길(=)이 절벽 면이나 바위 턱을 지나는 칸은 저절로 계단이 되고, def.ladders 의 절벽 면 칸은 사다리예요.
+//   그래서 위아래는 계단·사다리로만 오가요(걷기·길 찾기·우산몬·사람 모두 막힌 칸 규칙 그대로).
+//   level: 칸 → 높이(언덕 1, 계단·사다리 0.5) · cliff: { face, rim(칸 → 'nwe' 중 열린 쪽), stairs, ladders }
+function applyHeights(out, def) {
+  const R = new Set(), K = (x, y) => `${x},${y}`;
+  for (const r of def.heights) for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++) R.add(K(x, y));
+  const level = new Map(), face = new Set(), rim = new Map(), stairs = new Set(), ladders = new Set();
+  const path = (x, y) => out.grid[y]?.[x] === TILE_CODES.PATH || out.ground.some(g => g.kind === 'steps' && g.x === x && g.y === y);
+  for (const k of R) {
+    const [x, y] = k.split(',').map(Number); level.set(k, 1);
+    if (!R.has(K(x, y + 1))) face.add(K(x, y + 1));
+    const sides = (R.has(K(x, y - 1)) ? '' : 'n') + (R.has(K(x - 1, y)) ? '' : 'w') + (R.has(K(x + 1, y)) ? '' : 'e');
+    if (sides) rim.set(k, sides);
+  }
+  for (const k of face) { const [x, y] = k.split(',').map(Number); if (path(x, y) && !out.solid.has(k)) stairs.add(k); }
+  for (const k of rim.keys()) { const [x, y] = k.split(',').map(Number); if (path(x, y) && !out.solid.has(k)) stairs.add(k); }
+  for (const [x, y] of def.ladders || []) if (face.has(K(x, y))) ladders.add(K(x, y));
+  for (const k of face) if (!stairs.has(k) && !ladders.has(k)) out.solid.add(k); else level.set(k, .5);
+  for (const k of rim.keys()) if (!stairs.has(k)) out.solid.add(k); else level.set(k, .5);
+  out.level = level; out.cliff = { face, rim, stairs, ladders, region: R };
+}
 // Returns the tile grid (array of rows of tile codes) plus the map's objects.
 export function parseMap(id) {
   const def = getMapDef(id);
@@ -804,6 +836,7 @@ export function parseMap(id) {
     const cx = Math.round((x0 + x1) / 2), cy = Math.round((y0 + y1) / 2);
     if (comp.length >= 12 && x1 - x0 >= 2 && y1 - y0 >= 2 && rockSet.has(`${cx},${cy}`)) out.decor.push({ kind: 'crag', x: x0, y: y1, w: x1 - x0 + 1, h: y1 - y0 + 1 });
   }
+  if (def.heights) applyHeights(out, def);
   out.spawns.a ||= out.spawns.z; out.spawns.z ||= out.spawns.a;
   parsed.set(def.id, out);
   return out;

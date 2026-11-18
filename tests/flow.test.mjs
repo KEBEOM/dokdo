@@ -414,7 +414,15 @@ if (await G(() => window.__dokdo.map.kind !== 'room' && !window.__dokdo.busy)) {
   const f1 = await G(() => ({ x: window.__dokdo.state.x, vx: window.__dokdo.motion().view.x, battle: !!window.__dokdo.battle, dir: window.__dokdo.state.dir }));
   if (!f1.battle) { assert.equal(f1.dir, 'right'); assert.ok(f1.vx > f0 + .5, `W walks the way the camera looks (${f0} → ${f1.vx})`); assert.ok(Math.abs(f1.vx - Math.round(f1.vx)) > .001, 'free walking can stop between tiles'); assert.equal(f1.x, Math.round(f1.vx), 'my tile is the nearest one'); }
   if (await G(() => !!window.__dokdo.battle)) await G(() => window.__dokdo.closeBattleForTest());
-  await G(() => { document.exitPointerLock?.(); window.__dokdo.setView3d(false); }); await page.waitForTimeout(200); assert.ok(!(await page.isVisible('.mini-map')), 'no mini map in 2D');
+  await G(() => { document.exitPointerLock?.(); window.__dokdo.setView3d(false); }); await page.waitForTimeout(200); assert.ok(await page.isVisible('.mini-map'), 'v0.68: the mini map shows in 2D too');
+  // v0.68 사계절: 메뉴의 계절 고르기 → 위치 칸에 계절 이름, 다시 자동으로
+  await page.click('#menuBtn'); await page.selectOption('#seasonPick', 'winter'); assert.match(await page.textContent('#weather'), /겨울/); assert.equal(await G(() => window.__dokdo.season), 'winter');
+  await page.selectOption('#seasonPick', 'flow'); await G(() => window.__dokdo.closeModal()); await page.waitForTimeout(200);
+  // v0.69 낮·밤: 밤 11시로 돌리면 위치 칸에 ‘밤’, 길과 마을의 노래가 밤 노래로 바뀌어요. 다시 아침으로
+  await G(() => window.__dokdo.setClock(150000 / 24 * 15)); await page.waitForTimeout(700);
+  assert.ok(await G(() => window.__dokdo.clock.night)); assert.match(await page.textContent('#weather'), /밤/);
+  if (await G(() => window.__dokdo.map.kind !== 'room' && !window.__dokdo.battle)) assert.match(await G(() => window.__dokdo.music), /^night/, 'night music');
+  await G(() => window.__dokdo.setClock(0)); await page.waitForTimeout(500); assert.ok(!(await G(() => window.__dokdo.clock.night)));
   // 2D에서도 자유 걷기: 방향키 두 개를 함께 누르면 비스듬히 걸어요
   if (await G(() => !window.__dokdo.battle && !window.__dokdo.busy)) {
     const g0 = await G(() => { const d = window.__dokdo; d.place(d.state.x, d.state.y, 'right'); return d.motion().view; });

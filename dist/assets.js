@@ -1,6 +1,10 @@
 import {PLAYER_SHEETS} from './player-art.js';
 // Replace PNGs at these paths to customize the game. No fetch(), so file:// works.
 const cache=new Map(),listeners=new Set();
+// v0.68 그림 색 바꾸기 고리(계절, season.js): tint(key, image)가 돌려준 그림을 tag별로 기억해 써요
+let tintFn=null,tintTag='';
+export function setAssetTint(fn,tag){tintFn=fn;tintTag=String(tag||'');for(const fn2 of listeners)fn2('*tint');}
+export const assetTintTag=()=>tintTag;
 export function onAssetReady(callback){listeners.add(callback);return ()=>listeners.delete(callback);}
 export function assetImage(key){
   if(typeof Image==='undefined')return null;
@@ -10,7 +14,10 @@ export function assetImage(key){
     entry.image.onerror=()=>{entry.ready=false;entry.failed=true;for(const fn of listeners)fn(key);};
     entry.image.src=globalThis.DOKDOMON_EMBEDDED_ASSETS?.[key]||PLAYER_SHEETS[key]||`assets/${key}${/\.(png|jpe?g|webp)$/i.test(key)?'':'.png'}`;
   }
-  const entry=cache.get(key);return entry.ready?entry.image:null;
+  const entry=cache.get(key);if(!entry.ready)return null;
+  if(!tintFn)return entry.image;
+  if(entry.tag!==tintTag){entry.tag=tintTag;try{entry.tinted=tintFn(key,entry.image)||entry.image;}catch{entry.tinted=entry.image;}}
+  return entry.tinted;
 }
 export function drawAsset(ctx,key,x,y,width,height=width){
   const image=assetImage(key);if(!image)return false;

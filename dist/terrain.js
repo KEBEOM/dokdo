@@ -1,4 +1,6 @@
-import {assetImage} from './assets.js';
+import {assetImage,assetTintTag} from './assets.js';
+import {tintCanvas} from './season.js';
+import {paintCliffs} from './heights.js';
 import {TERRAIN_ATLAS} from './terrain-atlas.js';
 import {V2_TERRAIN,V2_DETAILS,v2TileRect} from './tileset-v2.js';
 
@@ -6,7 +8,7 @@ const TILE=32;
 // v0.45: 3번 칸은 풀숲이 아니라 독도의 ‘바위 들판’(응회암 땅·자갈·이끼·해국). 풀숲 그림(tall)은 컷신에서만 써요.
 const kinds={0:'water',1:'grass',2:'path',3:'rocky',4:'sand',5:'grass',6:'dock',7:'grass'};
 const colors={water:'#4aa9d8',grass:'#8fd16a',path:'#e2c88f',tall:'#4d9a43',rocky:'#bfad8c',sand:'#f4e2ae',dock:'#c28b54'};
-let cachedMap=null,cachedSheet=null,ground=null; // cachedSheet: 어떤 그림으로 그려 둔 땅인지(v2 · v2d · 예전 그림)
+let cachedMap=null,cachedSheet=null,ground=null,cachedTint=null; // cachedSheet: 어떤 그림으로 그려 둔 땅인지(v2 · v2d · 예전 그림)
 const at=(map,x,y)=>map[y]?.[x];
 
 // Texture coordinates continue across adjacent tiles. Mirrored repeat boundaries
@@ -179,7 +181,17 @@ export function v2Tile(map,x,y,depth){
  if(k===3)return r<.22?pick(V2.moss,x,y,3):pick(V2.basalt,x,y);
  if(k===4)return r<.12?pick(V2.sandPebble,x,y,3):pick(V2.sand,x,y);
  if(k===6)return pick(V2.wood,x,y);
- return r<.06?pick(V2.flowers,x,y,3):r<.2?pick(V2.sprouts,x,y,3):pick(V2.grass,x,y); // 풀밭: 꽃은 아주 드물게
+ return r<.2?pick(V2.sprouts,x,y,3):pick(V2.grass,x,y); // 풀밭(v0.68: 꽃은 땅에 그리지 않고 flowerTiles 자리에 세워요)
+}
+// v0.68 세워 그리는 들꽃 자리: 예전에 꽃 무늬 땅을 깔던 풀밭 칸(약 6%) 중 건물·물건·출입구 둘레를 뺀 곳
+export function flowerTiles(map){
+ if(map.kind==='room')return [];
+ const busy=new Set(map.keepClear||[]);for(const k of map.solid||[])busy.add(k);
+ for(const b of map.buildings||[])for(let y=b.y-1;y<=b.y+b.h;y++)for(let x=b.x-1;x<=b.x+b.w;x++)busy.add(`${x},${y}`);
+ for(const d of map.decor||[])busy.add(`${d.x},${d.y}`);for(const g of map.ground||[])busy.add(`${g.x},${g.y}`);
+ const out=[];
+ for(let y=1;y<map.length-1;y++)for(let x=1;x<map[0].length-1;x++){const k=at(map,x,y);if([0,2,3,4,6].includes(k)||map.rockTiles?.has(`${x},${y}`)||busy.has(`${x},${y}`))continue;const r=hash(x,y,17);if(r<.13)out.push([x,y,r<.06]);} // r<.06: 늘 피는 자리 · 나머지는 봄에만 더 피어요
+ return out;
 }
 // 넘을 수 없는 바위 덩어리: 윗줄은 풀이 덮인 절벽 위, 아랫줄은 절벽 아래, 옆은 절벽 옆, 안쪽은 바위벽
 export function v2Rock(map,x,y){
@@ -232,9 +244,11 @@ export function drawTerrain(ctx,map,time,{x=0,y=0,width=768,height=480}={}){
  // v0.67: 타일셋 v2 그림이 준비되면 v2로, 아직이면(또는 읽지 못하면) 예전 땅 그림으로 그려요
  const v2=assetImage(V2_TERRAIN.key),det=assetImage(V2_DETAILS.key),sheet=v2?null:assetImage(TERRAIN_ATLAS.key),tag=v2?(det?'v2d':'v2'):sheet;
  if(typeof document!=='undefined'){
-  if(!ground||cachedMap!==map||cachedSheet!==tag){
+  if(!ground||cachedMap!==map||cachedSheet!==tag||cachedTint!==assetTintTag()){cachedTint=assetTintTag();
    ground=document.createElement('canvas');ground.width=map[0].length*TILE;ground.height=map.length*TILE;
    if(v2)paintGroundV2(ground.getContext('2d'),map,v2,det);else paintGround(ground.getContext('2d'),map,sheet);cachedMap=map;cachedSheet=tag;
+   paintCliffs(ground.getContext('2d'),map,v2); // v0.70 언덕·절벽·계단·사다리
+   tintCanvas(ground,'ground'); // v0.68: 계절 색(풀 테두리까지 한 번에)
   }
   ctx.drawImage(ground,0,0);
  }else paintGround(ctx,map,sheet);

@@ -1,7 +1,7 @@
 // 길 위를 걸어 다니는 야생 우산몬: 잔디·풀숲에서만, 겹치지 않게, 결투 뒤 다시 나타나는지 확인해요.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createRoamers, roamerPool, ROAMER_COUNT, FIELD_TILES, STEP_MS } from '../dist/roamers.js';
+import { createRoamers, roamerPool, ROAMER_COUNT, FIELD_TILES, STEP_MS, habitat, habitatTile } from '../dist/roamers.js';
 import { createMap, npcs } from '../dist/world.js';
 import { MAPS } from '../dist/maps.js';
 import { getSpecies, isUnique } from '../dist/data.js';
@@ -29,7 +29,7 @@ test('on every route they walk on grass and fields only, never overlap, never st
       const tiles = r.list.map(w => `${w.x},${w.y}`);
       assert.equal(new Set(tiles).size, tiles.length, 'no two on one tile');
       for (const w of r.list) {
-        assert.ok(FIELD_TILES.has(map[w.y][w.x]), `${def.name}: on grass or field (${w.x},${w.y})`);
+        assert.ok(habitatTile(map, w.x, w.y, habitat(w.species)), `${def.name}: where it lives (${habitat(w.species)} ${w.x},${w.y})`); // v0.70: 물고기는 물가 물속, 갯바위 생물은 물가, 나머지는 풀밭
         assert.ok(!(w.x === player.x && w.y === player.y), 'never on the player');
         assert.ok(!people.some(n => n.x === w.x && n.y === w.y), 'never on a person or object');
         assert.ok(pool.includes(w.species) && !isUnique(getSpecies(w.species)), 'a wild species of this area (no legendaries or starters)');
@@ -72,7 +72,7 @@ test('v0.47 나리분지 초원: the 30 friends 김박사 brought walk on the gr
   const start = r.list.map(w => `${w.x},${w.y}`).join('|');
   for (let t = 0; t < 30000; t += 100) {
     r.update(map, people, map.spawns.a, t, false);
-    for (const w of r.list) assert.ok(FIELD_TILES.has(map[w.y][w.x]), 'on the grass');
+    for (const w of r.list) assert.ok(habitatTile(map, w.x, w.y, habitat(w.species)), `where it lives (${w.species} ${habitat(w.species)})`);
   }
   assert.notEqual(r.list.map(w => `${w.x},${w.y}`).join('|'), start, 'they wander around');
   r.remove(r.list[0].uid, 30000); for (let t = 30000; t < 60000; t += 100) r.update(map, people, map.spawns.a, t, false);
