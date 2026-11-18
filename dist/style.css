@@ -1043,3 +1043,10 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
 #battleScreen .dq-hint-row .text-button{font-size:15px}
 #battleScreen .dq-command-title{font-size:16px}
 @media (max-width:430px),(max-height:700px){#battleScreen .dq-message{font-size:16px!important;line-height:1.5!important}#battleScreen .dq-chips,#battleScreen .dq-chips *{font-size:13px}#battleScreen .dq-hint-row .text-button{font-size:13px}}
+
+/* v0.72 잠수 단추: 물에 있을 때만 보여요 */
+.dive-btn{position:absolute;z-index:6;right:16px;bottom:118px;padding:10px 16px;border-radius:10px;border:2px solid #f6f3e6;background:#155a7ae8;color:#fff8e6;font-weight:800;font-size:15px;box-shadow:0 3px 0 #0a2a3a,0 6px 14px #0005;cursor:pointer}
+.dive-btn small{opacity:.7;font-size:11px;margin-left:4px}
+.dive-btn.down{background:#0b3b55e8}
+.battling .dive-btn,.story .dive-btn{display:none!important}
+@media (max-width:600px),(max-height:460px){.dive-btn{bottom:96px;right:8px;padding:8px 12px;font-size:13px}.dive-btn small{display:none}}

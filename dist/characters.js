@@ -1,58 +1,41 @@
 import {assetImage} from './assets.js';
 import {strideFrame,MOVE_DURATION} from './movement.js';
-import {SHEET_KEYS,PICTURE_KEYS,BASELINE,pixelPrint,sheetAtlas} from './character-sheets.js';
-import {EXPLORER_ATLAS} from './explorer-atlas.js';
 import {V2_CHARACTERS} from './tileset-v2.js';
 import {NPC_ATLASES as RESIDENT_ATLASES} from './npc-atlases.js';
 import {VILLAIN_ATLASES} from './villain-atlases.js';
-// v0.54: 주인공과 김박사는 Aseprite로 고치는 도트 시트(character-sheets.js)에서 그려요.
-export const EXPLORER_ATLASES={boy:sheetAtlas(SHEET_KEYS.boy,{dot:1}),girl:sheetAtlas(SHEET_KEYS.girl,{dot:1})};
-// 고치기 전에 쓰는 원본 그림(예전 큰 그림)
-const splitExplorer=who=>({key:EXPLORER_ATLAS.key,width:EXPLORER_ATLAS.width,height:EXPLORER_ATLAS.height,unit:EXPLORER_ATLAS.unit,rows:{down:0,right:1,up:2},frames:['down','right','up'].map(d=>EXPLORER_ATLAS.frames[EXPLORER_ATLAS.rows[who][d]])});
+// v0.72: 캐릭터마다 걷기 시트 1장 + 큰 그림 1장만 써요.
+//   주인공(남학생·여학생) 걷기 characters/explorers-v2-64x72.png · 큰 그림 characters/explorer-{girl,boy}-portrait-v33.png
+//   김박사 걷기 characters/professor-atlas-v33.png(npc-atlases.js) · 큰 그림 characters/professor-portrait-v33.png
 // v0.67 타일셋 v2: 같은 원본 그림(explorers-atlas-v17)을 64×72칸에 발끝(32, 68)을 맞춰 정리한 그림. 한 방향에 5장을 모두 걷기에 써요.
 // unit 64: 캐릭터 상자(48)에 그리면 0.75배 — 예전 원본 그림과 키가 같아서 김박사·마을 사람들과 나란히 서도 어색하지 않아요.
 const normalizedExplorer=who=>{const C=V2_CHARACTERS,W=C.frameWidth,H=C.frameHeight,R=C.rows[who];
  return {key:C.key,width:W*C.columns,height:H*6,unit:64,dot:1,walk:5,rows:{down:0,right:1,up:2},
   frames:['down','right','up'].map(d=>Array.from({length:C.columns},(_,c)=>({rect:[c*W,R[d]*H,W,H],anchor:[c*W+C.foot[0],R[d]*H+C.foot[1]]})))};};
 export const EXPLORER_V2={boy:normalizedExplorer('boy'),girl:normalizedExplorer('girl')};
-const ORIGINAL={boy:EXPLORER_V2.boy,girl:EXPLORER_V2.girl,professor:RESIDENT_ATLASES.professor};
-export const EXPLORER_V17={boy:splitExplorer('boy'),girl:splitExplorer('girl')}; // 예전 방식(원본을 그대로 잘라 쓰기) — 비교·되돌리기용
-const ORIGINAL_PICTURE={[PICTURE_KEYS.boy]:'characters/explorer-boy-portrait-v33',[PICTURE_KEYS.girl]:'characters/explorer-girl-portrait-v33',[PICTURE_KEYS.professor]:'characters/professor-portrait-v33'};
-// 시트를 고쳤는지: 'edited'(고침) · 'same'(처음 그대로) · null(아직 그림을 읽는 중)
-const sheetState=new Map();
-export function sheetEdited(key){
- if(!BASELINE[key])return true;
- if(sheetState.has(key))return sheetState.get(key)==='edited';
- const img=assetImage(key);if(!img)return null;
- let st='edited';
- try{const w=img.naturalWidth||img.width,h=img.naturalHeight||img.height,c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');g.drawImage(img,0,0);st=pixelPrint(w,h,g.getImageData(0,0,w,h).data)===BASELINE[key]?'same':'edited';}catch{st='edited';}
- sheetState.set(key,st);return st==='edited';
-}
-// 지금 그릴 걷기 그림: 고친 시트가 있으면 시트, 아니면 원본
-function liveAtlas(id){const sheet=id==='professor'?SHEET_PROFESSOR:EXPLORER_ATLASES[id];return sheet&&sheetEdited(sheet.key)===true?sheet:ORIGINAL[id]||sheet;}
-// 큰 그림도 같은 규칙(cutscene.js · paintPicture)
-export function pictureKey(key){return ORIGINAL_PICTURE[key]&&sheetEdited(key)!==true?ORIGINAL_PICTURE[key]:key;}
+// 지금 그릴 걷기 그림
+function liveAtlas(id){return id==='professor'?RESIDENT_ATLASES.professor:EXPLORER_V2[id]||EXPLORER_V2.girl;}
+// 큰 그림 이름(예전 호환용: 이제 그대로 돌려줘요)
+export function pictureKey(key){return key;}
 // 몽땅랜드 시트도 8픽셀 = 1도트인 도트 그림이에요.
 for(const a of Object.values(VILLAIN_ATLASES))a.dot??=8;
 // Residents plus the 몽땅랜드 designs; every NPC sheet shares one format.
-const SHEET_PROFESSOR=sheetAtlas(SHEET_KEYS.professor,{dot:1});
 export const NPC_ATLASES={...RESIDENT_ATLASES,...VILLAIN_ATLASES};
 // picture: the large drawing shown in the character choice window (scripts/import-heroes.py)
-export const EXPLORERS=[{id:'girl',label:'여학생',picture:PICTURE_KEYS.girl,sheet:SHEET_KEYS.girl},{id:'boy',label:'남학생',picture:PICTURE_KEYS.boy,sheet:SHEET_KEYS.boy}];
-export const PROFESSOR_PICTURE=PICTURE_KEYS.professor;
+export const EXPLORERS=[{id:'girl',label:'여학생',picture:'characters/explorer-girl-portrait-v33',sheet:'characters/explorers-v2-64x72'},{id:'boy',label:'남학생',picture:'characters/explorer-boy-portrait-v33',sheet:'characters/explorers-v2-64x72'}];
+export const PROFESSOR_PICTURE='characters/professor-portrait-v33';
 export const RESIDENTS=[
  {id:'child-boy',label:'남자아이',sheet:'characters/child-boy-atlas-v18'},
  {id:'child-girl',label:'여자아이 · 양갈래 머리',sheet:'characters/child-girl-atlas-v18'},
  {id:'child-girl-ribbon',label:'여자아이 · 리본',sheet:'characters/child-girl-ribbon-atlas-v18'},
  {id:'man',label:'아저씨',sheet:'characters/man-atlas-v18'},
  {id:'woman',label:'아줌마',sheet:'characters/woman-atlas-v18'},
- {id:'professor',label:'김박사',sheet:SHEET_KEYS.professor},
+ {id:'professor',label:'김박사',sheet:RESIDENT_ATLASES.professor.key},
  ...Object.entries(VILLAIN_ATLASES).map(([id,a])=>({id,label:a.label,sheet:a.key,villain:true}))
 ];
 export const CHARACTER_SIZE=48;
 export function explorerInfo(id){return EXPLORERS.find(p=>p.id===id)||EXPLORERS[0];}
 // 서 있을 때는 0번 그림. 걸을 때: v2 그림은 5장(0→1→2→3→4, 16픽셀마다 한 장 = 한 칸에 2장),
-// Aseprite 시트는 걷기 4장(1→4). 왼쪽은 오른쪽 그림을 통째로 뒤집어요.
+// (김박사·마을 사람 시트는 걷기 4장 1→4) 왼쪽은 오른쪽 그림을 통째로 뒤집어요.
 export const WALK5_PIXELS=16;
 export const walk5Frame=distance=>Math.floor((((distance%(WALK5_PIXELS*5))+WALK5_PIXELS*5)%(WALK5_PIXELS*5))/WALK5_PIXELS);
 export function explorerFrame(id,direction,walking,distance=0){

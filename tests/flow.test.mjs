@@ -425,6 +425,17 @@ if (await G(() => window.__dokdo.map.kind !== 'room' && !window.__dokdo.busy)) {
   assert.ok(await G(() => window.__dokdo.clock.night)); assert.match(await page.textContent('#weather'), /밤/);
   if (await G(() => window.__dokdo.map.kind !== 'room' && !window.__dokdo.battle)) assert.match(await G(() => window.__dokdo.music), /^night/, 'night music');
   await G(() => window.__dokdo.setClock(0)); await page.waitForTimeout(500); assert.ok(!(await G(() => window.__dokdo.clock.night)));
+  // v0.72 잠수는 단추로: 물에 들어가면 ‘잠수하기’ 단추가 보이고, Q로 들어갔다 나와요. 땅에 오르면 단추가 숨고 저절로 물 위예요
+  if (await G(() => window.__dokdo.map.kind !== 'room' && !window.__dokdo.battle)) {
+    const spot = await G(() => { const m = window.__dokdo.map; for (const k of m.shallow) { const [x, y] = k.split(',').map(Number); if (!window.__dokdo.people().some(p => Math.abs(p.x - x) + Math.abs(p.y - y) <= 1)) return [x, y]; } return null; });
+    if (spot) {
+      await G(() => window.__dokdo.closeModal()); await page.evaluate(([x, y]) => window.__dokdo.place(x, y, 'down'), spot); await page.waitForTimeout(400);
+      assert.ok(await page.isVisible('#diveBtn'), 'dive button in water'); assert.ok(!(await G(() => window.__dokdo.diving)), 'no diving by itself');
+      await page.keyboard.press('q'); await page.waitForTimeout(300); assert.ok(await G(() => window.__dokdo.diving), 'Q dives'); assert.match(await page.textContent('#diveBtn'), /물 위로/);
+      await page.keyboard.press('q'); await page.waitForTimeout(300); assert.ok(!(await G(() => window.__dokdo.diving)), 'Q comes up');
+      await G(() => { const s = window.__dokdo.map.spawns.a; window.__dokdo.place(s.x, s.y, 'down'); }); await page.waitForTimeout(400); assert.ok(!(await page.isVisible('#diveBtn')), 'no dive button on land');
+    }
+  }
   // 2D에서도 자유 걷기: 방향키 두 개를 함께 누르면 비스듬히 걸어요
   if (await G(() => !window.__dokdo.battle && !window.__dokdo.busy)) {
     const g0 = await G(() => { const d = window.__dokdo; d.place(d.state.x, d.state.y, 'right'); return d.motion().view; });

@@ -97,17 +97,22 @@ export function boxDepth(box, cam) {
 export function drawFace(ctx, P, cam, face) {
   const L = face.lift || 0; // v0.71: 바닷속에서 땅 위 건물·물건은 한 단 위
   const pts = face.v.map(([x, y, z, u, v]) => { const dx = x - cam.x, dy = y - cam.y; return { l: dx * cam.rx + dy * cam.ry, z: dx * cam.fx + dy * cam.fy, h: z + L, u, v }; });
-  let lo = Infinity, hi = -Infinity, behind = false;
-  for (const p of pts) { if (p.z < NEAR_Z) { behind = true; continue; } const sx = P.W / 2 + p.l * P.f / p.z; lo = Math.min(lo, sx); hi = Math.max(hi, sx); }
-  if (behind) { lo = 0; hi = P.W; } if (lo === Infinity) return;
+  // v0.73: 카메라 바로 앞을 지나는 면은 가까운 평면(NEAR_Z)에서 잘라 내요. 예전엔 일부 세로줄을 건너뛰어 면에 구멍이 뚫려 보였어요.
+  const NZ = NEAR_Z + .5; let poly = pts;
+  if (pts.some(p => p.z < NZ)) {
+    const out = []; for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length], ina = a.z >= NZ, inb = b.z >= NZ; if (ina) out.push(a); if (ina !== inb) { const t = (NZ - a.z) / (b.z - a.z); out.push({ l: a.l + t * (b.l - a.l), z: NZ, h: a.h + t * (b.h - a.h), u: a.u + t * (b.u - a.u), v: a.v + t * (b.v - a.v) }); } }
+    poly = out; if (poly.length < 3) return;
+  }
+  let lo = Infinity, hi = -Infinity;
+  for (const p of poly) { const sx = P.W / 2 + p.l * P.f / p.z; lo = Math.min(lo, sx); hi = Math.max(hi, sx); }
   lo = Math.max(0, Math.floor(lo)); hi = Math.min(P.W, Math.ceil(hi));
-  const n = pts.length, tex = face.tex, tw = tex.width, th = tex.height;
+  const pts2 = poly, n = pts2.length, tex = face.tex, tw = tex.width, th = tex.height;
   for (let X = lo; X < hi; X++) {
     const q = (X + .5 - P.W / 2) / P.f; let a = null, b = null;
     for (let i = 0; i < n; i++) {
-      const p0 = pts[i], p1 = pts[(i + 1) % n], den = (p1.l - p0.l) - q * (p1.z - p0.z); if (Math.abs(den) < 1e-6) continue;
+      const p0 = pts2[i], p1 = pts2[(i + 1) % n], den = (p1.l - p0.l) - q * (p1.z - p0.z); if (Math.abs(den) < 1e-6) continue;
       const s = (q * p0.z - p0.l) / den; if (s < -1e-4 || s > 1 + 1e-4) continue;
-      const z = p0.z + s * (p1.z - p0.z); if (z < NEAR_Z) continue;
+      const z = p0.z + s * (p1.z - p0.z); if (z < NEAR_Z - .01) continue;
       const hgt = p0.h + s * (p1.h - p0.h), y = cam.hz + ((cam.eye ?? EYE) - hgt) * P.f / z, pt = { y, u: p0.u + s * (p1.u - p0.u), v: p0.v + s * (p1.v - p0.v) };
       if (!a || y < a.y) a = pt; if (!b || y > b.y) b = pt;
     }
@@ -139,7 +144,7 @@ export function boxPainter(P, cam, keyOf, liftOf = () => 0) {
 // ── v0.71 납작한 물건(표지판·안내판·기록판·비석·상자·울타리·가림막·화분)을 세계에 고정된 얇은 판으로 ─────────
 // 세운 그림(빌보드)은 어느 쪽에서 봐도 앞모습이라, 뒤로 돌아가도 글씨 면이 보였어요.
 // 이제 앞(남쪽)은 2D 그림, 뒤(북쪽)는 어둡게 칠한 뒷판, 옆은 그 두께만큼의 옆면으로 보여요. 나무·바위처럼 둥근 것은 그대로 세운 그림이에요.
-export const SLAB = { sign: 4, landmark: 6, stone: 10, box: 22, board: 6, fence: 4, barrier: 6, planter: 24 };
+export const SLAB = { sign: 4, landmark: 6, stone: 10, box: 22, board: 6, fence: 4, barrier: 6, planter: 24, monument: 40 }; // monument: 두 섬 조형물(받침대가 있는 두꺼운 판)
 const slabCache = new Map();
 function slabTextures(key, render, fx, fy) {
   const id = `${key}:${assetTintTag()}`; if (slabCache.has(id)) return slabCache.get(id);

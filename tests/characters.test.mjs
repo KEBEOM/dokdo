@@ -1,19 +1,14 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {explorerFrame,drawExplorer,EXPLORERS,EXPLORER_ATLASES,NPC_ATLASES,PROFESSOR_PICTURE,CHARACTER_SIZE,EXPLORER_V2,walk5Frame,WALK5_PIXELS} from '../dist/characters.js';
+import {explorerFrame,drawExplorer,EXPLORERS,NPC_ATLASES,PROFESSOR_PICTURE,CHARACTER_SIZE,EXPLORER_V2,walk5Frame,WALK5_PIXELS} from '../dist/characters.js';
 import {V2_CHARACTERS} from '../dist/tileset-v2.js';
-import {SHEET,SHEET_KEYS,PICTURE_KEYS,PICTURE_SIZE,BASELINE,pixelPrint} from '../dist/character-sheets.js';
-import {EXPLORER_ATLAS} from '../dist/explorer-atlas.js';
 import {MOVE_DURATION,moveView,strideFrame,stepProgress} from '../dist/movement.js';
 import {ACTOR_IDS,MAP_PALETTE,createActorFrame,cleanSourceFrame} from '../dist/pixel-art.js';
 assert.equal(CHARACTER_SIZE,48);
-assert.equal(Object.values(EXPLORER_ATLASES).flatMap(a=>a.frames.flat()).length,30);
-// v0.54 Aseprite 시트: 파일 크기가 칸 규칙(32×40 × 5칸 × 3줄, 큰 그림 128×128)과 맞아야 해요.
+// v0.72: 캐릭터마다 걷기 시트 1장 + 큰 그림 1장
 const pngSize=key=>{const b=fs.readFileSync(new URL('../dist/assets/'+key+'.png',import.meta.url));assert.equal(b.subarray(1,4).toString(),'PNG',key);return [b.readUInt32BE(16),b.readUInt32BE(20)];};
-for(const [id,key] of Object.entries(SHEET_KEYS))assert.deepEqual(pngSize(key),[SHEET.cell[0]*SHEET.cols,SHEET.cell[1]*SHEET.rows.length],`${id}: 시트는 160×120`);
-for(const [id,key] of Object.entries(PICTURE_KEYS))assert.deepEqual(pngSize(key),[PICTURE_SIZE,PICTURE_SIZE],`${id}: 큰 그림은 128×128`);
-assert.deepEqual(EXPLORERS.map(e=>e.sheet).sort(),[SHEET_KEYS.boy,SHEET_KEYS.girl].sort());assert.equal(NPC_ATLASES.professor.key,'characters/professor-atlas-v33','고치기 전에는 원본 그림');assert.ok(Object.values(SHEET_KEYS).every(k=>BASELINE[k])&&Object.values(PICTURE_KEYS).every(k=>BASELINE[k]),'모든 시트에 처음 지문');
-assert.equal(pixelPrint(1,1,[1,2,3,0]),pixelPrint(1,1,[9,9,9,0]),'투명한 칸의 색은 지문에 들어가지 않아요');assert.notEqual(pixelPrint(1,1,[1,2,3,255]),pixelPrint(1,1,[1,2,4,255]));assert.equal(PROFESSOR_PICTURE,PICTURE_KEYS.professor);
+assert.deepEqual(EXPLORERS.map(e=>e.sheet),['characters/explorers-v2-64x72','characters/explorers-v2-64x72'],'주인공 걷기 시트는 한 장');for(const e of EXPLORERS)assert.deepEqual(pngSize(e.sheet).length,2);assert.deepEqual(pngSize('characters/explorers-v2-64x72'),[320,432]);for(const k of [...EXPLORERS.map(e=>e.picture),PROFESSOR_PICTURE])pngSize(k);assert.ok(!fs.existsSync(new URL('../dist/assets/characters/sheets',import.meta.url)),'고쳐 쓰는 시트 폴더는 없어요');
+assert.equal(NPC_ATLASES.professor.key,'characters/professor-atlas-v33');
 assert.equal(stepProgress(473.638213,693.6382129999999),1);
 for(const id of ['girl','boy'])for(const dir of ['down','left','right','up']){
  // v0.67 타일셋 v2: 걷기는 5장(0→4)을 16픽셀마다 한 장씩, 80픽셀마다 처음으로
@@ -29,7 +24,7 @@ for(const id of ['girl','boy'])for(const dir of ['down','left','right','up']){
   assert.deepEqual([ax-x,ay-y],V2_CHARACTERS.foot,'발끝 기준점(32, 68)');
  }
 }
-assert.notEqual(EXPLORER_ATLASES.boy.key,EXPLORER_ATLASES.girl.key,'남학생과 여학생은 각자 시트');
+
 // The actual renderer samples one complete artwork frame; there is no procedural arm/leg patching.
 globalThis.Image=class {set src(v){this.naturalWidth=320;this.naturalHeight=432;this.onload();}};
 const calls=[];const ctx=new Proxy({},{get:(o,k)=>o[k]||((...args)=>calls.push([k,...args])),set:(o,k,v)=>(o[k]=v,true)});

@@ -14,6 +14,7 @@ import { V2_OBJECTS } from './tileset-v2.js';
 
 export const TILE = 32, W = MAP_W, H = MAP_H;
 export const PROP_KINDS = ['sign', 'landmark', 'box', 'trash', 'observe', 'stone', 'legend'];
+const SURFACE_BIRDS = new Set([79, 80, 81]); // 가마우지·아비: 물 위에 떠 있어요
 
 // A tile grid (rows of tile codes) carrying the parsed map: buildings, decor, exits, spawns.
 export function createMap(ref = 0) {
@@ -244,7 +245,24 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
       list.push({ n, fx, fy, p });
     }
     for (const w of project.walls || []) list.push({ wall: w, p: { z: w.z } }); // v0.70 언덕 둘레 바위벽
-    list.sort((a, b) => (b.p.z ?? 0) - (a.p.z ?? 0));
+    // v0.73 그리는 순서 바로잡기: 건물·벽처럼 큰 것은 ‘가장 가까운 점’ 거리만으로는 사람과 앞뒤가 틀려요(문 앞에 선 사람이 건물에 가려졌어요).
+    //   카메라 → 사람 발끝 선이 건물 바닥(또는 벽)을 지나면 사람은 그 뒤 → 먼저 그리고, 안 지나고 건물 먼 쪽보다 가까우면 앞 → 나중에 그려요.
+    const cam = project.cam;
+    if (cam) {
+      const segSeg = (ax, ay, bx, by, cx, cy, dx, dy) => { const d = (bx - ax) * (dy - cy) - (by - ay) * (dx - cx); if (Math.abs(d) < 1e-9) return false; const t = ((cx - ax) * (dy - cy) - (cy - ay) * (dx - cx)) / d, u = ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax)) / d; return t > 0 && t < 1 && u >= 0 && u <= 1; };
+      const zOf = (x, y) => (x - cam.x) * cam.fx + (y - cam.y) * cam.fy;
+      const occ = [];
+      for (const it of list) {
+        if (it.box) { const r = project.box.box(it.n.building); if (!r) continue; const e = [[r.x0, r.yB, r.x1, r.yB], [r.x1, r.yB, r.x1, r.yF], [r.x1, r.yF, r.x0, r.yF], [r.x0, r.yF, r.x0, r.yB]]; occ.push({ it, hit: (x, y) => e.some(s => segSeg(cam.x, cam.y, x, y, ...s)), far: Math.max(zOf(r.x0, r.yB), zOf(r.x1, r.yB), zOf(r.x0, r.yF), zOf(r.x1, r.yF)) }); }
+        else if (it.wall) { const w = it.wall; occ.push({ it, hit: (x, y) => segSeg(cam.x, cam.y, x, y, w.x0, w.y0, w.x1, w.y1), far: Math.max(zOf(w.x0, w.y0), zOf(w.x1, w.y1)) }); }
+      }
+      for (const it of list) {
+        if (it.box || it.wall || it.fx == null) continue; let k = it.p.z;
+        for (const o of occ) { const oz = o.it.p.z; if (o.hit(it.fx, it.fy)) k = Math.max(k, oz + 1); else if (k > oz && it.p.z < o.far) k = Math.min(k, oz - 1); }
+        it.key = k;
+      }
+    }
+    list.sort((a, b) => (b.key ?? b.p.z ?? 0) - (a.key ?? a.p.z ?? 0));
     for (const { n, fx, fy, p, box, wall, slab } of list) { const fa = project.fog && !n?.player ? 1 - project.fog(p.z ?? 0) : 1; if (fa < .04) continue; ctx.save(); ctx.globalAlpha *= fa; drawItem(); ctx.restore(); function drawItem() { if (slab) { ctx.save(); ctx.setTransform(base); if (project.fadeZ && p.z < project.fadeZ) ctx.globalAlpha *= .3; project.slab.draw(ctx, n, slab, fx, fy, g => { const keep = ctx; ctx = g; drawOne(n); ctx = keep; }); ctx.restore(); return; } if (wall) { ctx.save(); ctx.setTransform(base); project.drawWall(ctx, wall); ctx.restore(); return; } if (box) { ctx.save(); ctx.setTransform(base); project.box.draw(ctx, n.building); ctx.restore(); return; } ctx.save(); if (!n.player && project.fadeZ && p.z < project.fadeZ) ctx.globalAlpha *= .22; ctx.setTransform(base.a * p.k, 0, 0, base.d * p.k, base.a * (p.x - fx * p.k), base.d * (p.y - fy * p.k)); drawOne(n); ctx.restore(); } } // v0.71 바닷속 안개: 멀수록 흐리게
   }
   function drawOne(n) {
@@ -255,7 +273,8 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
     else if (n.kind === 'wild' || n.kind === 'friend') { // 걸어 다니는 우산몬: 가는 쪽을 보고, 걸을 때 통통 튀어요 (사나워진 우산몬만 검은 기운)
       if (n.kind === 'wild') darkWisps(ctx, n.x, n.y, time);
       const f = facing(n.species), nd = seen(n.dir), flip = (nd === 'right' && f === 'left') || (nd === 'left' && f === 'right'), hop = n.walking ? Math.abs(Math.sin(time / 70)) * 3 : 0;
-      const swim = map?.[Math.round(n.y)]?.[Math.round(n.x)] === 0 && !map.diving; // v0.70 물속 우산몬: 물결 위로 몸 위쪽만 보이고 둥실 떠요(v0.71 잠수하면 온몸이 보여요)
+      if (map?.diving && SURFACE_BIRDS.has(Number(n.species))) return; // v0.72 물 위의 새는 잠수했을 때 안 보여요(머리 위 물낯에 떠 있어요)
+      const swim = map?.[Math.round(n.y)]?.[Math.round(n.x)] === 0 && (!map.diving || SURFACE_BIRDS.has(Number(n.species))); // v0.70 물속 우산몬: 물결 위로 몸 위쪽만 보이고 둥실 떠요(v0.71 잠수하면 온몸이 보여요)
       if (swim) {
         const bob = Math.sin(time / 420 + n.x * 1.7) * 2, line = n.y * 32 + 20;
         ctx.save(); ctx.beginPath(); ctx.rect(n.x * 32 - 24, n.y * 32 - 60, 80, line - (n.y * 32 - 60)); ctx.clip();

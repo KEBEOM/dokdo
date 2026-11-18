@@ -40,7 +40,7 @@ import { OPENING, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.72';
+const VERSION = '0.73';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -562,7 +562,13 @@ function paintDaylight(g, K) {
   g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.drawImage(nightCanvas, 0, 0); g.restore();
 }
 // v0.71 바닷속: 깊은 물(얕은 물보다 안쪽)에 들어가면 잠수해요. 푸른 물빛, 일렁이는 빛무늬, 위에서 비치는 빛줄기, 내 둘레에 올라가는 물방울
-function isDiving() { if (map.kind === 'room') return false; const x = Math.round(view.x), y = Math.round(view.y); return map[y]?.[x] === 0 && !map.shallow?.has(`${x},${y}`); }
+// v0.72: 저절로 잠수하지 않아요. 물에 있을 때 ‘잠수하기’ 단추(또는 Q)로 들어가고 ‘물 위로’로 나와요. 땅에 오르면 저절로 물 위예요.
+let diveWanted = false;
+function inWater() { if (map.kind === 'room') return false; return map[Math.round(view.y)]?.[Math.round(view.x)] === 0; }
+function isDiving() { if (!inWater()) diveWanted = false; return diveWanted; }
+function toggleDive() { if (!inWater() || busy() || battle) return; diveWanted = !diveWanted; sfx('toggle'); }
+function updateDiveButton() { const b = $('#diveBtn'), show = inWater() && !battle && state.started; b.classList.toggle('hidden', !show); if (!show) return; const label = map.diving ? '⬆ 물 위로' : '🫧 잠수하기'; if (b.dataset.label !== label) { b.dataset.label = label; b.innerHTML = `${label} <small>Q</small>`; b.setAttribute('aria-label', label); } b.classList.toggle('down', !!map.diving); }
+$('#diveBtn').onclick = e => { toggleDive(); e.currentTarget.blur(); };
 function paintUnderwater(g, K, now) {
   const t = now / 1000, w = sceneWidth, h = sceneHeight;
   g.save(); g.setTransform(K, 0, 0, K, 0, 0);
@@ -767,6 +773,7 @@ window.addEventListener('keydown', e => {
   if (battle) { battleUI.handleKey(e); return; }
   if (in3d() && e.key.startsWith('Arrow')) { e.preventDefault(); lookKeys.add(e.key); return; } // 3D 보기: 방향키는 둘러보기, 걷기는 W A S D
   if (vectors[e.key]) { e.preventDefault(); if (!e.repeat) keys.press(e.key, performance.now()); path = []; pathAction = null; }
+  if ((e.key === 'q' || e.key === 'Q') && !e.repeat && $('#modal').classList.contains('hidden') && !dialogueState) { toggleDive(); return; } // v0.72 잠수·물 위로
   if (['e', 'E', ' ', 'Enter'].includes(e.key) && !e.repeat) {
     if (!$('#modal').classList.contains('hidden')) return;
     if (document.activeElement?.tagName === 'BUTTON' && !dialogueState) return;
@@ -785,7 +792,7 @@ function frame(now) {
   const dt = Math.max(0, Math.min(now - lastTick, 100)); lastTick = now;
   if (state.started && !document.hidden) state.playMs += dt;
   diveT += ((map.diving ? 1 : 0) - diveT) * Math.min(1, dt / 220); if (diveT < .005) diveT = 0;
-  { const d = isDiving(); if (d !== !!map.diving) { map.diving = d; if (d && !frame.dived) { frame.dived = true; toast('🫧 바닷속으로 잠수했어요! 물고기 우산몬이 헤엄치고 있어요.'); } frame.clockText = ''; } } // v0.71 잠수
+  { const d = isDiving(); if (d !== !!map.diving) { map.diving = d; if (d && !frame.dived) { frame.dived = true; toast('🫧 바닷속으로 잠수했어요! ‘물 위로’ 단추(Q)로 올라와요.'); } frame.clockText = ''; } if (now - (frame.diveAt || 0) > 150) { frame.diveAt = now; updateDiveButton(); } } // v0.72 잠수는 단추로
   // v0.69 게임 시계: 결투·컷신·타이틀 화면에서는 멈춰요. 계절이 바뀌면 알려 주고, 시각은 위치 칸에 보여요.
   if (state.started && !document.hidden && !battle && !cutscenes.active() && titleEl.classList.contains('hidden')) {
     const ev = clockTick(dt); if (ev?.season) { toast(`${SEASON_ICON[ev.season]} ${SEASON_NAME[ev.season]}이 왔어요.`); sfx('toggle'); }
@@ -869,7 +876,7 @@ function frame(now) {
         project.drawWall = (g, w) => drawFace(g, P, cam, { tex: w.tex, lift: w.lift, v: [[w.x0, w.y0, 0, 0, w.th], [w.x1, w.y1, 0, 32, w.th], [w.x1, w.y1, w.h, 32, 0], [w.x0, w.y0, w.h, 0, 0]] });
       }
       project.slab = { has: k => k in SLAB, draw: (g, n, kind, fx, fy, render) => drawSlab(g, P, cam, `${kind}|${n.art || ''}|${n.w || ''}|${n.used ? 1 : 0}|${n.species || ''}`, fx, fy, kind === 'fence' ? 4 : SLAB[kind], render, liftAt(fx, fy)) };
-      project.fadeZ = BACK - 6; project.seen = d => seenDir(yaw, d); project.box = boxPainter(P, cam, b => buildingArt(map, b), () => DIVE_LAND * diveT); // v0.68: 건물은 앞·뒤·옆이 있는 상자로
+      project.fadeZ = BACK - 6; project.cam = cam; // v0.73 그리는 순서(가림) 판단용 project.seen = d => seenDir(yaw, d); project.box = boxPainter(P, cam, b => buildingArt(map, b), () => DIVE_LAND * diveT); // v0.68: 건물은 앞·뒤·옆이 있는 상자로
       drawActors(actorCtx, state, view, now, motion, people, map, project);
       { const lp = P.project(cam, view.x * TILE + 16, view.y * TILE + 28); lamp = lp ? { x: lp.x, y: lp.y - 22 * lp.k, r: 120 * lp.k } : null; }
       paintMiniMap(now, people); if (!scene.classList.contains('look-on')) scene.classList.add('look-on');
@@ -1652,7 +1659,7 @@ if (typeof location !== 'undefined' && new URLSearchParams(location.search).has(
     get longestQuestion() { return QUESTIONS.reduce((m, q) => (q.prompt.length + q.options.join('').length + q.explanation.length > m.prompt.length + m.options.join('').length + m.explanation.length ? q : m)); },
     set forceQuestion(q) { testQuestion = q; }, questionById: id => QUESTIONS.find(q => q.id === id), closeBattleForTest: () => { if (battle) closeBattle(); },
     screenOf(x, y) { const r = canvas.getBoundingClientRect(), p = toScreen(x * TILE + 16, y * TILE + 16); return { x: r.left + p.x * sceneScale, y: r.top + p.y * sceneScale }; },
-    get view3d() { return view3d; }, setView3d, get look() { return { yaw, pitch }; }, setLook(y, p = 0) { yaw = y; pitch = clampPitch(p); }, setHand, setClock: ms => setClock(ms), get diving() { return !!map.diving; }, get clock() { return { ms: gameClock(), hour: daylight().hour, night: isNight(), day: DAY_MS, weather: weatherNow() }; }, get music() { return musicFor(); }, setSeason: v => { const r = setSeason(v); updateUI(); return r; }, get season() { return currentSeason(); },
+    get view3d() { return view3d; }, setView3d, get look() { return { yaw, pitch }; }, setLook(y, p = 0) { yaw = y; pitch = clampPitch(p); }, setHand, setClock: ms => setClock(ms), get diving() { return !!map.diving; }, toggleDive, get inWater() { return inWater(); }, get clock() { return { ms: gameClock(), hour: daylight().hour, night: isNight(), day: DAY_MS, weather: weatherNow() }; }, get music() { return musicFor(); }, setSeason: v => { const r = setSeason(v); updateUI(); return r; }, get season() { return currentSeason(); },
     standAtDoor(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b); settleMovement(); freePos = null; state.x = f.x; state.y = f.y; view = { x: f.x, y: f.y }; state.dir = 'up'; return f; },
     goInside(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b), p = pathfind(map, state.x, state.y, f.x, f.y, liveNPCs()); if (state.x === f.x && state.y === f.y) enterBuilding(b); else { path = p; pathAction = () => enterBuilding(b); } return p.length; },
     legendRadio: false, dexDetail, showDex, showQuest, checkLegends, place(x, y, dir = 'right') { settleMovement(); freePos = null; path = []; state.x = x; state.y = y; view = { x, y }; state.dir = dir; },

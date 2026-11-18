@@ -16,4 +16,6 @@ const fishSpot = [...meadow.shallow].map(k => k.split(',').map(Number)).find(([x
 assert.ok(pathfind(meadow, s.x, s.y, fishSpot[0], fishSpot[1]).length > 0, '연못 속까지 걸어가요');
 // 외부 링크 없음: 새 창으로 나가는 링크가 없어요
 { const fs = await import('node:fs'); for (const f of ['dist/game.js', 'dist/battle-ui.js', 'dist/index.html']) { const t = fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8'); assert.ok(!/target="_blank"|href="https?:/.test(t), `${f}: 외부 링크`); } }
+// v0.72: 가마우지·아비는 물 위의 새(물속엔 없어요)
+{ const { habitat } = await import('../dist/roamers.js'); for (const id of [79, 80, 81]) assert.equal(habitat(id), 'surface'); assert.equal(habitat(37), 'sea'); }
 console.log('PASS: v0.71 wading into shallow water (player only), every fish spot reachable');
