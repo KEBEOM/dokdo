@@ -2314,7 +2314,7 @@ export const MONSTERS=[
 export const getSpecies=id=>MONSTERS.find(m=>m.id===Number(id))||MONSTERS[0];
 // 첫 동료(v0.47): 울릉도 들판에 무작위로 풀어 둔 30마리 가운데 하나를 골라요. 전설·이야기 우산몬은 나오지 않아요.
 // 어떤 친구를 골라도 첫 독도 지킴이를 혼자 이길 수 있게 Lv6에서 시작해요(tests/balance.test.mjs).
-export const STARTER_LEVEL=6, STARTER_FIELD_SIZE=30;
+export const STARTER_LEVEL=1, STARTER_FIELD_SIZE=30; // v0.71: 첫 동료는 Lv1부터(1장 상대도 Lv1~2로 맞췄어요)
 export const starterPool=()=>MONSTERS.filter(m=>!m.legendary).map(m=>m.id);
 export function pickStarterField(rng=Math.random,n=STARTER_FIELD_SIZE){const pool=starterPool();for(let i=pool.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}return pool.slice(0,n);}
 // 수호관을 지키는 여덟 독도 지킴이(v0.47, 예전 이름 ‘관장’): 인증 이름을 붙여 「물결 지킴이 해온」처럼 불러요.

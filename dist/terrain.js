@@ -240,7 +240,21 @@ function paintGround(ctx,map,sheet){
  if(sheet){paintFlowers(ctx,map);banks(ctx,map);}
 }
 
-export function drawTerrain(ctx,map,time,{x=0,y=0,width=768,height=480}={}){
+// v0.71 바닷속(잠수했을 때): 물 칸을 바다 밑바닥으로 — 깊을수록 푸르고 어두운 모래, 바위, 해초, 산호, 조개
+let seaGround=null,seaKey='';
+function paintSeabed(ctx,map){
+ const depth=seaDepth(map);
+ for(let y=0;y<map.length;y++)for(let x=0;x<map[0].length;x++){
+  if(map[y][x]!==0)continue;const d=Math.min(4,depth[y][x]),px=x*TILE,py=y*TILE,r=hash(x,y,61);
+  const base=['#c9b98e','#b2a98a','#93978a','#7a8888','#667a84'][d];ctx.fillStyle=base;ctx.fillRect(px,py,TILE,TILE);
+  for(let i=0;i<6;i++){const a=hash(x,y,70+i);ctx.fillStyle=a<.5?'rgba(255,255,255,.12)':'rgba(0,0,0,.1)';ctx.fillRect(px+Math.floor(hash(x,y,80+i)*28),py+Math.floor(hash(x,y,90+i)*30),3,1);}
+  if(r<.1){ctx.fillStyle='#5d6672';ctx.fillRect(px+8,py+14,14,9);ctx.fillStyle='#7c8794';ctx.fillRect(px+10,py+13,9,4);ctx.fillStyle='#46505b';ctx.fillRect(px+8,py+22,14,2);} // 바위
+  else if(r<.3){const cx=px+6+Math.floor(hash(x,y,62)*18),h=10+Math.floor(hash(x,y,63)*14),c=hash(x,y,64)<.5?'#3f8f4a':'#5aa64b';ctx.fillStyle=c;for(let k=0;k<h;k++){const w=Math.round(Math.sin(k*.6+x)*1.5);ctx.fillRect(cx+w,py+28-k,2,1);ctx.fillRect(cx+4+Math.round(Math.sin(k*.6+y)*1.5),py+28-k*.8,2,1);}} // 해초
+  else if(r<.38){const cx=px+10+Math.floor(hash(x,y,65)*12),c=hash(x,y,66)<.5?'#ef7f8f':'#f2a14a';ctx.fillStyle=c;ctx.fillRect(cx,py+18,2,10);ctx.fillRect(cx-4,py+20,2,6);ctx.fillRect(cx+4,py+19,2,7);ctx.fillRect(cx-4,py+24,10,2);ctx.fillStyle='#ffd0d6';ctx.fillRect(cx,py+17,2,2);} // 산호
+  else if(r<.44){const cx=px+8+Math.floor(hash(x,y,67)*16);ctx.fillStyle='#f3e6d0';ctx.fillRect(cx,py+20,5,3);ctx.fillStyle='#d8b98e';ctx.fillRect(cx+1,py+21,3,1);} // 조개
+ }
+}
+export function drawTerrain(ctx,map,time,{x=0,y=0,width=768,height=480,seabed=false}={}){
  // v0.67: 타일셋 v2 그림이 준비되면 v2로, 아직이면(또는 읽지 못하면) 예전 땅 그림으로 그려요
  const v2=assetImage(V2_TERRAIN.key),det=assetImage(V2_DETAILS.key),sheet=v2?null:assetImage(TERRAIN_ATLAS.key),tag=v2?(det?'v2d':'v2'):sheet;
  if(typeof document!=='undefined'){
@@ -250,6 +264,7 @@ export function drawTerrain(ctx,map,time,{x=0,y=0,width=768,height=480}={}){
    paintCliffs(ground.getContext('2d'),map,v2); // v0.70 언덕·절벽·계단·사다리
    tintCanvas(ground,'ground'); // v0.68: 계절 색(풀 테두리까지 한 번에)
   }
+  if(seabed){const k=map.id+'|'+cachedTint+'|'+cachedSheet;if(!seaGround||seaKey!==k){seaKey=k;seaGround=document.createElement('canvas');seaGround.width=ground.width;seaGround.height=ground.height;const g=seaGround.getContext('2d');g.drawImage(ground,0,0);paintSeabed(g,map);}ctx.drawImage(seaGround,0,0);return;}
   ctx.drawImage(ground,0,0);
  }else paintGround(ctx,map,sheet);
  // Four-sided shoreline. Never paint foam where a pier joins the water.

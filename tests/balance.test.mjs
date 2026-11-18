@@ -21,7 +21,8 @@ function winRate(party, team, p, n, rng) {
   return wins / n;
 }
 // 독도 지킴이 인증 결투: 상대는 이 장 기준 레벨 −2, 나는 지난 인증 보너스 레벨(1장은 첫 동료 Lv6)
-const gym = z => ({ me: z === 0 ? STARTER_LEVEL : 8 + 4 * (z - 1), team: ZONES[z].bossTeam.slice(0, z === 7 ? 3 : 2).map(i => [i, Math.max(3, 5 + 4 * z - 2)]) });
+// v0.71: 1장은 첫 동료 Lv1 → 연습 결투와 야생 결투 두어 번 뒤 Lv3쯤에 지킴이(Lv1 둘)를 만나요
+const gym = z => ({ me: z === 0 ? STARTER_LEVEL + 2 : 8 + 4 * (z - 1), team: ZONES[z].bossTeam.slice(0, z === 7 ? 3 : 2).map(i => [i, z === 0 ? 1 : Math.max(3, 5 + 4 * z - 2)]) });
 
 test('the first gym (도동항 물결 지킴이 해온) can be beaten alone by any 우산몬 you pick on the field, answering 60% right', () => {
   const rng = seeded(11), { me, team } = gym(0);

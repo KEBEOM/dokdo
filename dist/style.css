@@ -1029,3 +1029,17 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
 .dq-hint-row{display:flex;justify-content:flex-start}.dq-hint-row .text-button{width:auto;flex:0 0 auto}
 .dq-result-text{text-align:center}
 .when-note{margin:.5em 0 0;padding:6px 10px;border-radius:8px;background:#eef3e6;color:#3d5a4a;font-size:12px;line-height:1.5}
+.resource-list .resource-item{color:#4f6f62;display:block;margin:13px 0;font-size:14px;line-height:1.6}.resource-list .resource-item small{display:block;margin-top:2px;font-size:11px;color:#8a7a5c}span.source-link{display:inline-block;color:#6a7f76;font-size:.9em;text-decoration:none;cursor:default}
+/* v0.71 결투 글 가독성: 글자를 키우고 밝게, 어두운 바탕 위 글은 그림자로 또렷하게 */
+#battleScreen .dq-message{font-size:clamp(18px,2.3vw,22px)!important;line-height:1.65!important}
+#battleScreen .dq-text{color:#fff8e6;font-weight:500;text-shadow:0 1px 0 #000c,0 0 5px #0008;letter-spacing:.01em}
+#battleScreen .dq-message.dark .dq-text{color:#f1e4ff}
+#battleScreen .dq-message.good .dq-text{color:#d6ffdf}
+#battleScreen .dq-message.bad .dq-text{color:#ffdcd3}
+#battleScreen .dq-label{font-size:13px!important;padding:3px 10px!important}
+#battleScreen .dq-gauge-label{font-size:13px!important;color:#3a4252!important;font-weight:700}
+#battleScreen .dq-tag{font-size:11px!important;padding:3px 5px 3px 6px!important}
+#battleScreen .dq-chips,#battleScreen .dq-chips *{font-size:15px}
+#battleScreen .dq-hint-row .text-button{font-size:15px}
+#battleScreen .dq-command-title{font-size:16px}
+@media (max-width:430px),(max-height:700px){#battleScreen .dq-message{font-size:16px!important;line-height:1.5!important}#battleScreen .dq-chips,#battleScreen .dq-chips *{font-size:13px}#battleScreen .dq-hint-row .text-button{font-size:13px}}

@@ -25,6 +25,7 @@ const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]], N8 = [...N4, [1, 1], [1, -1], [-1
 // 그 사는 곳에 맞는 칸인지(막힘·사람은 따로 봐요)
 export function habitatTile(map, x, y, hab) {
   const t = map[y]?.[x]; if (t === undefined) return false;
+  if (hab === 'sea' && map.shallow) return t === 0; // v0.71: 얕은 물(걸어서)과 깊은 물(잠수해서) 모두 — 나도 들어가서 만날 수 있어요
   if (hab === 'sea') return t === 0 && N4.some(([a, b]) => { const n = map[y + b]?.[x + a]; return n !== undefined && n !== 0 && !map.solid?.has(`${x + a},${y + b}`); }); // 물가에서 한 칸 안쪽 물(부딪혀 만날 수 있게)
   if (hab === 'shore') return (t === 4 || t === 1 || t === 3) && N8.some(([a, b]) => map[y + b]?.[x + a] === 0);
   return FIELD_TILES.has(t);
@@ -108,7 +109,8 @@ export function createRoamers(rng = Math.random, when = () => null) {
     const byHab = { land: spotsFor('land'), sea: spotsFor('sea'), shore: spotsFor('shore') };
     const pool = (fixed ? [fixed] : roamerPool(map.zone, when())).filter(id => byHab[habitat(id)].length || fixed);
     if (!pool.length) return null;
-    const species = pool[Math.floor(rng() * pool.length)], spots = byHab[habitat(species)].length ? byHab[habitat(species)] : byHab.land;
+    const species = pool[Math.floor(rng() * pool.length)]; let spots = byHab[habitat(species)].length ? byHab[habitat(species)] : byHab.land;
+    if (habitat(species) === 'sea' && map.shallow) { const near = spots.filter(p => map.shallow.has(`${p.x},${p.y}`)); if (near.length && rng() < .5) spots = near; } // 절반은 물가 가까이, 절반은 깊은 바닷속
     if (!spots.length) return null;
     const p = spots[Math.floor(rng() * spots.length)];
     const m = MONSTERS.find(m => m.id === species);

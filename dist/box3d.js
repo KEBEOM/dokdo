@@ -134,3 +134,33 @@ export function boxPainter(P, cam, keyOf) {
     }
   };
 }
+
+// ── v0.71 납작한 물건(표지판·안내판·기록판·비석·상자·울타리·가림막·화분)을 세계에 고정된 얇은 판으로 ─────────
+// 세운 그림(빌보드)은 어느 쪽에서 봐도 앞모습이라, 뒤로 돌아가도 글씨 면이 보였어요.
+// 이제 앞(남쪽)은 2D 그림, 뒤(북쪽)는 어둡게 칠한 뒷판, 옆은 그 두께만큼의 옆면으로 보여요. 나무·바위처럼 둥근 것은 그대로 세운 그림이에요.
+export const SLAB = { sign: 4, landmark: 6, stone: 10, box: 22, board: 6, fence: 4, barrier: 6, planter: 24 };
+const slabCache = new Map();
+function slabTextures(key, render, fx, fy) {
+  const id = `${key}:${assetTintTag()}`; if (slabCache.has(id)) return slabCache.get(id);
+  const S = 192, c = canvas(S, S), g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.save(); g.translate(S / 2 - fx, S - 24 - fy); render(g); g.restore();
+  const d = g.getImageData(0, 0, S, S).data, foot = S - 24; let l = S, r = -1, t = foot;
+  for (let y = 0; y < foot; y++) for (let x = 0; x < S; x++) if (d[(y * S + x) * 4 + 3] > 40) { if (x < l) l = x; if (x > r) r = x; if (y < t) t = y; }
+  if (r < l) { slabCache.set(id, null); return null; }
+  const w = r - l + 1, h = foot - t, front = canvas(w, h); front.getContext('2d').drawImage(c, l, t, w, h, 0, 0, w, h);
+  const back = canvas(w, h), bg = back.getContext('2d'); bg.translate(w, 0); bg.scale(-1, 1); bg.drawImage(front, 0, 0); bg.setTransform(1, 0, 0, 1, 0, 0);
+  bg.globalCompositeOperation = 'source-atop'; bg.fillStyle = 'rgba(58,42,30,.62)'; bg.fillRect(0, 0, w, h);
+  const side = canvas(2, h), sg = side.getContext('2d'), fd = front.getContext('2d').getImageData(0, 0, w, h).data;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (y * w + x) * 4; if (fd[i + 3] > 40) { sg.fillStyle = `rgb(${fd[i] * .55 | 0},${fd[i + 1] * .55 | 0},${fd[i + 2] * .55 | 0})`; sg.fillRect(0, y, 2, 1); break; } }
+  const tex = { front, back, side, w, h, ax: l - S / 2 }; slabCache.set(id, tex); return tex;
+}
+// t: 두께(지도 픽셀) · lift: 언덕 위 높이
+export function drawSlab(ctx, P, cam, key, fx, fy, t, render, lift = 0) {
+  const T = slabTextures(key, render, fx, fy); if (!T) return false;
+  const x0 = fx + T.ax, x1 = x0 + T.w, yF = fy + t / 2, yB = fy - t / 2, z0 = lift, z1 = lift + T.h, W = T.w, H = T.h;
+  ctx.imageSmoothingEnabled = false;
+  if (cam.y > yF) drawFace(ctx, P, cam, { tex: T.front, v: [[x0, yF, z0, 0, H], [x1, yF, z0, W, H], [x1, yF, z1, W, 0], [x0, yF, z1, 0, 0]] });
+  if (cam.y < yB) drawFace(ctx, P, cam, { tex: T.back, v: [[x1, yB, z0, 0, H], [x0, yB, z0, W, H], [x0, yB, z1, W, 0], [x1, yB, z1, 0, 0]] });
+  if (cam.x < x0) drawFace(ctx, P, cam, { tex: T.side, v: [[x0, yB, z0, 0, H], [x0, yF, z0, 2, H], [x0, yF, z1, 2, 0], [x0, yB, z1, 0, 0]] });
+  if (cam.x > x1) drawFace(ctx, P, cam, { tex: T.side, v: [[x1, yF, z0, 0, H], [x1, yB, z0, 2, H], [x1, yB, z1, 2, 0], [x1, yF, z1, 0, 0]] });
+  return true;
+}

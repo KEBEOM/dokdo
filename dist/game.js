@@ -19,7 +19,7 @@ import { VILLAIN_ATLASES } from './villain-atlases.js';
 import { music, sfx, jingle, setOn, setVolume, isOn, audioPrefs, currentMusic, wantedMusic } from './audio.js';
 import { TRACKS } from './music-data.js';
 import { makeChase, cameraStep, seenDir, clampPitch, DIR_ANGLE, BACK } from './view3d.js';
-import { boxPainter, drawFace } from './box3d.js';
+import { boxPainter, drawFace, drawSlab, SLAB } from './box3d.js';
 import { levelAt, LEVEL_H, cliffWalls, cliffTextures, regionMask } from './heights.js';
 import { V2_TERRAIN } from './tileset-v2.js';
 import { weatherNow, weatherChoice, setWeather, currentSeason, seasonChoice, setSeason, seasonColor, seasonWind, SEASON_NAME, SEASON_ICON, seasonOfMonth, clockTick, setClock, gameClock, daylight, isNight, clockLabel, dayNightChoice, setDayNight, DAY_MS } from './season.js';
@@ -40,7 +40,7 @@ import { OPENING, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.70';
+const VERSION = '0.71';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -164,7 +164,7 @@ function toast(message) { $('#toast').textContent = message; $('#toast').classLi
 // 결투 > 컷신 > 타이틀 > 지금 있는 곳 순서로 정해요. 매 화면마다 불러도 같은 곡이면 그대로 이어요.
 const CUTSCENE_MUSIC = { opening: 'town', guide: 'meadow', ferry: 'dokdo', legend: 'legend', 'boss-reveal': 'villain', 'boss-fall': 'dokdo', 'tree-joins': 'legend', epilogue: 'title' };
 // v0.69: 밤에는 밤 노래(마을·초원 ‘별 헤는 밤’, 바닷길·독도 ‘달빛 밤바다’). 건물 안은 늘 같아요.
-function mapMusic() { const d = map.def, n = d.kind !== 'room' && isNight(); return d.kind === 'route' ? (n ? 'nightsea' : 'route') : d.kind === 'room' ? 'room' : d.kind === 'meadow' ? (n ? 'night' : 'meadow') : d.island === '울릉도' ? (n ? 'night' : 'town') : (n ? 'nightsea' : 'dokdo'); }
+function mapMusic() { const d = map.def, n = d.kind !== 'room' && isNight(); if (map.diving) return 'nightsea'; /* v0.71 바닷속은 잔잔한 노래 */ return d.kind === 'route' ? (n ? 'nightsea' : 'route') : d.kind === 'room' ? 'room' : d.kind === 'meadow' ? (n ? 'night' : 'meadow') : d.island === '울릉도' ? (n ? 'night' : 'town') : (n ? 'nightsea' : 'dokdo'); }
 let musicPreview = null; // 모험 메뉴의 ‘배경음악 듣기’로 고른 곡(메뉴를 닫으면 원래대로)
 function musicFor() {
   if (musicPreview) return musicPreview;
@@ -516,18 +516,54 @@ function step(v, now) {
 // ox, oy: 화면이 움직인 만큼(2D는 카메라, 3D는 보는 방향) 함께 밀려서 제자리에 떠 있는 것처럼 보여요.
 // v0.69 낮·밤: 새벽·노을은 주황빛, 밤은 짙은 남색을 덮고 내 둘레만 손전등처럼 밝게 남겨요.
 let lamp = null, nightCanvas = null;
-function weatherText() { const L = daylight(), w = weatherNow(), sky = w.kind === 'rain' && w.amount > .3 ? '☂ 비' : w.kind === 'snow' && w.amount > .3 ? '❄ 눈' : L.night > .5 ? '☾ 밤' : z().sky; return `${sky} · ${SEASON_NAME[currentSeason()]} · ${clockLabel()}`; }
+// v0.71 일출·일몰: 하늘 색(낮 파랑 · 새벽 분홍빛 · 노을 주황 · 밤 남색)과 해·달
+const mixHex = (a, b, t) => { const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)), A = p(a), B = p(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join(''); };
+function skyColors() {
+  const L = daylight(), dusk = L.hour > 12, warm = dusk ? ['#3c3f80', '#f0846a', '#ffc46e'] : ['#4a5a96', '#ee9fb0', '#ffd49a'], night = ['#16224e', '#24336a', '#3a4c7e'];
+  let c = ['#4f9fd6', '#8fcbe6', '#e4f4f6'].map((d, i) => mixHex(d, warm[i], L.warm * .9)); c = c.map((d, i) => mixHex(d, night[i], L.night)); return c;
+}
+function paintSunMoon(g, P, hz, yaw) {
+  const L = daylight(), h = L.hour, u = sceneHeight / 100, f = P.f;
+  const body = (t, az, elev, sun) => { // t: 떠 있는 정도 0..1 · az: 방위(0 북 · π/2 동 · π 남) · elev: 높이 0..1
+    let a = az - yaw; a = ((a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI; if (Math.abs(a) > 1.35) return;
+    const x = sceneWidth / 2 + Math.tan(a) * f, y = hz - elev * sceneHeight * .85 - 2 * u, low = 1 - Math.min(1, elev * 3), r = (sun ? 5.5 : 4.5) * u * (1 + low * .25);
+    const glow = g.createRadialGradient(x, y, r * .4, x, y, r * (sun ? 4.5 : 3));
+    glow.addColorStop(0, sun ? `rgba(255,${Math.round(236 - low * 90)},${Math.round(170 - low * 110)},${.55 * t})` : `rgba(220,230,255,${.35 * t})`); glow.addColorStop(1, 'rgba(255,200,120,0)');
+    g.fillStyle = glow; g.fillRect(x - r * 5, y - r * 5, r * 10, r * 10);
+    g.globalAlpha = t; g.fillStyle = sun ? mixHex('#fff4c8', '#ff8a3c', low) : '#eef2ff'; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+    if (!sun) { g.fillStyle = 'rgba(160,170,200,.5)'; g.beginPath(); g.arc(x - r * .3, y - r * .2, r * .25, 0, Math.PI * 2); g.arc(x + r * .35, y + r * .25, r * .18, 0, Math.PI * 2); g.fill(); }
+    g.globalAlpha = 1;
+  };
+  if (h > 5 && h < 19.5) { const p = (h - 5.6) / 13; body(Math.min(1, Math.max(0, Math.min(h - 5, 19.5 - h) / .7)), Math.PI / 2 + Math.PI * p, Math.max(0, Math.sin(Math.PI * Math.max(0, Math.min(1, p)))) * .9, true); }
+  if (h > 18 || h < 6.5) { const p = ((h - 18.4 + 24) % 24) / 11.6; body(Math.min(1, L.night * 1.4), Math.PI / 2 + Math.PI * p, Math.max(0, Math.sin(Math.PI * Math.max(0, Math.min(1, p)))) * .75, false); }
+}
+function weatherText() { if (map.diving) return `🫧 바닷속 · ${SEASON_NAME[currentSeason()]} · ${clockLabel()}`; const L = daylight(), w = weatherNow(), sky = w.kind === 'rain' && w.amount > .3 ? '☂ 비' : w.kind === 'snow' && w.amount > .3 ? '❄ 눈' : L.night > .5 ? '☾ 밤' : z().sky; return `${sky} · ${SEASON_NAME[currentSeason()]} · ${clockLabel()}`; }
 function paintDaylight(g, K) {
   const L = daylight(); if (L.night < .01 && L.warm < .01) return;
   const w = g.canvas.width, h = g.canvas.height;
   nightCanvas ||= document.createElement('canvas'); if (nightCanvas.width !== w || nightCanvas.height !== h) { nightCanvas.width = w; nightCanvas.height = h; }
   const n = nightCanvas.getContext('2d'); n.setTransform(1, 0, 0, 1, 0, 0); n.globalCompositeOperation = 'source-over'; n.clearRect(0, 0, w, h);
-  if (L.warm > .01) { n.fillStyle = `rgba(255,128,48,${(.2 * L.warm * (1 - L.night * .6)).toFixed(3)})`; n.fillRect(0, 0, w, h); }
+  if (L.warm > .01) { // 새벽은 동쪽(오른쪽)에서, 노을은 서쪽(왼쪽)에서 비치는 주황빛(2D) · 3D는 고르게
+    const k = L.warm * (1 - L.night * .6); n.fillStyle = `rgba(255,128,48,${(.11 * k).toFixed(3)})`; n.fillRect(0, 0, w, h);
+    if (!in3d()) { const east = L.hour < 12, gr = n.createLinearGradient(east ? w : 0, 0, east ? 0 : w, 0); gr.addColorStop(0, `rgba(255,140,60,${(.3 * k).toFixed(3)})`); gr.addColorStop(.6, 'rgba(255,140,60,0)'); n.fillStyle = gr; n.fillRect(0, 0, w, h); }
+  }
   if (L.night > .01) {
     n.fillStyle = `rgba(8,16,54,${(.6 * L.night).toFixed(3)})`; n.fillRect(0, 0, w, h);
     if (lamp) { const x = lamp.x * K, y = lamp.y * K, r = lamp.r * K, gr = n.createRadialGradient(x, y, r * .12, x, y, r); gr.addColorStop(0, `rgba(0,0,0,${(.8 * L.night).toFixed(3)})`); gr.addColorStop(1, 'rgba(0,0,0,0)'); n.globalCompositeOperation = 'destination-out'; n.fillStyle = gr; n.fillRect(x - r, y - r, r * 2, r * 2); n.globalCompositeOperation = 'source-over'; }
   }
   g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.drawImage(nightCanvas, 0, 0); g.restore();
+}
+// v0.71 바닷속: 깊은 물(얕은 물보다 안쪽)에 들어가면 잠수해요. 푸른 물빛, 일렁이는 빛무늬, 위에서 비치는 빛줄기, 내 둘레에 올라가는 물방울
+function isDiving() { if (map.kind === 'room') return false; const x = Math.round(view.x), y = Math.round(view.y); return map[y]?.[x] === 0 && !map.shallow?.has(`${x},${y}`); }
+function paintUnderwater(g, K, now) {
+  const t = now / 1000, w = sceneWidth, h = sceneHeight;
+  g.save(); g.setTransform(K, 0, 0, K, 0, 0);
+  g.fillStyle = 'rgba(14,92,138,.36)'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 5; i++) { const x = ((i * 211 + t * 14) % (w + 200)) - 100, gr = g.createLinearGradient(x, 0, x + 60, h); gr.addColorStop(0, 'rgba(210,245,255,.16)'); gr.addColorStop(1, 'rgba(210,245,255,0)'); g.fillStyle = gr; g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 34, 0); g.lineTo(x + 110, h); g.lineTo(x + 50, h); g.closePath(); g.fill(); } // 빛줄기
+  g.fillStyle = 'rgba(220,250,255,.09)'; // 일렁이는 빛무늬
+  for (let i = 0; i < 46; i++) { const cx = ((i * 97) % w) + Math.sin(t * 1.3 + i) * 12, cy = ((i * 53) % h) + Math.cos(t * 1.1 + i * 1.7) * 9, r = 10 + (i % 5) * 4; g.beginPath(); g.ellipse(cx, cy, r, r * .45, Math.sin(t + i) * .5, 0, Math.PI * 2); g.fill(); }
+  if (lamp) { g.strokeStyle = 'rgba(235,252,255,.75)'; g.lineWidth = 1; for (let i = 0; i < 9; i++) { const life = (t * .7 + i / 9) % 1, bx = lamp.x + Math.sin(t * 3 + i * 2) * 6 + (i % 3 - 1) * 5, by = lamp.y - life * 70, r = 1.5 + (i % 3); g.globalAlpha = 1 - life; g.beginPath(); g.arc(bx, by, r, 0, Math.PI * 2); g.stroke(); } g.globalAlpha = 1; } // 물방울
+  g.restore();
 }
 function paintWind(g, now, K, ox = 0, oy = 0) {
   const wind = seasonWind(), cols = wind.colors, wx = weatherNow(); // v0.68: 봄 꽃잎 · 여름 잎 · 가을 단풍잎 · 겨울 눈송이
@@ -705,6 +741,11 @@ function tapAt(e) {
   canvas.focus({ preventScroll: true });
 }
 const vectors = KEY_VECTORS;
+// v0.71: 위쪽 단추(소리·저장·3D·전체 화면·메뉴)와 아래 탐험 메뉴는 누르고 나면 손을 떼요(포커스 해제).
+//        그래야 주황 테두리가 남지 않고, 스페이스·엔터가 그 단추를 또 누르지 않고 게임(말 걸기)으로 가요.
+//        Tab 키로 옮겨 가서 누른 경우(e.detail 0)는 그대로 두어 키보드로도 쓸 수 있어요.
+const HUD_BUTTONS = '.hud-actions button, .game-dock button';
+document.addEventListener('click', e => { const b = e.target.closest?.(HUD_BUTTONS); if (b && e.detail !== 0) setTimeout(() => { if (document.activeElement === b) b.blur(); }, 0); }, true);
 window.addEventListener('keydown', e => {
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
   if (cutscenes.active()) { cutscenes.handleKey(e); return; }
@@ -734,6 +775,7 @@ function frame(now) {
   let keyDir = null;
   const dt = Math.max(0, Math.min(now - lastTick, 100)); lastTick = now;
   if (state.started && !document.hidden) state.playMs += dt;
+  { const d = isDiving(); if (d !== !!map.diving) { map.diving = d; if (d && !frame.dived) { frame.dived = true; toast('🫧 바닷속으로 잠수했어요! 물고기 우산몬이 헤엄치고 있어요.'); } frame.clockText = ''; } } // v0.71 잠수
   // v0.69 게임 시계: 결투·컷신·타이틀 화면에서는 멈춰요. 계절이 바뀌면 알려 주고, 시각은 위치 칸에 보여요.
   if (state.started && !document.hidden && !battle && !cutscenes.active() && titleEl.classList.contains('hidden')) {
     const ev = clockTick(dt); if (ev?.season) { toast(`${SEASON_ICON[ev.season]} ${SEASON_NAME[ev.season]}이 왔어요.`); sfx('toggle'); }
@@ -764,7 +806,7 @@ function frame(now) {
       const cam = fpCamera(), gw = W * TILE, gh = H * TILE, hz = cam.hz; // 땅은 지도 전체를 그려 두고, 가까운 곳은 또렷하게·먼 곳은 줄여서 지도 끝까지 보여요(v0.64)
       ground3d ||= document.createElement('canvas'); if (ground3d.width !== gw || ground3d.height !== gh) { ground3d.width = gw; ground3d.height = gh; }
       const g = ground3d.getContext('2d'); g.imageSmoothingEnabled = false;
-      camera = drawWorld(g, map, state, { x: (cam.x - 16) / TILE, y: (cam.y - 16) / TILE }, now, target, motion, { width: gw, height: gh, labels: false, actors: false }, people);
+      camera = drawWorld(g, map, state, { x: (cam.x - 16) / TILE, y: (cam.y - 16) / TILE }, now, target, motion, { width: gw, height: gh, labels: false, actors: false, seabed: map.diving }, people);
       drawFlatDecor(g, map, now); // v0.68: 배는 물 위에 눕혀요
       rot3d ||= document.createElement('canvas'); if (rot3d.width !== P.RW || rot3d.height !== P.RH) { rot3d.width = P.RW; rot3d.height = P.RH; }
       far3d ||= document.createElement('canvas'); if (far3d.width !== P.FW || far3d.height !== P.FH) { far3d.width = P.FW; far3d.height = P.FH; }
@@ -774,14 +816,15 @@ function frame(now) {
       fr.setTransform(1, 0, 0, 1, 0, 0); fr.fillStyle = seasonColor(z().color); fr.fillRect(0, 0, P.FW, P.FH); fr.imageSmoothingEnabled = true;
       fr.setTransform(cs * fs, -sn * fs, sn * fs, cs * fs, P.FW / 2 - (cs * ux + sn * uy) * fs, P.FH - (-sn * ux + cs * uy) * fs); fr.drawImage(ground3d, 0, 0);
       // 하늘: 위로 볼수록 짙은 파랑, 지평선 쪽은 옅게. 구름은 보는 방향에 따라 흘러가요.
-      const sky = ctx.createLinearGradient(0, hz - sceneHeight * 1.4, 0, hz); sky.addColorStop(0, '#4f9fd6'); sky.addColorStop(.55, '#8fcbe6'); sky.addColorStop(1, '#e4f4f6'); ctx.fillStyle = sky; ctx.fillRect(0, 0, sceneWidth, sceneHeight);
+      const sky = ctx.createLinearGradient(0, hz - sceneHeight * 1.4, 0, hz), sc = map.diving ? ['#0b3f60', '#17668a', '#2b8bac'] : skyColors(); sky.addColorStop(0, sc[0]); sky.addColorStop(.55, sc[1]); sky.addColorStop(1, sc[2]); ctx.fillStyle = sky; ctx.fillRect(0, 0, sceneWidth, sceneHeight);
       const u = sceneHeight / 100; ctx.fillStyle = '#ffffffd9';
-      for (let i = 0; i < 9; i++) {
+      for (let i = 0; i < (map.diving ? 0 : 9); i++) {
         let a = (i * .7 + .35 - yaw + now * .000016) % (Math.PI * 2); // 구름은 바람을 타고 천천히 흘러가요 if (a > Math.PI) a -= Math.PI * 2; if (a < -Math.PI) a += Math.PI * 2; if (Math.abs(a) > 1.3) continue;
         const x = sceneWidth / 2 + Math.tan(a) * P.f, y = hz - (14 + (i * 37 % 60)) * u, w = (16 + i % 3 * 7) * u;
         ctx.fillRect(Math.round(x - w / 2), Math.round(y), Math.round(w), Math.round(3 * u)); ctx.fillRect(Math.round(x - w * .3), Math.round(y - 2 * u), Math.round(w * .55), Math.round(2 * u)); ctx.fillRect(Math.round(x - w * .1), Math.round(y - 3.4 * u), Math.round(w * .3), Math.round(1.5 * u));
       }
-      { const L = daylight(); if (L.night > .2) { ctx.fillStyle = '#ffffff'; for (let i = 0; i < 70; i++) { let a = (i * 2.399) % (Math.PI * 2) - Math.PI - yaw; a = ((a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI; if (Math.abs(a) > 1.3) continue; const sy = hz - (6 + (i * 53 % 90)) * u; if (sy < 0) continue; ctx.globalAlpha = L.night * (.45 + .55 * Math.abs(Math.sin(now / 900 + i))); const sz = i % 5 === 0 ? 3 : 2; ctx.fillRect(Math.round(sceneWidth / 2 + Math.tan(a) * P.f), Math.round(sy), sz, sz); } ctx.globalAlpha = 1; } } // v0.69 밤하늘 별
+      if (!map.diving) paintSunMoon(ctx, P, hz, yaw); // v0.71 일출·일몰: 해와 달이 동쪽에서 떠서 서쪽으로 져요
+      { const L = daylight(); if (L.night > .2 && !map.diving) { ctx.fillStyle = '#ffffff'; for (let i = 0; i < 70; i++) { let a = (i * 2.399) % (Math.PI * 2) - Math.PI - yaw; a = ((a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI; if (Math.abs(a) > 1.3) continue; const sy = hz - (6 + (i * 53 % 90)) * u; if (sy < 0) continue; ctx.globalAlpha = L.night * (.45 + .55 * Math.abs(Math.sin(now / 900 + i))); const sz = i % 5 === 0 ? 3 : 2; ctx.fillRect(Math.round(sceneWidth / 2 + Math.tan(a) * P.f), Math.round(sy), sz, sz); } ctx.globalAlpha = 1; } } // v0.69 밤하늘 별
       if (hz < sceneHeight) { ctx.fillStyle = seasonColor(z().color); ctx.fillRect(0, Math.max(0, hz), sceneWidth, sceneHeight - Math.max(0, hz)); }
       actorCtx.scale(K, K); actorCtx.imageSmoothingEnabled = false;
       for (let y = Math.max(0, Math.floor(hz) + 1); y < sceneHeight; y++) {
@@ -805,20 +848,22 @@ function frame(now) {
       const haze = actorCtx.createLinearGradient(0, hz, 0, hz + sceneHeight * .06); haze.addColorStop(0, '#e4f4f6'); haze.addColorStop(1, '#e4f4f600'); actorCtx.fillStyle = haze; actorCtx.fillRect(0, hz, sceneWidth, sceneHeight * .06);
       const project = (wx, wy) => { const p = P.project(cam, wx, wy), lv = map.level ? levelAt(map, (wx - 16) / TILE, (wy - 28) / TILE) : 0; if (p && lv) p.y -= lv * LEVEL_H * p.k; return p; }; // v0.70 언덕 위는 한 층 높이
       { const img = map.cliff && assetImage(V2_TERRAIN.key); if (img) { const tex = cliffTextures(img); project.walls = cliffWalls(map).map(w => { const mx = (w.x0 + w.x1) / 2, my = (w.y0 + w.y1) / 2; return { ...w, z: (mx - cam.x) * cam.fx + (my - cam.y) * cam.fy, facing: (cam.x - mx) * w.n[0] + (cam.y - my) * w.n[1] }; }).filter(w => w.facing > 0 && w.z > -40 && w.z < P.RH * 1.6); project.drawWall = (g, w) => drawFace(g, P, cam, { tex: w.ladder ? tex.ladder : tex.plain, v: [[w.x0, w.y0, 0, 0, 32], [w.x1, w.y1, 0, 32, 32], [w.x1, w.y1, LEVEL_H, 32, 0], [w.x0, w.y0, LEVEL_H, 0, 0]] }); } }
+      project.slab = { has: k => k in SLAB, draw: (g, n, kind, fx, fy, render) => drawSlab(g, P, cam, `${kind}|${n.art || ''}|${n.w || ''}|${n.used ? 1 : 0}|${n.species || ''}`, fx, fy, kind === 'fence' ? 4 : SLAB[kind], render, (map.level ? levelAt(map, (fx - 16) / TILE, (fy - 28) / TILE) : 0) * LEVEL_H) };
       project.fadeZ = BACK - 6; project.seen = d => seenDir(yaw, d); project.box = boxPainter(P, cam, b => buildingArt(map, b)); // v0.68: 건물은 앞·뒤·옆이 있는 상자로
       drawActors(actorCtx, state, view, now, motion, people, map, project);
       { const lp = P.project(cam, view.x * TILE + 16, view.y * TILE + 28); lamp = lp ? { x: lp.x, y: lp.y - 22 * lp.k, r: 120 * lp.k } : null; }
       paintMiniMap(now, people); if (!scene.classList.contains('look-on')) scene.classList.add('look-on');
     } else {
       if (scene.classList.contains('look-on')) scene.classList.remove('look-on');
-      camera = drawWorld(ctx, map, state, view, now, target, motion, { width: sceneWidth, height: sceneHeight, labels: false, actors: false }, people);
+      camera = drawWorld(ctx, map, state, view, now, target, motion, { width: sceneWidth, height: sceneHeight, labels: false, actors: false, seabed: map.diving }, people);
       actorCtx.scale(K, K); actorCtx.translate(-camera.x, -camera.y);
       drawActors(actorCtx, state, view, now, motion, people, map);
       lamp = { x: view.x * TILE + 16 - camera.x, y: view.y * TILE + 8 - camera.y, r: 120 };
       if (map.kind !== 'room') paintMiniMap(now, people); else if (miniMap) miniMap.hidden = true; // v0.68: 2D에서도 작은 지도
     }
     actorCtx.restore();
-    if (map.kind !== 'room') paintWind(actorCtx, now, K, in3d() ? -(yaw || 0) * projection().f * .8 : -camera.x, in3d() ? pitch * sceneHeight * .5 : -camera.y);
+    if (map.diving) paintUnderwater(actorCtx, K, now); // v0.71 바닷속
+    else if (map.kind !== 'room') paintWind(actorCtx, now, K, in3d() ? -(yaw || 0) * projection().f * .8 : -camera.x, in3d() ? pitch * sceneHeight * .5 : -camera.y);
     if (map.kind !== 'room') paintDaylight(actorCtx, K); // v0.69 낮·밤
     paintWorldLabels(people);
   }
@@ -854,7 +899,7 @@ function beginStudy(kind = 'review', concept = null, opts = {}) {
         recordAnswer(state, q, correct, assisted);
         $$('[data-answer]').forEach(btn => { btn.disabled = true; if (Number(btn.dataset.answer) === q.answer) btn.classList.add('correct'); });
         if (!correct) b.classList.add('wrong'); sfx(correct ? 'correct' : 'wrong');
-        $('#feedbackArea').innerHTML = `<div class="feedback"><strong>${correct ? '잘 연결했어요!' : '근거를 다시 살펴볼까요?'}</strong><br>${esc(q.explanation)}<br><a class="source-link" href="${q.source}" target="_blank" rel="noopener">출처: ${esc(sourceCite(q.source))} ↗</a></div><div class="modal-actions"><button id="nextQuestion" class="primary">${!correct ? '근거를 읽고 다시 풀기' : index < questions.length - 1 ? '다음 기록' : '조사 마치기'} →</button></div>`;
+        $('#feedbackArea').innerHTML = `<div class="feedback"><strong>${correct ? '잘 연결했어요!' : '근거를 다시 살펴볼까요?'}</strong><br>${esc(q.explanation)}<br><span class="source-link">출처: ${esc(sourceCite(q.source))}</span></div><div class="modal-actions"><button id="nextQuestion" class="primary">${!correct ? '근거를 읽고 다시 풀기' : index < questions.length - 1 ? '다음 기록' : '조사 마치기'} →</button></div>`;
         $('#nextQuestion').onclick = () => {
           if (!correct) { assisted = true; show(); return; }
           assisted = false; index++;
@@ -935,9 +980,10 @@ function startBattle(kind, id, opts = {}) {
   settleMovement(); path = []; pathAction = null; keys.clear();
   if (!state.party.some(m => m.hp > 0)) { healAll(state); state.active = 0; }
   if (state.party[state.active]?.hp <= 0) state.active = state.party.findIndex(m => m.hp > 0);
-  const base = 5 + state.zone * 4 + (map.kind === 'route' ? 2 : 0);
+  // v0.71: 첫 동료가 Lv1부터라 1장(도동항·숫돌바위 길)의 상대는 Lv1~2예요. 2장부터는 예전 그대로(인증하면 동료가 8+4×장 레벨로 올라요).
+  const first = state.zone === 0, base = first ? (map.kind === 'route' ? 2 : 1) : 5 + state.zone * 4 + (map.kind === 'route' ? 2 : 0);
   let enemies;
-  if (kind === 'wild') enemies = [createMonster(id, Math.max(3, base - 2 + Math.floor(Math.random() * 3)))];
+  if (kind === 'wild') enemies = [createMonster(id, first ? Math.max(1, base - 1 + Math.floor(Math.random() * 2)) : Math.max(3, base - 2 + Math.floor(Math.random() * 3)))];
   else if (kind === 'legend') enemies = [createMonster(id, base + 4)];
   else if (kind === 'tutorial') {
     // a gentle practice foe: two right answers calm it, and it only taps lightly
@@ -946,7 +992,7 @@ function startBattle(kind, id, opts = {}) {
   }
   else if (kind === 'enemy') { const pool = z().wild; enemies = (state.zone === 7 ? bossTeam() : [pool[2] || pool[0] || 21]).map(i => createMonster(i, base)); }
   else if (kind === 'trainer') enemies = (opts.npc.team?.length ? opts.npc.team : [z().wild[3]]).map(i => createMonster(i, base));
-  else enemies = z().bossTeam.slice(0, kind === 'rematch' ? 3 : 2).map(i => createMonster(i, kind === 'rematch' ? base + 1 : Math.max(3, base - 2))); // v0.44 독도 지킴이 약하게: 인증 결투는 이 장 기준 레벨 −2
+  else enemies = z().bossTeam.slice(0, kind === 'rematch' ? 3 : 2).map(i => createMonster(i, kind === 'rematch' ? base + 1 : first ? 1 : Math.max(3, base - 2))); // v0.44 독도 지킴이 약하게: 인증 결투는 이 장 기준 레벨 −2
   for (const m of enemies) if (!state.seen.includes(m.id)) state.seen.push(m.id);
   for (const m of enemies) m.record = pickRecord(state.zone, Math.random, enemies.map(x => x.record).filter(Boolean)); // 검은 기운이 지운 기록 한 줄씩
   preloadMonsters(enemies.map(m => m.id));
@@ -969,7 +1015,7 @@ function refreshBattle() {
 }
 // 출처 표시: 공공누리·자유이용 조건에 따라 문제마다 근거 자료의 이름을 밝혀요
 const sourceCite = url => SOURCES.find(s => s.url === url)?.cite || '학습 자료';
-function explanationHTML(q) { return `<p class="dq-explain">${esc(q.explanation)}</p><a class="source-link" href="${q.source}" target="_blank" rel="noopener" title="${esc(sourceCite(q.source))}" aria-label="출처: ${esc(sourceCite(q.source))}">출처 ↗</a>`; }
+function explanationHTML(q) { return `<p class="dq-explain">${esc(q.explanation)}</p><span class="source-link">출처: ${esc(sourceCite(q.source))}</span>`; }
 // 결투 글 줄이기(v0.65): ‘ [특성 이름]’ 꼬리말을 배지로 바꿔요
 const noteBadges = note => [...String(note || '').matchAll(/\[([^\]]+)\]/g)].map(m => `✦ ${m[1]}`);
 // ── 문제 결투 (v0.42) ───────────────────────────────────────────────────────────
@@ -1361,7 +1407,7 @@ function dexDetail(id, filter, view = 'dot') {
   const toggles = seen ? `<div class="dex-view">${[['dot', '도트 그림'], ...(hasForms ? [['form2', '변환폼']] : []), ...(credit ? [['photo', '실제 사진 보기']] : [])].map(([v, label]) => `<button data-view="${v}" class="${view === v ? 'selected' : ''}" aria-pressed="${view === v}">${label}</button>`).join('')}</div>` : '';
   const statBars = seen && m.base ? `<div class="base-stats" aria-label="기본 능력치">${[['체력', 'hp'], ['공격', 'attack'], ['방어', 'defense'], ['스피드', 'speed']].map(([l, k]) => `<div><span>${l}</span><i><b style="width:${Math.round(m.base[k] / 140 * 100)}%"></b></i><em>${m.base[k]}</em></div>`).join('')}</div>` : '';
   const legendNote = m.legendary ? `<br><strong>전설의 우산몬</strong>${hasForms ? ' · 결투에서 형태변환을 쓸 수 있어요' : ''}` : '';
-  openModal(head(seen ? m.name : '아직 만나지 못한 친구', `NO.${String(id).padStart(3, '0')}${m.legendary ? ' · 전설' : ''}`) + `<div class="monster-detail${photo ? ' with-photo' : ''}">${picture}<div><span class="type-chip">${seen ? TYPES[m.type].name : '발견 전'}</span><p>${seen ? m.detail : `${ZONES[m.zone].name} 부근에서 단서를 찾아보세요.`}</p>${whenNote(m.id) ? `<p class="when-note">🕒 ${esc(whenNote(m.id))}</p>` : ''}${seen ? `<p class="trait-line">${traitChip(m)} ${esc(traitOf(m.id).text)}</p>` : ''}</div></div>${toggles}${statBars}${seen ? `<div class="fact-box"><strong>실제 생물 모티브 · ${m.motif}</strong><br>${esc(m.area)} · ${esc(m.group)}<br>기록 확인: ${esc(m.recordStatus)}<br>${esc(m.recordNote)}${legendNote}<br>모습과 능력은 게임용 창작이에요.${m.source ? `<br><a href="${m.source}" target="_blank" rel="noopener" class="source-link">관련 자료 살펴보기 ↗</a>` : ''}</div>` : ''}<div class="modal-actions"><button id="backDex" class="neutral">← 도감으로</button></div>`, () => {
+  openModal(head(seen ? m.name : '아직 만나지 못한 친구', `NO.${String(id).padStart(3, '0')}${m.legendary ? ' · 전설' : ''}`) + `<div class="monster-detail${photo ? ' with-photo' : ''}">${picture}<div><span class="type-chip">${seen ? TYPES[m.type].name : '발견 전'}</span><p>${seen ? m.detail : `${ZONES[m.zone].name} 부근에서 단서를 찾아보세요.`}</p>${whenNote(m.id) ? `<p class="when-note">🕒 ${esc(whenNote(m.id))}</p>` : ''}${seen ? `<p class="trait-line">${traitChip(m)} ${esc(traitOf(m.id).text)}</p>` : ''}</div></div>${toggles}${statBars}${seen ? `<div class="fact-box"><strong>실제 생물 모티브 · ${m.motif}</strong><br>${esc(m.area)} · ${esc(m.group)}<br>기록 확인: ${esc(m.recordStatus)}<br>${esc(m.recordNote)}${legendNote}<br>모습과 능력은 게임용 창작이에요.${m.source ? `<br><span class="source-link">관련 자료: ${esc(sourceCite(m.source))}</span>` : ''}</div>` : ''}<div class="modal-actions"><button id="backDex" class="neutral">← 도감으로</button></div>`, () => {
     $('#backDex').onclick = () => showDex(filter);
     $$('[data-view]').forEach(b => b.onclick = () => dexDetail(id, filter, b.dataset.view));
   });
@@ -1481,7 +1527,7 @@ function showStudy(pageId = null) {
   if (state.started && !state.flags[`study:${p.id}`]) { state.flags[`study:${p.id}`] = true; save(); updateUI(); }
   const timeline = p.timeline ? `<ol class="study-timeline">${p.timeline.map(([y, t]) => `<li><b>${esc(y)}</b><span>${esc(t)}</span></li>`).join('')}</ol>` : '';
   const quiz = p.concepts.map(c => `<button class="primary" data-review="${c}" ${!state.started ? 'disabled' : ''}>확인 문제 · ${esc(CONCEPTS.find(x => x.id === c).title)}</button>`).join('');
-  const refs = p.sources.map(sourceOf).filter(Boolean).map(r => `<a href="${r.url}" target="_blank" rel="noopener" class="source-link">${esc(r.title)} ↗</a>`).join('');
+  const refs = p.sources.map(sourceOf).filter(Boolean).map(r => `<span class="source-link">${esc(r.title)}</span>`).join('');
   openModal(head(p.title, `독도 공부 수첩 · ${at + 1} / ${STUDY_PAGES.length}`) + noteTabs('study') + `<ul class="study-points">${p.points.map(t => `<li>${esc(t)}</li>`).join('')}</ul>${timeline}<div class="modal-actions study-quiz">${quiz}</div><div class="modal-actions study-nav"><button id="studyPrev" class="neutral" ${at === 0 ? 'disabled' : ''}>← 앞 쪽</button><button id="studyIndex" class="neutral">목차</button><button id="studyNext" class="neutral" ${at === STUDY_PAGES.length - 1 ? 'disabled' : ''}>다음 쪽 →</button></div><div class="study-sources"><strong>근거 자료</strong>${refs}</div>`, () => {
     bindTabs();
     $('#studyPrev').onclick = () => showStudy(STUDY_PAGES[at - 1]?.id); $('#studyNext').onclick = () => showStudy(STUDY_PAGES[at + 1]?.id); $('#studyIndex').onclick = () => showStudy();
@@ -1494,7 +1540,7 @@ function showNotebook() {
   });
 }
 function showSources() {
-  openModal(head('사실과 창작을 구분해요') + `<p>지역 이름은 실제 독도의 지명이에요. 우산몬·마을·건물·NPC 대사·기억의 세계는 창작입니다. 배경음악과 효과음도 이 게임을 위해 새로 지은 곡으로, 녹음한 소리 파일 없이 브라우저가 그 자리에서 만들어요(우리 5음 음계와 세마치·굿거리·자진모리·휘모리 장단을 본떴어요). 시간을 건너온 조상님 이서부·이규운·안응복·심흥탁·홍순팔도 창작 인물이고, 그들이 들려주는 이사부·이규원·안용복·심흥택·홍순칠의 활동은 실제 기록이에요. 실제 역사와 자연은 아래 자료를 바탕으로 살펴봐요. 타이틀 그림은 생성형 AI로 만든 그림을 실제 독도(동도의 등대·경비대 건물·태극기, 맞은편 서도, 괭이갈매기)에 맞게 다듬어 썼어요.</p><h3 class="source-head">문제와 공부 수첩의 자료</h3><p>문제 ${QUESTIONS.length}개는 모두 아래 공공 자료 가운데 하나에 근거해요. 이용 조건이 분명한 곳만 골랐어요. 한국민족문화대백과사전 본문은 저작권법 제24조의2(공공저작물의 자유이용)에 따라, 정책브리핑 글은 공공누리 제1유형(출처표시)에 따라 출처를 밝히고 썼어요. 문제와 해설은 자료의 사실을 초등학생 눈높이로 새로 쓴 글이에요.</p><div class="resource-list">${SOURCES.map(s => `<a href="${s.url}" target="_blank" rel="noopener">${esc(s.title)} ↗<small>${esc(s.license)} · 문제 ${QUESTIONS.filter(q => q.source === s.url).length}개</small></a>`).join('')}<a href="https://www.moe.go.kr/boardCnts/viewRenew.do?boardID=141&boardSeq=93458&lev=0&m=040401" target="_blank" rel="noopener">교육부 · 2022 개정 교육과정 고시 ↗</a></div><div class="fact-box">중심 성취기준: 사회 [6사01-02]<br>자료 신뢰성: 국어 [6국06-02]<br>생태계 보전: 과학 [4과14-01~03]의 선수학습 복습</div><p class="footer-note">개별 생물 모티브는 도감의 자료 링크에서 확인할 수 있어요. 수업 효과는 아직 검증하지 않았어요.</p>`);
+  openModal(head('사실과 창작을 구분해요') + `<p>지역 이름은 실제 독도의 지명이에요. 우산몬·마을·건물·NPC 대사·기억의 세계는 창작입니다. 배경음악과 효과음도 이 게임을 위해 새로 지은 곡으로, 녹음한 소리 파일 없이 브라우저가 그 자리에서 만들어요(우리 5음 음계와 세마치·굿거리·자진모리·휘모리 장단을 본떴어요). 시간을 건너온 조상님 이서부·이규운·안응복·심흥탁·홍순팔도 창작 인물이고, 그들이 들려주는 이사부·이규원·안용복·심흥택·홍순칠의 활동은 실제 기록이에요. 실제 역사와 자연은 아래 자료를 바탕으로 살펴봐요. 타이틀 그림은 생성형 AI로 만든 그림을 실제 독도(동도의 등대·경비대 건물·태극기, 맞은편 서도, 괭이갈매기)에 맞게 다듬어 썼어요.</p><h3 class="source-head">문제와 공부 수첩의 자료</h3><p>문제 ${QUESTIONS.length}개는 모두 아래 공공 자료 가운데 하나에 근거해요. 이용 조건이 분명한 곳만 골랐어요. 한국민족문화대백과사전 본문은 저작권법 제24조의2(공공저작물의 자유이용)에 따라, 정책브리핑 글은 공공누리 제1유형(출처표시)에 따라 출처를 밝히고 썼어요. 문제와 해설은 자료의 사실을 초등학생 눈높이로 새로 쓴 글이에요.</p><div class="resource-list">${SOURCES.map(s => `<div class="resource-item">${esc(s.title)}<small>${esc(s.license)} · 문제 ${QUESTIONS.filter(q => q.source === s.url).length}개</small></div>`).join('')}<div class="resource-item">교육부 · 2022 개정 교육과정 고시</div></div><div class="fact-box">중심 성취기준: 사회 [6사01-02]<br>자료 신뢰성: 국어 [6국06-02]<br>생태계 보전: 과학 [4과14-01~03]의 선수학습 복습</div><p class="footer-note">개별 생물 모티브는 도감의 자료 링크에서 확인할 수 있어요. 수업 효과는 아직 검증하지 않았어요.</p>`);
 }
 function exportLearning() {
   const quote = v => '"' + String(v).replace(/"/g, '""') + '"';
@@ -1586,7 +1632,7 @@ if (typeof location !== 'undefined' && new URLSearchParams(location.search).has(
     get longestQuestion() { return QUESTIONS.reduce((m, q) => (q.prompt.length + q.options.join('').length + q.explanation.length > m.prompt.length + m.options.join('').length + m.explanation.length ? q : m)); },
     set forceQuestion(q) { testQuestion = q; }, questionById: id => QUESTIONS.find(q => q.id === id), closeBattleForTest: () => { if (battle) closeBattle(); },
     screenOf(x, y) { const r = canvas.getBoundingClientRect(), p = toScreen(x * TILE + 16, y * TILE + 16); return { x: r.left + p.x * sceneScale, y: r.top + p.y * sceneScale }; },
-    get view3d() { return view3d; }, setView3d, get look() { return { yaw, pitch }; }, setLook(y, p = 0) { yaw = y; pitch = clampPitch(p); }, setHand, setClock: ms => setClock(ms), get clock() { return { ms: gameClock(), hour: daylight().hour, night: isNight(), day: DAY_MS, weather: weatherNow() }; }, get music() { return musicFor(); }, setSeason: v => { const r = setSeason(v); updateUI(); return r; }, get season() { return currentSeason(); },
+    get view3d() { return view3d; }, setView3d, get look() { return { yaw, pitch }; }, setLook(y, p = 0) { yaw = y; pitch = clampPitch(p); }, setHand, setClock: ms => setClock(ms), get diving() { return !!map.diving; }, get clock() { return { ms: gameClock(), hour: daylight().hour, night: isNight(), day: DAY_MS, weather: weatherNow() }; }, get music() { return musicFor(); }, setSeason: v => { const r = setSeason(v); updateUI(); return r; }, get season() { return currentSeason(); },
     standAtDoor(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b); settleMovement(); freePos = null; state.x = f.x; state.y = f.y; view = { x: f.x, y: f.y }; state.dir = 'up'; return f; },
     goInside(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b), p = pathfind(map, state.x, state.y, f.x, f.y, liveNPCs()); if (state.x === f.x && state.y === f.y) enterBuilding(b); else { path = p; pathAction = () => enterBuilding(b); } return p.length; },
     legendRadio: false, dexDetail, showDex, showQuest, checkLegends, place(x, y, dir = 'right') { settleMovement(); freePos = null; path = []; state.x = x; state.y = y; view = { x, y }; state.dir = dir; },

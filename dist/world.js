@@ -28,6 +28,8 @@ export function createMap(ref = 0) {
     doors: parsed.doors || [], stairs: parsed.stairs || [], focus: parsed.focus || null,
     level: parsed.level || null, cliff: parsed.cliff || null // v0.70 높낮이(언덕·절벽·계단·사다리)
   });
+  // v0.71 얕은 물: 걸을 수 있는 땅(풀·길·풀숲·모래·부두)에 맞닿은 물 칸
+  map.shallow = new Set(); if (map.kind !== 'room') for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (map[y][x] === 0 && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => [1, 2, 3, 4, 6].includes(map[y + b]?.[x + a]) && !map.solid.has(`${x + a},${y + b}`))) map.shallow.add(`${x},${y}`);
   map.decor = [...map.decor, ...flowerTiles(map).map(([x, y, common]) => ({ kind: 'flower', x, y, common }))]; // v0.68: 세워 그리는 들꽃(3D에서도 서 있어요)
   return map;
 }
@@ -86,9 +88,11 @@ export function npcs(ref = 0, progress = {}, flags = {}) {
   }));
 }
 
-export function blocked(map, x, y, people = [], ignorePeople = false) {
+// v0.71 물: 땅에 맞닿은 얕은 물은 첨벙첨벙 걷고, 그보다 깊은 물에선 잠수해요(바닷속). 마을 사람들은 물에 들어가지 않아요(wade = false).
+export function blocked(map, x, y, people = [], ignorePeople = false, wade = true) {
   if (x < 0 || y < 0 || x >= W || y >= H) return true;
   const t = map[y][x];
+  if (t === 0 && wade && map.kind !== 'room') return !ignorePeople && people.some(n => (n.occupied || [n]).some(p => p.x === x && p.y === y)); // v0.71 물속까지(얕은 물은 걷고, 깊은 물은 잠수)
   if (t === 0 || t === 5 || t === 7 || t === 8 || t === 9 || map.solid?.has(`${x},${y}`)) return true;
   return !ignorePeople && people.some(n => (n.occupied || [n]).some(p => p.x === x && p.y === y));
 }
@@ -171,7 +175,7 @@ export function drawWorld(ctx, map, state, view, time, target = null, motion = {
   ctx.clearRect(0, 0, width, height); ctx.fillStyle = room ? '#0e1418' : seasonColor(z.color); ctx.fillRect(0, 0, width, height);
   ctx.save(); ctx.translate(-camX, -camY);
   if (room) drawInterior(ctx, map, time, { x: camX, y: camY, width, height });
-  else { drawTerrain(ctx, map, time, { x: camX, y: camY, width, height }); for (const g of map.ground || []) drawGround(ctx, g, time); }
+  else { drawTerrain(ctx, map, time, { x: camX, y: camY, width, height, seabed: !!viewport.seabed }); for (const g of map.ground || []) drawGround(ctx, g, time); }
   if (target) { ctx.fillStyle = '#fff1b440'; ctx.fillRect(target.x * 32, target.y * 32, 32, 32); ctx.strokeStyle = '#f6d37d'; ctx.lineWidth = 2; ctx.strokeRect(target.x * 32 + 3, target.y * 32 + 3, 26, 26); }
   if (viewport.actors !== false) drawActors(ctx, state, view, time, motion, people, map);
   if (viewport.labels) for (const n of people) if (n.actor) drawNPCNameplate(ctx, n.name, (n.drawX ?? n.x) * 32 + 16, (n.drawY ?? n.y) * 32 + 35, camX, camY);
@@ -231,6 +235,8 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
     const list = [];
     for (const n of order) {
       if (n.scenery === 'boat') continue; // v0.68: 배는 위에서 본 그림이라 3D에서는 물 위에 눕혀 그려요(drawFlatDecor)
+      const slabKind = project.slab && (n.kind === 'board' ? 'board' : PROP_KINDS.includes(n.kind) ? n.kind : n.scenery); // v0.71 납작한 물건은 앞·뒤·옆이 있는 판으로
+      if (project.slab && project.slab.has(slabKind) && !n.player) { const fx = n.x * TILE + (n.w ? n.w * 16 : 16), fy = n.depth, p = project(fx, fy); if (p && p.k > 0 && !(project.fadeZ && p.z < project.fadeZ * .7)) list.push({ n, fx, fy, p, slab: slabKind }); continue; }
       if (n.building && project.box) { const z = project.box.depth(n.building); if (z != null) { list.push({ n, box: true, p: { z } }); continue; } } // v0.68: 입체 건물(box3d.js)
       const fx = n.building ? (n.building.x + n.building.w / 2) * TILE : n.x * TILE + (n.w ? n.w * 16 : 16), fy = n.depth, p = project(fx, fy);
       if (!p || p.k <= 0) continue;
@@ -239,7 +245,7 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
     }
     for (const w of project.walls || []) list.push({ wall: w, p: { z: w.z } }); // v0.70 언덕 둘레 바위벽
     list.sort((a, b) => (b.p.z ?? 0) - (a.p.z ?? 0));
-    for (const { n, fx, fy, p, box, wall } of list) { if (wall) { ctx.save(); ctx.setTransform(base); project.drawWall(ctx, wall); ctx.restore(); continue; } if (box) { ctx.save(); ctx.setTransform(base); project.box.draw(ctx, n.building); ctx.restore(); continue; } ctx.save(); if (!n.player && project.fadeZ && p.z < project.fadeZ) ctx.globalAlpha = .22; ctx.setTransform(base.a * p.k, 0, 0, base.d * p.k, base.a * (p.x - fx * p.k), base.d * (p.y - fy * p.k)); drawOne(n); ctx.restore(); }
+    for (const { n, fx, fy, p, box, wall, slab } of list) { if (slab) { ctx.save(); ctx.setTransform(base); if (project.fadeZ && p.z < project.fadeZ) ctx.globalAlpha = .3; project.slab.draw(ctx, n, slab, fx, fy, g => { const keep = ctx; ctx = g; drawOne(n); ctx = keep; }); ctx.restore(); continue; } if (wall) { ctx.save(); ctx.setTransform(base); project.drawWall(ctx, wall); ctx.restore(); continue; } if (box) { ctx.save(); ctx.setTransform(base); project.box.draw(ctx, n.building); ctx.restore(); continue; } ctx.save(); if (!n.player && project.fadeZ && p.z < project.fadeZ) ctx.globalAlpha = .22; ctx.setTransform(base.a * p.k, 0, 0, base.d * p.k, base.a * (p.x - fx * p.k), base.d * (p.y - fy * p.k)); drawOne(n); ctx.restore(); }
   }
   function drawOne(n) {
     if (n.scenery) { drawDecor(ctx, n, map, time); return; }
@@ -249,7 +255,7 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
     else if (n.kind === 'wild' || n.kind === 'friend') { // 걸어 다니는 우산몬: 가는 쪽을 보고, 걸을 때 통통 튀어요 (사나워진 우산몬만 검은 기운)
       if (n.kind === 'wild') darkWisps(ctx, n.x, n.y, time);
       const f = facing(n.species), nd = seen(n.dir), flip = (nd === 'right' && f === 'left') || (nd === 'left' && f === 'right'), hop = n.walking ? Math.abs(Math.sin(time / 70)) * 3 : 0;
-      const swim = map?.[Math.round(n.y)]?.[Math.round(n.x)] === 0; // v0.70 물속 우산몬: 물결 위로 몸 위쪽만 보이고 둥실 떠요
+      const swim = map?.[Math.round(n.y)]?.[Math.round(n.x)] === 0 && !map.diving; // v0.70 물속 우산몬: 물결 위로 몸 위쪽만 보이고 둥실 떠요(v0.71 잠수하면 온몸이 보여요)
       if (swim) {
         const bob = Math.sin(time / 420 + n.x * 1.7) * 2, line = n.y * 32 + 20;
         ctx.save(); ctx.beginPath(); ctx.rect(n.x * 32 - 24, n.y * 32 - 60, 80, line - (n.y * 32 - 60)); ctx.clip();
@@ -265,7 +271,12 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
     }
     else if (n.kind === 'legend') { legendGlow(ctx, n.x, n.y, time); drawMonster(ctx, n.species, n.x * 32 - 10, n.y * 32 - 22 + Math.round(Math.sin(time / 300) * 2), 52, time / 1000); if (!n.used) marker(ctx, n.x, n.y, time, '#ffe9a0'); }
     else if (PROP_KINDS.includes(n.kind)) drawProp(ctx, n.kind, n.x, n.y, { open: n.used, art: n.art, time, water: map[n.y]?.[n.x] === 0 });
-    else if (n.player) { if (!drawExplorer(ctx, state.avatar, fx, fy, CHARACTER_SIZE, seen(state.dir), motion.walking, motion.distance || 0)) drawHuman(ctx, fx, fy, '#418e91', state.dir, 0, 'normal', null, CHARACTER_SIZE); }
+    else if (n.player) {
+      const wet = map?.[Math.round(n.y)]?.[Math.round(n.x)] === 0 && !map.diving, line = n.y * 32 + 22; // v0.71 얕은 물에 들어가면 무릎까지 잠기고 물결이 일어요
+      if (wet) { ctx.save(); ctx.beginPath(); ctx.rect(n.x * 32 - 40, n.y * 32 - 90, 112, line - (n.y * 32 - 90)); ctx.clip(); }
+      if (!drawExplorer(ctx, state.avatar, fx, fy, CHARACTER_SIZE, seen(state.dir), motion.walking, motion.distance || 0)) drawHuman(ctx, fx, fy, '#418e91', state.dir, 0, 'normal', null, CHARACTER_SIZE);
+      if (wet) { ctx.restore(); ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1.5; const w = 12 + Math.sin(time / 260) * 2; ctx.beginPath(); ctx.ellipse(n.x * 32 + 16, line, w, 4, 0, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = .4; ctx.beginPath(); ctx.ellipse(n.x * 32 + 16, line + 1, w + 7, 6, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
+    }
     else if (n.actor && drawResident(ctx, n.actor, fx, fy, CHARACTER_SIZE, time, seen(n.dir || 'down'), n.walking || false, n.walkDistance || 0)) { /* drawn */ }
     else drawHuman(ctx, fx, fy, n.color || '#a88668', 'down', 0, n.kind, n.sprite, CHARACTER_SIZE);
     if (!n.player && wanted && n.id === wanted) marker(ctx, n.x, n.y, time);

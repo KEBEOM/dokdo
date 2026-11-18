@@ -10,7 +10,7 @@ import {selectBattleQuestion,shuffledChoices} from '../dist/battle-quiz.js';
 test('100 collectible species and real-name roster',()=>{
   for(const zone of ZONES){assert.ok(zone.wild.length>0,'every region has encounters');for(const id of [...zone.wild,...zone.bossTeam])assert.ok(MONSTERS.some(m=>m.id===id&&!m.legendary));}
   assert.equal(MONSTERS.length,100);assert.equal(new Set(MONSTERS.map(m=>m.id)).size,100);assert.equal(new Set(MONSTERS.map(m=>m.name)).size,100);
-  assert.equal(starterPool().length,92);assert.ok(starterPool().every(id=>!getSpecies(id).legendary));assert.equal(STARTER_LEVEL,6);for(let k=0;k<20;k++){const f=pickStarterField();assert.equal(f.length,30);assert.equal(new Set(f).size,30);assert.ok(f.every(id=>starterPool().includes(id)));}assert.equal(getSpecies(100).legendary,true);
+  assert.equal(starterPool().length,92);assert.ok(starterPool().every(id=>!getSpecies(id).legendary));assert.equal(STARTER_LEVEL,1);for(let k=0;k<20;k++){const f=pickStarterField();assert.equal(f.length,30);assert.equal(new Set(f).size,30);assert.ok(f.every(id=>starterPool().includes(id)));}assert.equal(getSpecies(100).legendary,true);
   for(const m of MONSTERS){assert.ok(m.zone>=0&&m.zone<8);if(m.source)assert.match(m.source,/^https:/);assert.equal(m.evolvesTo,null);if(m.evolvesTo){const to=getSpecies(m.evolvesTo);assert.equal(to.family,m.family);assert.equal(to.stage,m.stage+1);}}
   const obtainable=new Set(MONSTERS.filter(m=>m.stage===1).map(m=>m.id));for(const m of MONSTERS)if(m.evolvesTo&&obtainable.has(m.id))obtainable.add(m.evolvesTo);assert.equal(obtainable.size,100);
 });
@@ -34,7 +34,7 @@ test('every map: people on land, arrivals free, everyone and every exit reachabl
       for(const p of paths){let last=[s.x,s.y];for(const [x,y] of p){assert.equal(Math.abs(x-last[0])+Math.abs(y-last[1]),1);assert.ok(!blocked(map,x,y,people));last=[x,y];}}
     }
     for(const [k] of map.exits){const [x,y]=k.split(',').map(Number);assert.ok(pathfind(map,s.x,s.y,x,y,people).length,`${def.id}: exit ${k} unreachable`);}
-    assert.deepEqual(pathfind(map,s.x,s.y,0,0,people),[]);
+    if(map[0][0]!==0)assert.deepEqual(pathfind(map,s.x,s.y,0,0,people),[]); // v0.71: 바다는 헤엄쳐 갈 수 있어요(나무·바위 구석은 여전히 못 가요)
   }
 });
 test('a correct answer to the opponent question still hurts, but much less',()=>{

@@ -415,6 +415,8 @@ if (await G(() => window.__dokdo.map.kind !== 'room' && !window.__dokdo.busy)) {
   if (!f1.battle) { assert.equal(f1.dir, 'right'); assert.ok(f1.vx > f0 + .5, `W walks the way the camera looks (${f0} → ${f1.vx})`); assert.ok(Math.abs(f1.vx - Math.round(f1.vx)) > .001, 'free walking can stop between tiles'); assert.equal(f1.x, Math.round(f1.vx), 'my tile is the nearest one'); }
   if (await G(() => !!window.__dokdo.battle)) await G(() => window.__dokdo.closeBattleForTest());
   await G(() => { document.exitPointerLock?.(); window.__dokdo.setView3d(false); }); await page.waitForTimeout(200); assert.ok(await page.isVisible('.mini-map'), 'v0.68: the mini map shows in 2D too');
+  // v0.71 위쪽 단추를 마우스로 누른 뒤에는 포커스가 남지 않아요(스페이스가 3D 단추를 또 누르지 않게)
+  { const v0 = await G(() => window.__dokdo.view3d); await page.click('#viewBtn'); await page.waitForTimeout(150); assert.ok(!(await G(() => document.activeElement?.id === 'viewBtn')), 'the 3D button lets go of focus'); await page.keyboard.press('Space'); await page.waitForTimeout(150); assert.equal(await G(() => window.__dokdo.view3d), !v0, 'Space does not press it again'); await closeAll(); if (await G(() => !!window.__dokdo.battle)) await G(() => window.__dokdo.closeBattleForTest()); if (await G(() => window.__dokdo.view3d)) await G(() => window.__dokdo.setView3d(false)); }
   // v0.68 사계절: 메뉴의 계절 고르기 → 위치 칸에 계절 이름, 다시 자동으로
   await page.click('#menuBtn'); await page.selectOption('#seasonPick', 'winter'); assert.match(await page.textContent('#weather'), /겨울/); assert.equal(await G(() => window.__dokdo.season), 'winter');
   await page.selectOption('#seasonPick', 'flow'); await G(() => window.__dokdo.closeModal()); await page.waitForTimeout(200);

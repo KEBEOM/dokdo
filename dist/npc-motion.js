@@ -33,7 +33,7 @@ export function createNPCMotion(random=Math.random){
    const others=snapshot(people).filter(p=>p.uid!==n.uid);
    const candidates=directions.filter(([dx,dy])=>{
     const x=r.x+dx,y=r.y+dy;
-    return Math.abs(x-r.homeX)+Math.abs(y-r.homeY)<=NPC_RADIUS&&!map.keepClear?.has([x,y].join(','))&&!reserved.has([x,y].join(','))&&!blocked(map,x,y,others);
+    return Math.abs(x-r.homeX)+Math.abs(y-r.homeY)<=NPC_RADIUS&&!map.keepClear?.has([x,y].join(','))&&!reserved.has([x,y].join(','))&&!blocked(map,x,y,others,false,false); // v0.71 마을 사람은 물에 안 들어가요
    });
    r.wait=delay();if(!candidates.length)continue;
    const [dx,dy,dir]=candidates[Math.min(candidates.length-1,Math.floor(random()*candidates.length))];
