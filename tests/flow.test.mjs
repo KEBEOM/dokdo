@@ -422,7 +422,11 @@ assert.equal(await page.$('#viewBtn'), null, 'no 2D/3D view button any more');
   // 걷기: 방향키·WASD 모두 화면 방향 그대로(위 = 북쪽), 칸 사이에도 설 수 있어요
   await G(() => window.__dokdo.changeMap('route0', 'a', { instant: true })); await page.waitForTimeout(900);
   for (let i = 0; i < 8 && await page.$('#dialogue:not(.hidden) #nextTalk'); i++) await page.click('#nextTalk');
-  if (h.ok) { await page.waitForTimeout(500); const g0 = await G(() => window.__dokdo.gl); assert.ok(g0.pier, 'v0.82 동도 선착장 GLB'); assert.ok(g0.playerDrawn, 'my explorer is always drawn'); assert.ok(g0.models > 100 && g0.glbLandmarks.includes('숫돌바위'), `GLB: 숫돌바위 and stairs are real 3D models ${JSON.stringify({ models: g0.models, lm: g0.glbLandmarks })}`); }
+  if (h.ok) { await page.waitForTimeout(500); const g0 = await G(() => window.__dokdo.gl); assert.ok(g0.pier, 'v0.82 동도 선착장 GLB'); assert.ok(g0.rockCaps > 100, `v0.84 못 지나가는 바위 칸·절벽 끝 턱이 바위로 보여요 (${g0.rockCaps})`); { // v0.84 1인칭 관찰: 숫돌바위를 내 눈으로 → Esc로 돌아와요
+    await G(() => { const d = window.__dokdo, ob = d.map.parsed.objects.find(o => o.name === '숫돌바위'); d.startFirstPerson(ob, 'look'); }); await page.waitForTimeout(600);
+    const f1 = await G(() => window.__dokdo.fp); assert.equal(f1?.mode, 'look', '1인칭으로 봐요'); assert.ok(await page.isVisible('#fpView'), '1인칭 화면'); assert.ok(!(await page.isVisible('#interactionPrompt')), 'HUD는 숨겨요');
+    await page.keyboard.press('ArrowRight'); assert.ok((await G(() => window.__dokdo.fp.yaw)) > f1.yaw, '방향키로 둘러봐요');
+    await page.keyboard.press('Escape'); assert.equal(await G(() => window.__dokdo.fp), null, 'Esc로 돌아와요'); assert.ok(!(await page.$('#fpView')), '1인칭 화면이 닫혀요'); } assert.ok(g0.playerDrawn, 'my explorer is always drawn'); assert.ok(g0.models > 100 && g0.glbLandmarks.includes('숫돌바위'), `GLB: 숫돌바위 and stairs are real 3D models ${JSON.stringify({ models: g0.models, lm: g0.glbLandmarks })}`); }
   const f0 = await G(() => window.__dokdo.motion().view.x);
   await page.keyboard.down('ArrowRight'); await page.waitForTimeout(330); await page.keyboard.up('ArrowRight'); await page.waitForTimeout(120);
   const f1 = await G(() => ({ x: window.__dokdo.state.x, vx: window.__dokdo.motion().view.x, battle: !!window.__dokdo.battle, dir: window.__dokdo.state.dir }));

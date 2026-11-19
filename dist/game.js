@@ -6,7 +6,7 @@ import { worldScale } from './layout.js';
 import { createJoystick, createLookStick } from './joystick.js';
 import { createDirectionInput, KEY_VECTORS } from './input.js';
 import { roomId, parseRoomId } from './interiors.js';
-import { createGL, hdCamera } from './gl3d.js';
+import { createGL, hdCamera, fpCamera } from './gl3d.js';
 import { MONSTERS, ZONES, TYPES, getSpecies, isUnique, pickStarterField, STARTER_LEVEL, keeperName } from './data.js';
 import { CONCEPTS, QUESTIONS, SOURCES } from './learning.js';
 import { STUDY_PAGES } from './study.js';
@@ -32,20 +32,21 @@ import { createRoamers } from './roamers.js';
 import { MOVE_DURATION, moveView } from './movement.js';
 import { selectBattleQuestion, shuffledChoices, quizFormat, oxShown } from './battle-quiz.js';
 import { pickRecord } from './records.js';
-import { createMap, npcs, blocked, pathfind, drawWorld, drawActors, drawFlatDecor, TILE, W, H, wantedRole, VILLAIN_BY_ZONE, ROLE_ACTOR, buildingArt } from './world.js';
+import { createMap, npcs, blocked, pathfind, drawWorld, drawActors, drawFlatDecor, TILE, W, H, wantedRole, VILLAIN_BY_ZONE, ROLE_ACTOR, buildingArt, doorColumns } from './world.js';
 import { MAPS, getMapDef, townId, nextMapId, prevMapId } from './maps.js';
 import { createCutscenePlayer } from './cutscene.js';
 import { OPENING, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_FALL, TREE_JOINS, EPILOGUE, FERRY, FERRY_AGAIN, ISLAND_BOAT } from './story.js';
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.83';
+const VERSION = '0.85';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const KEY = 'dokdomon-save-v1';
 
 let state = newState(), saved = null, map = createMap('town0');
+let fp = null; // v0.84 1인칭 관찰 중이면 { 이름, 눈 자리, 보는 방향, 모드 }
 // v0.79 보기는 HD-2D 하나예요(2D·3D 보기 단추를 없앴어요). 들판·마을·건물 안·바닷속 모두 gl3d.js가 그려요.
 //   카메라는 북쪽을 보며 비스듬히 내려다보고 돌리지 않아요 → 걷기·누르기는 2D와 같아요(위 = 북쪽).
 //   WebGL이 안 되는 기기만 예전 2D 그리기가 자동으로 대신해요(고르는 메뉴는 없어요).
@@ -106,7 +107,7 @@ const battleUI = createBattleUI($('#battleScreen'), { onBlip: () => sfx('blip'),
 const z = () => ZONES[state.zone];
 const progress = () => state.progress[state.zone];
 const name = m => getSpecies(m.id).name;
-const busy = () => !state.started || !$('#modal').classList.contains('hidden') || !!dialogueState || !!battle || cutscenes.active() || transition;
+const busy = () => !state.started || !$('#modal').classList.contains('hidden') || !!dialogueState || !!battle || cutscenes.active() || transition || !!fp;
 function liveNPCs() { const base = npcs(map, progress(), state.flags); npcMotion.sync(map.id, base); return [...npcMotion.snapshot(base), ...roamers.snapshot(performance.now())]; }
 
 // The visible height of the browser window (iPad/iPhone Safari toolbars excluded), also for browsers without 100dvh.
@@ -146,11 +147,11 @@ function paintWorldLabels(people = liveNPCs()) {
   if (labelKey !== key) {
     labelKey = key; const layer = $('#worldLabels'); layer.replaceChildren();
     // 건물 이름은 문 위 간판처럼, 사람 이름은 머리 위에 — 가까이 갔을 때만 나타나서 다른 캐릭터를 가리지 않아요.
-    const fixed = [...map.buildings.map(b => ({ name: b.name, x: (b.x + b.w / 2) * TILE, y: (b.y + b.h) * TILE - 46, door: { x: b.x + Math.floor(b.w / 2), y: b.y + b.h }, building: true })), ...exitLabels()];
+    const fixed = [...(map.kind === 'town' ? enterable() : []).map(b => { const c = doorCols(b), dx = (c[0] + c[c.length - 1]) / 2; return { name: b.name, x: dx * TILE + 16, y: (b.y + b.h) * TILE - 2, lift: 44, door: { x: dx, y: b.y + b.h }, building: true }; }), ...exitLabels()]; // v0.84 간판은 진짜 문 바로 위에(집·가게·터미널도)
     labelNodes = [...fixed, ...people.filter(n => n.actor).map(n => ({ name: n.name, uid: n.uid }))].map(n => {
       const el = document.createElement('span');
       el.className = n.exit ? `exit-label${n.locked ? ' locked' : ''}` : n.building ? 'building-label' : 'world-nameplate';
-      el.textContent = n.name; layer.append(el); return { ...n, el };
+      if (n.building) { el.innerHTML = '<i class="door-ico" aria-hidden="true"></i>'; el.append(n.name); } else el.textContent = n.name; layer.append(el); return { ...n, el };
     });
   }
   const positions = new Map(people.map(n => [n.uid, n])), talking = !!dialogueState;
@@ -158,13 +159,15 @@ function paintWorldLabels(people = liveNPCs()) {
   // 사람 이름표는 한 명만: 2칸 안에서 가장 가까운 사람(말을 걸 상대)
   let closest = null, best = Infinity;
   for (const p of people) { if (!p.actor) continue; const px = p.drawX ?? p.x, py = p.drawY ?? p.y, d = Math.abs(px - view.x) + Math.abs(py - view.y); if (near(px, py, 2) && d < best) { best = d; closest = p.uid; } }
+  let doorNear = null, doorBest = Infinity; // v0.84 문 간판도 한 개만: 3칸 안에서 가장 가까운 문
+  for (const n of labelNodes) if (n.building && near(n.door.x, n.door.y, 3)) { const d = Math.abs(n.door.x - view.x) + Math.abs(n.door.y - view.y) * 1.5; if (d < doorBest) { doorBest = d; doorNear = n; } }
   for (const n of labelNodes) {
     const live = positions.get(n.uid), fixed = n.building || n.exit;
     const px = live?.drawX ?? live?.x ?? 0, py = live?.drawY ?? live?.y ?? 0;
-    const at = fixed ? toScreen(n.x, n.y) : toScreen(px * TILE + 16, py * TILE + 28, 48 + 24); // 48 = 캐릭터 키, 그 위 ‘!’ 표시보다 위쪽
+    const at = fixed ? toScreen(n.x, n.y, n.lift || 0) : toScreen(px * TILE + 16, py * TILE + 28, 48 + 24); // 48 = 캐릭터 키, 그 위 ‘!’ 표시보다 위쪽
     const x = Math.round(at.x * sceneScale), y = Math.round(at.y * sceneScale);
     const onScreen = x >= 0 && x <= sceneWidth * sceneScale && y >= 20 && y < sceneHeight * sceneScale - 25;
-    const shown = onScreen && (n.exit || (!talking && (n.building ? near(n.door.x, n.door.y, 3) : n.uid === closest)));
+    const shown = onScreen && (n.exit || (!talking && (n.building ? n === doorNear : n.uid === closest)));
     n.el.hidden = !onScreen; n.el.classList.toggle('show', shown);
     if (onScreen) { const half = (n.el.offsetWidth || n.name.length * 14 + 20) / 2; n.el.style.left = Math.round(Math.max(half + 5, Math.min(sceneWidth * sceneScale - half - 5, x))) + 'px'; n.el.style.top = y + 'px'; }
   }
@@ -221,16 +224,16 @@ function head(title, kicker = '탐험 수첩', close = true) { return `<div clas
 function paintPortraits() { $$('canvas[data-portrait]').forEach(c => portrait(c, c.dataset.portrait)); } // '68-2' = 변환폼
 
 // ── map dialogue ───────────────────────────────────────────────────────────────
-function talk(speakerName, lines, done, note = '게임용 재구성 대화', actor = null) {
+function talk(speakerName, lines, done, note = '게임용 재구성 대화', actor = null, extra = null) {
   const speaker = liveNPCs().find(n => n.name === speakerName); actor = actor || speaker?.actor || null;
   if (speaker) { npcFocus = speaker.uid; npcMotion.face(npcFocus, state); }
   settleMovement(); keys.clear(); path = []; pathAction = null;
-  dialogueState = { name: speakerName, lines, index: 0, done, note, actor }; renderTalk(); sfx('talk');
+  dialogueState = { name: speakerName, lines, index: 0, done, note, actor, extra }; renderTalk(); sfx('talk');
 }
 function renderTalk() {
   const d = dialogueState; scene.classList.add('talking'); $('#dialogue').classList.remove('hidden');
-  $('#dialogue').innerHTML = `<div class="speaker">${d.actor ? '<canvas class="resident-portrait" width="64" height="64" aria-hidden="true"></canvas>' : ''}<span class="speaker-name">${esc(d.name)}</span></div><p>${esc(d.lines[d.index])}</p><div class="dialogue-footer"><small>${esc(d.note)} · ${d.index + 1}/${d.lines.length}</small><button id="nextTalk">${d.index === d.lines.length - 1 ? '알겠어요' : '계속 듣기'} ▸</button></div>`;
-  $('#nextTalk').onclick = nextTalk; paintResidentPortrait();
+  $('#dialogue').innerHTML = `<div class="speaker">${d.actor ? '<canvas class="resident-portrait" width="64" height="64" aria-hidden="true"></canvas>' : ''}<span class="speaker-name">${esc(d.name)}</span></div><p>${esc(d.lines[d.index])}</p><div class="dialogue-footer"><small>${esc(d.note)} · ${d.index + 1}/${d.lines.length}</small>${d.extra && d.index === d.lines.length - 1 ? `<button id="extraTalk" class="talk-extra">${esc(d.extra.label)}</button>` : ''}<button id="nextTalk">${d.index === d.lines.length - 1 ? '알겠어요' : '계속 듣기'} ▸</button></div>`;
+  $('#nextTalk').onclick = nextTalk; if ($('#extraTalk')) $('#extraTalk').onclick = () => { const x = dialogueState?.extra; nextTalk(); x?.fn(); }; paintResidentPortrait();
 }
 function paintResidentPortrait() { const p = $('.resident-portrait'); if (p && dialogueState?.actor) { const c = p.getContext('2d'); c.clearRect(0, 0, 64, 64); drawResident(c, dialogueState.actor, 0, 0, 64); } }
 function nextTalk() {
@@ -473,7 +476,7 @@ function interact(n) {
     case 'wild': return startBattle('wild', n.species, { roamer: n.uid });
     case 'friend': return meetFriend(n);
     case 'sign': return talk(n.name, n.lines, () => setFlag(n.flag), '안내판 · 실제 지명 정보');
-    case 'landmark': return talk(n.name, n.lines, () => setFlag(n.flag), LANDMARK_NOTE[n.name] || '실제 지명 · 지도 위 그림은 게임용');
+    case 'landmark': return talk(n.name, n.lines, () => setFlag(n.flag), LANDMARK_NOTE[n.name] || (n.view ? '해돋이·해넘이 보는 곳 · 게임 속 자리' : '실제 지명 · 지도 위 그림은 게임용'), null, hdOn() ? { label: n.view === 'sunrise' ? '🌅 해돋이 보기' : n.view === 'sunset' ? '🌇 해넘이 보기' : '👁 1인칭으로 보기', fn: () => startFirstPerson(n, n.view || 'look') } : null);
     case 'person':
       if (n.give && !n.used) return talk(n.name, n.lines, () => { giveItems(n.give); setFlag(n.flag); }, '길에서 만난 사람 · 창작 대화', n.actor);
       return talk(n.name, n.used && n.after ? n.after : n.lines, () => setFlag(n.flag), '길에서 만난 사람 · 창작 대화', n.actor);
@@ -501,7 +504,7 @@ function interact(n) {
 
 // ── buildings: doors, floors and stairs ────────────────────────────────────────
 // A building's door is the middle of its bottom row (both middle columns for even widths).
-const doorCols = b => b.w % 2 ? [b.x + Math.floor(b.w / 2)] : [b.x + b.w / 2 - 1, b.x + b.w / 2];
+const doorCols = b => doorColumns(b); // v0.84 문 자리는 world.js 한 곳에서
 const enterable = () => [...map.buildings, ...(map.structures || [])]; // v0.75 시가지의 집·가게·터미널도 들어가요
 function buildingDoorAt(x, y) { return map.kind === 'town' ? enterable().find(b => y === b.y + b.h - 1 && doorCols(b).includes(x)) : null; }
 function doorAhead() { return map.kind === 'town' && state.dir === 'up' ? buildingDoorAt(state.x, state.y - 1) : null; }
@@ -565,6 +568,91 @@ function paintDaylight(g, K) {
 }
 // v0.71 바닷속: 깊은 물(얕은 물보다 안쪽)에 들어가면 잠수해요. 푸른 물빛, 일렁이는 빛무늬, 위에서 비치는 빛줄기, 내 둘레에 올라가는 물방울
 // v0.72: 저절로 잠수하지 않아요. 물에 있을 때 ‘잠수하기’ 단추(또는 Q)로 들어가고 ‘물 위로’로 나와요. 땅에 오르면 저절로 물 위예요.
+// ── v0.84 1인칭 관찰 ──────────────────────────────────────────────────────────
+// 대표 바위·자연물 앞에서 말을 다 들으면 ‘1인칭으로 보기’: 그 자리에 서서 내 눈으로 둘러봐요(끌기·방향키·확대).
+// 해돋이 보는 곳(동도)·해넘이 보는 곳(서도)에선 해가 수평선에서 뜨고 지는 장면을 봐요(게임 시계는 그대로).
+const FP_LOOK = { up: 0, right: Math.PI / 2, down: Math.PI, left: -Math.PI / 2 };
+const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+function startFirstPerson(n, mode = 'look') {
+  if (!hdOn() || !glView?.ok) { toast('이 기기에서는 1인칭 보기를 할 수 없어요(그래픽 가속이 필요해요).'); return; }
+  if (map.diving) { toast('물 위로 올라와서 볼 수 있어요.'); return; }
+  const ex = view.x * TILE + 16, ez = view.y * TILE + 24, eh = glView.groundAt(map, ex, ez) + 44;
+  let yaw = FP_LOOK[state.dir] ?? 0, pitch = .03; const lm = mode === 'look' ? glView.landmark?.(n.name) : null;
+  if (mode === 'sunrise') yaw = Math.PI / 2 + .2; else if (mode === 'sunset') yaw = -Math.PI / 2 + .12;
+  else if (lm) { const dx = lm.x - ex, dz = lm.z - ez, d = Math.hypot(dx, dz) || 1; yaw = Math.atan2(dx, -dz); pitch = Math.max(-.5, Math.min(.3, -Math.atan2(lm.h + lm.top * .4 - eh, d))); }
+  fp = { name: n.name, mode, ex, ez, eh, yaw, pitch, fov: mode === 'look' ? 52 : 46, t0: performance.now(), li: 0, lines: n.lines || [], note: LANDMARK_NOTE[n.name] || '', sky: null, phase: '' };
+  settleMovement(); keys.clear(); path = []; pathAction = null; sfx('toggle');
+  scene.classList.add('fp-on'); fpTick(performance.now()); renderFP();
+}
+function closeFP() { if (!fp) return; fp = null; scene.classList.remove('fp-on'); $('#fpView')?.remove(); labelKey = ''; sfx('toggle'); }
+const fpClampP = p => Math.max(-.75, Math.min(.6, p));
+function zoomFP(d) { if (fp) fp.fov = Math.max(22, Math.min(68, fp.fov + d)); }
+function nextFP() { if (!fp) return; if (fp.lines.length > 1) { fp.li = (fp.li + 1) % fp.lines.length; const p = $('#fpLine'); if (p) p.textContent = fp.lines[fp.li]; sfx('next'); } }
+// 하늘 색·해 방향: 관찰은 지금 게임 시각 그대로, 해돋이·해넘이는 16초 동안 해가 수평선을 지나요
+function fpTick(now) {
+  const L = daylight();
+  if (fp.mode === 'look') { const c = skyColors(), lt = lightFor(L); fp.sky = { zen: c[0], mid: c[1], horizon: c[2], sun: lt.sun, tint: lt.tint, light: Math.max(0, 1 - (L.night || 0)), night: L.night || 0, sunShow: (L.night || 0) < .5, glit: (L.night || 0) < .5, glitCol: [1, .93, .78] }; return; }
+  const t = Math.min(1, (now - fp.t0) / 16000), up = fp.mode === 'sunrise', el = up ? -.09 + .3 * t : .21 - .3 * t;
+  const sx = (up ? 1 : -1) * Math.cos(el) * .96, sz = (up ? .27 : .18) * Math.cos(el), n3 = Math.hypot(sx, Math.sin(el), sz), sun = [sx / n3, Math.sin(el) / n3, sz / n3];
+  const day = smooth(-.08, .2, el), glow = 1 - smooth(.04, .22, el), dark = 1 - smooth(-.1, -.02, el);
+  const zen = mixHex(mixHex('#1a2152', '#5a95d0', day), '#121838', dark * .5), mid = mixHex(mixHex('#5d4a8a', '#a6cde6', day), up ? '#e8907a' : '#e07a62', glow * .55);
+  const horizon = mixHex(mixHex('#3c3a66', up ? '#ff9a52' : '#ff7a46', smooth(-.1, -.03, el)), '#ffe2b0', smooth(.04, .22, el));
+  const tint = [1, .97, .92].map((v, i) => v + ([1.28, .84, .62][i] - v) * glow * (1 - dark * .6) + ([.55, .55, .8][i] - v) * dark * .7);
+  fp.sky = { zen, mid, horizon, sun, tint, light: smooth(-.06, .12, el), night: dark * .5, sunShow: true, el, glit: el > -.03, glitCol: [1, .62 + .3 * day, .35 + .45 * day] };
+  const ph = up ? (el < -.012 ? '동쪽 하늘이 붉게 물들어요' : el < .02 ? '해가 수평선 위로 고개를 내밀어요' : el < .1 ? '바다 위로 반짝이는 햇빛 길이 생겨요' : '해가 떠올랐어요. 독도의 아침이에요')
+    : (el > .12 ? '해가 서쪽 바다로 기울어요' : el > .03 ? '바다가 금빛으로 물들어요' : el > -.02 ? '해가 수평선 너머로 들어가요' : '노을이 남은 하늘 · 독도의 저녁이에요');
+  if (ph !== fp.phase) { fp.phase = ph; const e = $('#fpPhase'); if (e) e.textContent = ph; }
+}
+// 하늘(장면 뒤 2D 그림): 위에서 수평선까지 색 띠 · 해 둘레 빛 · 도트 해 · 구름 줄 · 해넘이엔 울릉도 그림자
+function paintFPSky(g, V) {
+  const W = sceneWidth, H = sceneHeight, S = fp.sky, far = 9000, ex = fp.ex, ez = fp.ez, eh = fp.eh;
+  const fx = Math.sin(fp.yaw), fz = -Math.cos(fp.yaw), hz = V.project(ex + fx * far, ez + fz * far, 0), hy = hz ? Math.max(-H, Math.min(H * 2, hz.y)) : H * .5;
+  const gr = g.createLinearGradient(0, Math.min(hy - H * 1.2, 0), 0, hy); gr.addColorStop(0, S.zen); gr.addColorStop(.62, S.mid); gr.addColorStop(1, S.horizon);
+  g.fillStyle = gr; g.fillRect(0, 0, W, H); g.fillStyle = S.horizon; if (hy < H) g.fillRect(0, Math.max(0, hy), W, H);
+  const at = (dx, dy, dz) => V.project(ex + dx * far, ez + dz * far, eh + dy * far);
+  g.save(); g.beginPath(); g.rect(0, 0, W, Math.max(0, hy + 1)); g.clip();
+  if (fp.mode === 'sunset') { // 울릉도: 서북서 87.4km(높이 984m) — 수평선 위 낮은 그림자
+    const a0 = Math.atan2(-.36, -.93); let pts = [];
+    for (let i = 0; i <= 12; i++) { const a = a0 - .055 + i * .0092, hh = Math.sin(i / 12 * Math.PI) ** .8 * .0105 + (i === 6 ? .0012 : 0); const p = at(Math.cos(a), hh, Math.sin(a)); if (p) pts.push(p); }
+    if (pts.length > 2) { g.fillStyle = mixHex(S.horizon, '#3b3550', .55); g.beginPath(); g.moveTo(pts[0].x, hy + 1); for (const p of pts) g.lineTo(p.x, p.y); g.lineTo(pts.at(-1).x, hy + 1); g.fill(); const top = pts[6]; if (top && top.x > 0 && top.x < W) { g.fillStyle = 'rgba(255,250,235,.85)'; g.font = `bold ${Math.round(11 + H / 90)}px ${getComputedStyle(document.body).fontFamily}`; g.textAlign = 'center'; g.fillText('울릉도 (87.4km)', top.x, top.y - 10); } }
+  }
+  const sp = S.sunShow && S.sun[1] > -.12 ? at(S.sun[0], S.sun[1], S.sun[2]) : null;
+  if (sp) { const R = Math.max(4, H * .028 * (50 / fp.fov)), low = 1 - smooth(.02, .2, S.sun[1]);
+    const gl2 = g.createRadialGradient(sp.x, sp.y, R, sp.x, sp.y, H * (.28 + .2 * low)); gl2.addColorStop(0, `rgba(255,${200 - 50 * low | 0},${150 - 70 * low | 0},${.55 + .3 * low})`); gl2.addColorStop(1, 'rgba(255,160,90,0)'); g.fillStyle = gl2; g.fillRect(0, 0, W, H);
+    g.imageSmoothingEnabled = false; g.fillStyle = mixHex('#fff4cf', '#ff8a3c', low * .8); g.beginPath(); g.arc(Math.round(sp.x), Math.round(sp.y), R, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(255,255,240,.9)'; g.beginPath(); g.arc(Math.round(sp.x - R * .2), Math.round(sp.y - R * .2), R * .55, 0, Math.PI * 2); g.fill(); }
+  // 구름 줄: 세계에 고정(둘러보면 같이 돌아요), 해 쪽은 아랫면이 빛나요
+  for (let i = 0; i < 14; i++) { const a = i * .45 + (i % 3) * .11, e = .035 + (i % 4) * .028, p = at(Math.cos(a), e, Math.sin(a)); if (!p || p.y > hy) continue;
+    const w = (40 + (i * 37) % 70) * (50 / fp.fov) * H / 480, h = Math.max(2, Math.round(w * .08)), lit = S.sun ? Math.max(0, Math.cos(a) * S.sun[0] + Math.sin(a) * S.sun[2]) : 0;
+    g.fillStyle = mixHex(mixHex(S.mid, '#ffffff', .35), '#ffb37a', lit * (1 - smooth(.05, .25, S.sun[1])) * .8); g.globalAlpha = .55 + .25 * lit; g.fillRect(Math.round(p.x - w / 2), Math.round(p.y), Math.round(w), Math.round(h)); g.fillRect(Math.round(p.x - w * .3), Math.round(p.y - h), Math.round(w * .55), Math.round(h)); g.globalAlpha = 1; }
+  g.restore();
+}
+function renderFP() {
+  let el = $('#fpView'); if (!el) { el = document.createElement('div'); el.id = 'fpView'; scene.append(el); bindFP(el); }
+  const sun = fp.mode !== 'look', tag = fp.mode === 'sunrise' ? '🌅 해돋이' : fp.mode === 'sunset' ? '🌇 해넘이' : '👁 1인칭 관찰';
+  el.className = 'fp-view' + (sun ? ' fp-sun' : '');
+  el.innerHTML = `<div class="fp-top"><span class="fp-tag">${tag}</span><strong>${esc(fp.name)}</strong>${fp.note ? `<small>${esc(fp.note)}</small>` : ''}</div>
+    <div class="fp-cap">${sun ? `<b id="fpPhase">${esc(fp.phase)}</b>` : ''}<p id="fpLine">${esc(fp.lines[fp.li] || '')}</p>
+    <div class="fp-ctl"><button data-fp="zout" aria-label="넓게 보기">－</button><button data-fp="zin" aria-label="가깝게 보기">＋</button>${fp.lines.length > 1 ? '<button data-fp="next">다음 이야기 ▸</button>' : ''}${sun ? '<button data-fp="again">다시 보기 ↺</button>' : ''}<button data-fp="close" class="fp-close">돌아가기 ✕</button></div>
+    <small class="fp-hint">끌어서 둘러보기 · 방향키 · 휠·＋－로 확대 · Esc 돌아가기</small></div>`;
+}
+function bindFP(el) {
+  let drag = null;
+  el.addEventListener('pointerdown', e => { if (!fp || e.target.closest('button')) return; drag = { x: e.clientX, y: e.clientY, yaw: fp.yaw, pitch: fp.pitch }; el.setPointerCapture?.(e.pointerId); });
+  el.addEventListener('pointermove', e => { if (!fp || !drag) return; const k = fp.fov / 52 * .0055; fp.yaw = drag.yaw - (e.clientX - drag.x) * k; fp.pitch = fpClampP(drag.pitch - (e.clientY - drag.y) * k); });
+  const end = () => { drag = null; }; el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+  el.addEventListener('wheel', e => { if (!fp) return; e.preventDefault(); zoomFP(e.deltaY > 0 ? 4 : -4); }, { passive: false });
+  el.addEventListener('click', e => { const b = e.target.closest('[data-fp]'); if (!b || !fp) return; const a = b.dataset.fp;
+    if (a === 'close') closeFP(); else if (a === 'zin') zoomFP(-6); else if (a === 'zout') zoomFP(6); else if (a === 'next') nextFP(); else if (a === 'again') { fp.t0 = performance.now(); sfx('select'); } });
+}
+window.addEventListener('keydown', e => { // 1인칭일 때는 걷기 대신 둘러보기(먼저 받아요)
+  if (!fp) return; const k = e.code; let used = true;
+  if (k === 'ArrowLeft' || k === 'KeyA') fp.yaw -= .08; else if (k === 'ArrowRight' || k === 'KeyD') fp.yaw += .08;
+  else if (k === 'ArrowUp' || k === 'KeyW') fp.pitch = fpClampP(fp.pitch - .06); else if (k === 'ArrowDown' || k === 'KeyS') fp.pitch = fpClampP(fp.pitch + .06);
+  else if (k === 'Equal' || k === 'NumpadAdd') zoomFP(-6); else if (k === 'Minus' || k === 'NumpadSubtract') zoomFP(6);
+  else if (k === 'Escape' || k === 'KeyQ' || k === 'Backspace') closeFP(); else if (k === 'Enter' || k === 'Space' || k === 'KeyE') nextFP(); else used = false;
+  if (used) { e.preventDefault(); e.stopImmediatePropagation(); }
+}, true);
 let diveWanted = false;
 function inWater() { if (map.kind === 'room') return false; return map[Math.round(view.y)]?.[Math.round(view.x)] === 0; }
 function deepWater() { if (!inWater() || map.diving) return false; return !map.shallow?.has(`${Math.round(view.x)},${Math.round(view.y)}`); } // v0.82 깊은 물: 헤엄쳐요(조금 느리게)
@@ -807,9 +895,11 @@ function frame(now) {
       if (gkey !== groundCache.key || now - groundCache.at > 4000) { groundCache.camera = drawWorld(g, map, state, view, now, target, motion, { width: gw, height: gh, labels: false, actors: false, seabed: map.diving }, people); groundCache.key = gkey; groundCache.at = now; groundCache.ver++; }
       camera = groundCache.camera;
       const sc = map.diving ? ['#7fd6ec', '#2c8db5', FOG] : map.kind === 'room' ? ['#3b3448', '#3b3448', '#3b3448'] : skyColors(); ctx.fillStyle = sc[2]; ctx.fillRect(0, 0, sceneWidth, sceneHeight);
-      const px = view.x * TILE + 16, py = view.y * TILE + 28; hdView = hdCamera(px, py, glView.groundAt(map, px, py), 0, sceneWidth, sceneHeight);
-      const L = daylight(), room = map.kind === 'room', lt = room ? { sun: [.42, .82, .39], tint: [1, 1, 1] } : lightFor(L);
-      glView.render({ map, ground: ground3d, groundVer: groundCache.ver, view: hdView, now, people, viewPos: view, state, motion, wanted: map.kind === 'town' ? wantedRole(state.progress[state.zone] || {}) : null, seen: d => seenDir(0, d), fogColor: sc[2], seaColor: map.diving ? '#1d6f96' : '#3d8fc4', sun: lt.sun, tint: map.diving ? [.72, .9, 1.05] : lt.tint, night: room ? 0 : L.night, light: room ? .5 : Math.max(0, 1 - (L.night || 0)), post: true, season: currentSeason(), quality: gfxQ });
+      const px = view.x * TILE + 16, py = view.y * TILE + 28;
+      if (fp) { fpTick(now); hdView = fpCamera(fp.ex, fp.ez, fp.eh, fp.yaw, fp.pitch, fp.fov * Math.PI / 180, sceneWidth, sceneHeight); paintFPSky(ctx, hdView); sc[2] = fp.sky.horizon; } // v0.84 1인칭 관찰
+      else hdView = hdCamera(px, py, glView.groundAt(map, px, py), 0, sceneWidth, sceneHeight);
+      const L = daylight(), room = map.kind === 'room', lt = fp ? { sun: fp.sky.sun, tint: fp.sky.tint } : room ? { sun: [.42, .82, .39], tint: [1, 1, 1] } : lightFor(L);
+      glView.render({ map, ground: ground3d, groundVer: groundCache.ver, view: hdView, now, people, viewPos: view, state, motion, wanted: map.kind === 'town' ? wantedRole(state.progress[state.zone] || {}) : null, seen: d => seenDir(0, d), fogColor: sc[2], seaColor: map.diving ? '#1d6f96' : '#3d8fc4', sun: lt.sun, tint: map.diving ? [.72, .9, 1.05] : lt.tint, night: fp ? fp.sky.night : room ? 0 : L.night, light: fp ? fp.sky.light : room ? .5 : Math.max(0, 1 - (L.night || 0)), post: !fp, glit: !!fp?.sky.glit, glitCol: fp?.sky.glitCol, season: currentSeason(), quality: gfxQ });
       nightLamps = !room && L.night > .05 ? (glView.info.lamps || []).map(([x, h, z]) => hdView.project(x, z, h)).filter(Boolean).map(p => ({ x: p.x, y: p.y, r: 64 * p.k })) : [];
       { const lp = toScreen(px, py); lamp = lp && lp.k ? { x: lp.x, y: lp.y - 22 * lp.k, r: 120 * lp.k } : null; }
       if (!room) paintMiniMap(now, people); else if (miniMap) miniMap.hidden = true;
@@ -823,8 +913,8 @@ function frame(now) {
     }
     actorCtx.restore();
     if (map.diving) paintUnderwater(actorCtx, K, now); // v0.71 바닷속
-    else if (map.kind !== 'room') paintWind(actorCtx, now, K, hdOn() ? -view.x * TILE : -camera.x, hdOn() ? -view.y * TILE * .6 : -camera.y);
-    if (map.kind !== 'room') paintDaylight(actorCtx, K); // v0.69 낮·밤
+    else if (map.kind !== 'room' && !fp) paintWind(actorCtx, now, K, hdOn() ? -view.x * TILE : -camera.x, hdOn() ? -view.y * TILE * .6 : -camera.y);
+    if (map.kind !== 'room' && (!fp || fp.mode === 'look')) paintDaylight(actorCtx, K); // v0.69 낮·밤
     paintWorldLabels(people);
   }
   music(musicFor());
@@ -1590,7 +1680,7 @@ if (typeof location !== 'undefined' && new URLSearchParams(location.search).has(
     get longestQuestion() { return QUESTIONS.reduce((m, q) => (q.prompt.length + q.options.join('').length + q.explanation.length > m.prompt.length + m.options.join('').length + m.explanation.length ? q : m)); },
     set forceQuestion(q) { testQuestion = q; }, questionById: id => QUESTIONS.find(q => q.id === id), closeBattleForTest: () => { if (battle) closeBattle(); },
     screenOf(x, y) { const r = canvas.getBoundingClientRect(), p = toScreen(x * TILE + 16, y * TILE + 16); return { x: r.left + p.x * sceneScale, y: r.top + p.y * sceneScale }; },
-    get view3d() { return hdOn(); }, setView3d, get look() { return { yaw, pitch }; }, setGL, get gl() { return { wanted: !force2D, mode: hdOn() ? 'hd' : '2d', ...(glView?.info || {}) }; }, setQuality, get quality() { return gfxQ; }, setWeather: v => setWeather(v), get pos() { return { x: view.x, y: view.y }; }, setLook(y, p = 0) { yaw = y; pitch = clampPitch(p); }, setHand, setClock: ms => setClock(ms), get diving() { return !!map.diving; }, toggleDive, get inWater() { return inWater(); }, get clock() { return { ms: gameClock(), hour: daylight().hour, night: isNight(), day: DAY_MS, weather: weatherNow() }; }, get music() { return musicFor(); }, setSeason: v => { const r = setSeason(v); updateUI(); return r; }, get season() { return currentSeason(); },
+    get view3d() { return hdOn(); }, get fp() { return fp ? { name: fp.name, mode: fp.mode, yaw: fp.yaw, pitch: fp.pitch, fov: fp.fov, phase: fp.phase } : null; }, startFirstPerson, closeFP, setView3d, get look() { return { yaw, pitch }; }, setGL, get gl() { return { wanted: !force2D, mode: hdOn() ? 'hd' : '2d', ...(glView?.info || {}) }; }, setQuality, get quality() { return gfxQ; }, setWeather: v => setWeather(v), get pos() { return { x: view.x, y: view.y }; }, setLook(y, p = 0) { yaw = y; pitch = clampPitch(p); }, setHand, setClock: ms => setClock(ms), get diving() { return !!map.diving; }, toggleDive, get inWater() { return inWater(); }, get clock() { return { ms: gameClock(), hour: daylight().hour, night: isNight(), day: DAY_MS, weather: weatherNow() }; }, get music() { return musicFor(); }, setSeason: v => { const r = setSeason(v); updateUI(); return r; }, get season() { return currentSeason(); },
     standAtDoor(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b); settleMovement(); freePos = null; state.x = f.x; state.y = f.y; view = { x: f.x, y: f.y }; state.dir = 'up'; return f; },
     goInside(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b), p = pathfind(map, state.x, state.y, f.x, f.y, liveNPCs()); if (state.x === f.x && state.y === f.y) enterBuilding(b); else { path = p; pathAction = () => enterBuilding(b); } return p.length; },
     legendRadio: false, dexDetail, showDex, showQuest, checkLegends, place(x, y, dir = 'right') { settleMovement(); freePos = null; path = []; state.x = x; state.y = y; view = { x, y }; state.dir = dir; },

@@ -1062,3 +1062,30 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
 @media (max-width:430px){.hrt{width:12px;height:10px}.hearts{max-width:120px}}
 /* v0.83 글자 또렷하게: 맞힌·틀린 답 단추의 진한 2px 그림자는 낮은 밀도 화면에서 글자가 두 겹으로 번져 보여요 → 1px 옅은 그림자 */
 .battle-screen.dq .dq-answer.correct,.battle-screen.dq .dq-answer.wrong{text-shadow:0 1px 0 #0002}
+/* v0.84 문 간판: 진짜 문 바로 위에 걸린 나무 간판 + 작은 도트 문 그림 + 문을 가리키는 꼭지 */
+.building-label{display:inline-flex;align-items:center;gap:5px;padding:3px 9px 3px 6px;margin-top:-8px}
+.building-label::after{content:'';position:absolute;left:50%;bottom:-8px;margin-left:-6px;border:6px solid transparent;border-top-color:#3f2a1a;border-bottom:0}
+.building-label::before{content:'';position:absolute;left:50%;bottom:-5px;margin-left:-4px;border:4px solid transparent;border-top-color:#6a4a30;border-bottom:0;z-index:1}
+.building-label .door-ico{display:inline-block;width:10px;height:13px;flex:0 0 10px;image-rendering:pixelated;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 13' shape-rendering='crispEdges'%3E%3Cpath fill='%23f3dca6' d='M1 0h8v13H1z'/%3E%3Cpath fill='%233f2a1a' d='M2 1h6v12H2z'/%3E%3Cpath fill='%23a8743f' d='M3 2h4v11H3z'/%3E%3Cpath fill='%23c99257' d='M3 2h4v4H3z'/%3E%3Cpath fill='%23ffd75e' d='M6 8h1v1H6z'/%3E%3C/svg%3E") center/contain no-repeat}
+.building-label.show{animation:door-sign-bob 1.6s ease-in-out infinite}
+@keyframes door-sign-bob{0%,100%{transform:translate(-50%,-100%)}50%{transform:translate(-50%,calc(-100% - 2px))}}
+@media (prefers-reduced-motion:reduce){.building-label.show{animation:none}}
+
+/* v0.84 1인칭 관찰 · 해돋이/해넘이: 화면을 꽉 채우고, 위엔 이름, 아래엔 이야기와 조작 */
+#gameApp.fp-on .hud-top,#gameApp.fp-on .mini-map,#gameApp.fp-on #worldLabels,#gameApp.fp-on #interactionPrompt,#gameApp.fp-on #diveBtn,#gameApp.fp-on #joystick,#gameApp.fp-on #interactBtn,#gameApp.fp-on #lookStick,#gameApp.fp-on .game-controls,#gameApp.fp-on .place-banner,#gameApp.fp-on #actors{display:none!important}
+.fp-view{position:absolute;inset:0;z-index:30;display:flex;flex-direction:column;justify-content:space-between;padding:max(14px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;background:radial-gradient(ellipse at center,transparent 62%,rgba(10,14,26,.35) 100%)}
+.fp-view:active{cursor:grabbing}
+.fp-top{align-self:flex-start;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;max-width:min(92%,640px);padding:8px 14px;background:#fbf6e6ee;color:#2a2420;border:2px solid #3f2a1a;border-radius:6px;box-shadow:0 3px 0 #2c1d12}
+.fp-top strong{font-size:18px}.fp-top small{font-size:12px;color:#7a6442;flex-basis:100%}
+.fp-tag{font-size:12px;font-weight:800;padding:2px 8px;border-radius:3px;background:#2f5f8a;color:#fff7df}
+.fp-sun .fp-tag{background:#c4572c}
+.fp-cap{align-self:center;width:min(100%,760px);padding:12px 16px 10px;background:#1d2230e6;color:#fff8e6;border:2px solid #fff7df;border-radius:10px;box-shadow:0 3px 0 #0008;cursor:default}
+.fp-cap b{display:block;font-size:13px;color:#ffd08a;margin-bottom:4px;letter-spacing:.02em}
+.fp-cap p{margin:0 0 8px;font-size:16px;line-height:1.6}
+.fp-ctl{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.fp-ctl button{min-width:44px;min-height:40px;padding:6px 12px;border-radius:6px;background:#fff7df;color:#2a2420;font-weight:800;border:2px solid #9c7f52;box-shadow:0 2px 0 #0006}
+.fp-ctl .fp-close{background:#c4572c;color:#fff;border-color:#7a2f15}
+.fp-hint{display:block;margin-top:6px;font-size:11px;color:#c9d3e0;text-align:right}
+@media (pointer:coarse){.fp-hint{display:none}}
+@media (max-height:520px){.fp-cap{padding:8px 12px 6px}.fp-cap p{font-size:14px;margin-bottom:4px}.fp-top{padding:5px 10px}.fp-top strong{font-size:15px}.fp-top small{display:none}}
+.talk-extra{margin-right:6px;background:#2f5f8a!important;color:#fff7df!important;border-color:#1d3e5c!important}

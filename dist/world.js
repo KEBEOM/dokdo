@@ -17,6 +17,12 @@ export const PROP_KINDS = ['sign', 'landmark', 'box', 'trash', 'observe', 'stone
 const SURFACE_BIRDS = new Set([79, 80, 81]); // 가마우지·아비: 물 위에 떠 있어요
 
 // A tile grid (rows of tile codes) carrying the parsed map: buildings, decor, exits, spawns.
+// v0.84 문 자리: 건물 아랫줄의 어느 칸이 문인지(들어가기·나오기·문 앞 발판·간판이 모두 여기서 읽어요).
+// 기본은 가운데(짝수 폭이면 가운데 두 칸). 도동 골목 집 그림 3종은 문이 오른쪽에 그려져 있어서 오른쪽 칸(+2)이 문이에요.
+export function doorColumns(b) {
+  if (b.kind === 'house' && b.w === 3) return [b.x + 2];
+  return b.w % 2 ? [b.x + Math.floor(b.w / 2)] : [b.x + b.w / 2 - 1, b.x + b.w / 2];
+}
 export function createMap(ref = 0) {
   const parsed = parseMap(ref), def = parsed.def;
   const grid = parsed.grid.map(row => row.slice());

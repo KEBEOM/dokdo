@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { ROOM_TEMPLATES, ROOM_DEFS, roomId, parseRoomId } from '../dist/interiors.js';
 import { MAPS, MAP_BY_ID, parseMap } from '../dist/maps.js';
-import { createMap, blocked, npcs, pathfind } from '../dist/world.js';
+import { createMap, blocked, npcs, pathfind, doorColumns } from '../dist/world.js';
 import { validateSave, newState, createMonster, addMonster } from '../dist/engine.js';
 
 const TYPES = new Set(['shopkeeper', 'storage', 'dex', 'rest', 'badges', 'sign', 'landmark', 'person', 'box', 'stone', 'observe']);
@@ -45,7 +45,7 @@ for (const def of MAPS.filter(m => m.kind === 'town')) {
     assert.ok(MAP_BY_ID[roomId(def.zone, b.kind, 1)], `${def.id}: ${b.kind} has an inside`);
   }
   for (const b of town.structures || []) { // v0.75 문이 있는 건물은 모두 들어가요
-    const f = { x: b.x + Math.floor(b.w / 2), y: b.y + b.h };
+    const f = { x: doorColumns(b)[0], y: b.y + b.h }; // v0.84 집 3종은 그림 속 문이 있는 오른쪽 칸
     assert.ok(!blocked(town, f.x, f.y, people) && pathfind(town, s.x, s.y, f.x, f.y, people).length, `${def.id}: ${b.name}(${b.room}) door can be reached`);
     const inside = MAP_BY_ID[roomId(def.zone, b.room, 1)]; assert.ok(inside && inside.building === b.room, `${def.id}: ${b.room} has an inside`);
   }
