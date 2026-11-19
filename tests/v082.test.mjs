@@ -26,5 +26,5 @@ assert.ok(!GLB_MODELS.lighthouse, 'the real lighthouse is not used as a story la
 // 선착장: 모델이 덮는 # 칸은 지도 그대로 걸을 수 있고, 출구(a <)·안내판(1·2)·몽돌(3) 칸도 그대로
 const r0 = createMap('route0'); assert.ok(r0.exits.has('0,24')); assert.equal(r0[24][2], 6);
 // 추정 표시: 바위 지명 말 걸기에 모양 확인 수준
-const game = fs.readFileSync(new URL('game.js', dist), 'utf8'); assert.match(game, /보찰바위': '실제 지명 · 바위 모양은 추정/); assert.match(game, /상장군바위': '게임 속 임시 이름/); assert.match(game, /이야기 시설/);
+const game = fs.readFileSync(new URL('game.js', dist), 'utf8'); assert.match(game, /보찰바위': '실제 지명 · 바위 모양은 추정/); assert.match(game, /지네바위': '실제 지명/); assert.match(game, /이야기 시설/);
 console.log('v082 ok');

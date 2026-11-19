@@ -5,6 +5,21 @@ import { SCENERY_ATLAS } from './scenery-atlas.js';
 import { PROPS_ATLAS } from './props-atlas.js';
 import { CUTSCENE_ATLAS } from './cutscene-atlas.js';
 import { islandFrame } from './island-pictures.js';
+import { FURN_ATLAS, REGION_ATLAS } from './furniture-atlas.js';
+
+// v0.88 바깥 안내판: 「가구·표지판·해안 벽 확장팩」의 빈 판(글자 없음 — 이름은 게임의 이름표로 따로 띄워요)
+export function signSprite(name = '') {
+  if (/길 안내|오르막|갈림길|이정표/.test(name)) return 'sign_direction';
+  if (/주의|위험|조심|갯바위|가림막/.test(name)) return 'sign_warning';
+  if (/항 안내|부두|선착장|항구/.test(name)) return 'sign_harbor';
+  return 'sign_information';
+}
+const SIGN_SCALE = { sign_direction: .64, sign_warning: .7, sign_harbor: .6, sign_information: .52 }; // 안내판 키는 사람(48px)보다 크지 않게
+function packSign(ctx, name, cx, bottom) {
+  const img = assetImage(FURN_ATLAS.key), id = signSprite(name), f = FURN_ATLAS.frames[id]; if (!img || !f) return false;
+  const s = SIGN_SCALE[id], w = Math.round(f[2] * s), h = Math.round(f[3] * s);
+  shadow(ctx, cx, bottom, w * .7); ctx.imageSmoothingEnabled = true; ctx.drawImage(img, f[0], f[1], f[2], f[3], Math.round(cx - w / 2), Math.round(bottom + 2 - h), w, h); ctx.imageSmoothingEnabled = false; return true;
+}
 
 const PALETTE = {
   o: '#232634', O: '#3a3f52',
@@ -194,7 +209,7 @@ export function drawProp(ctx, kind, tx, ty, opts = {}) {
   const cx = tx * 32 + 16, bottom = ty * 32 + 30, t = opts.time || 0;
   ctx.save(); ctx.imageSmoothingEnabled = false;
   switch (kind) {
-    case 'sign': if (!propArt(ctx, 'sign', cx, bottom)) { shadow(ctx, cx, bottom, 20); blit(ctx, 'sign', cx, bottom); } break;
+    case 'sign': if (!opts.art && packSign(ctx, opts.name, cx, bottom)) break; if (!propArt(ctx, 'sign', cx, bottom)) { shadow(ctx, cx, bottom, 20); blit(ctx, 'sign', cx, bottom); } break;
     case 'box': if (!propArt(ctx, opts.open ? 'boxOpen' : 'box', cx, bottom)) { shadow(ctx, cx, bottom, 26); blit(ctx, opts.open ? 'boxOpen' : 'box', cx, bottom); } break;
     case 'trash': if (!propArt(ctx, 'trash', cx, bottom)) blit(ctx, 'trash', cx, bottom); break;
     case 'observe': if (!propArt(ctx, 'observe', cx + 2, bottom)) { shadow(ctx, cx, bottom, 22); blit(ctx, 'observe', cx + 4, bottom); } break;
@@ -231,6 +246,7 @@ export function drawProp(ctx, kind, tx, ty, opts = {}) {
       drawPeaks(ctx, 'peaks', left + w / 2, base, w); break;
     }
     case 'landmark': {
+      if (opts.region) { const img = assetImage(REGION_ATLAS.key), f = REGION_ATLAS.frames[opts.region]; if (img && f) { const r = opts.rock, bx = r ? (r[0] + r[2] + 1) * 16 : cx, by = r ? (r[3] + 1) * 32 - 2 : bottom; shadow(ctx, bx, by, f[2] * .7); ctx.drawImage(img, f[0], f[1], f[2], f[3], Math.round(bx - f[2] / 2), Math.round(by + 2 - f[3]), f[2], f[3]); break; } } // v0.88 실제 시설 관찰용 외관(지명 자리 칸 아랫변이 바닥 · 말 거는 자리는 그 앞 칸)
       const art = opts.art || 'peak';
       if (opts.water) { ctx.fillStyle = '#d5e0bb'; ctx.fillRect(cx - 26, bottom - 3, 52, 2); }
       if (art === 'peaks') drawPeaks(ctx, 'peaks', cx, bottom + 2, 104);

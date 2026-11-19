@@ -1,7 +1,8 @@
 import { ZONES, EXTRA_NPCS, getSpecies, keeperName } from './data.js';
-import { drawHuman, drawMonster, facing } from './sprites.js';
+import { drawHuman, drawMonster, drawMonsterField, facing } from './sprites.js';
 import { drawScenery, drawIslandArt } from './scenery.js';
 import { drawTerrain, flowerTiles } from './terrain.js';
+import { seabedLayout } from './seabed.js';
 import { seasonFlowers, seasonColor, currentSeason as seasonName } from './season.js';
 import { drawExplorer, drawResident, CHARACTER_SIZE } from './characters.js';
 import { parseMap, getMapDef, MAP_W, MAP_H } from './maps.js';
@@ -26,17 +27,20 @@ export function doorColumns(b) {
 export function createMap(ref = 0) {
   const parsed = parseMap(ref), def = parsed.def;
   const grid = parsed.grid.map(row => row.slice());
+  for (const d of parsed.decor || []) { const hull = d.kind === 'boat' ? [[0, 0], [0, 1]] : d.kind === 'ferry' ? [-3, -2, -1, 0, 1, 2, 3].flatMap(i => [[i, 3], [i, 4]]) : []; for (const [i, j] of hull) if (parsed.grid[d.y + j]?.[d.x + i] === 0) (parsed.hull ||= new Set()).add(`${d.x + i},${d.y + j}`); } // v0.87 배는 물 위에서 막혀요(헤엄쳐 배 위를 지나가지 않게, 잠수하면 배 밑으로)
+  for (const o of parsed.objects || []) if (o.rock) for (let y = o.rock[1]; y <= o.rock[3]; y++) for (let x = o.rock[0]; x <= o.rock[2]; x++) parsed.solid.add(`${x},${y}`); // v0.86 바다의 바위(지명 고증 자리)
   const keepClear = new Set([...parsed.exits.keys(), ...Object.values(parsed.spawns).map(p => `${p.x},${p.y}`)]);
   for (const b of parsed.buildings) keepClear.add(`${b.x + Math.floor(b.w / 2)},${b.y + b.h}`);
   const map = Object.assign(grid, {
     id: def.id, def, zone: def.zone, kind: def.kind, name: def.name,
     solid: parsed.solid, exits: parsed.exits, spawns: parsed.spawns,
-    buildings: parsed.buildings, structures: parsed.structures || [], decor: parsed.decor, ground: parsed.ground || [], rockTiles: parsed.rockTiles, keepClear, parsed,
+    hull: parsed.hull || new Set(), buildings: parsed.buildings, structures: parsed.structures || [], decor: parsed.decor, ground: parsed.ground || [], rockTiles: parsed.rockTiles, keepClear, parsed,
     doors: parsed.doors || [], stairs: parsed.stairs || [], focus: parsed.focus || null,
     level: parsed.level || null, cliff: parsed.cliff || null // v0.70 높낮이(언덕·절벽·계단·사다리)
   });
   // v0.71 얕은 물: 걸을 수 있는 땅(풀·길·풀숲·모래·부두)에 맞닿은 물 칸
-  map.shallow = new Set(); if (map.kind !== 'room') for (let y = 0; y < grid.length; y++) for (let x = 0; x < grid[0].length; x++) if (map[y][x] === 0 && !map.solid.has(`${x},${y}`) && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => [1, 2, 3, 4, 6].includes(map[y + b]?.[x + a]) && !map.solid.has(`${x + a},${y + b}`))) map.shallow.add(`${x},${y}`);
+  map.shallow = new Set(); if (map.kind !== 'room') for (let y = 0; y < grid.length; y++) for (let x = 0; x < grid[0].length; x++) if (map[y][x] === 0 && !map.solid.has(`${x},${y}`) && !map.hull.has(`${x},${y}`) && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => [1, 2, 3, 4, 6].includes(map[y + b]?.[x + a]) && !map.solid.has(`${x + a},${y + b}`))) map.shallow.add(`${x},${y}`);
+  map.uwSolid = map.kind === 'room' ? null : seabedLayout(map).solid; // v0.87 바닷속 바위 지형 칸
   map.decor = [...map.decor, ...flowerTiles(map).map(([x, y, common]) => ({ kind: 'flower', x, y, common }))]; // v0.68: 세워 그리는 들꽃(3D에서도 서 있어요)
   return map;
 }
@@ -100,6 +104,8 @@ export function blocked(map, x, y, people = [], ignorePeople = false, wade = tru
   if (x < 0 || y < 0 || y >= map.length || x >= map[0].length) return true;
   const t = map[y][x];
   if (map.solid?.has(`${x},${y}`)) return true; // v0.74 물 위에 놓인 소파블록·바위도 막혀요
+  if (map.diving && map.uwSolid?.has(`${x},${y}`)) return true; // v0.87 바닷속 바위 지형(바닥 닿는 칸만)
+  if (!map.diving && map.hull?.has(`${x},${y}`)) return true; // v0.87 배(물 위에서만)
   if (t === 0 && wade && map.kind !== 'room') return !ignorePeople && people.some(n => (n.occupied || [n]).some(p => p.x === x && p.y === y)); // v0.71 물속까지(얕은 물은 걷고, 깊은 물은 잠수)
   if (t === 0 || t === 5 || t === 7 || t === 8 || t === 9 || map.solid?.has(`${x},${y}`)) return true;
   return !ignorePeople && people.some(n => (n.occupied || [n]).some(p => p.x === x && p.y === y));
@@ -189,7 +195,7 @@ export function drawWorld(ctx, map, state, view, time, target = null, motion = {
   ctx.clearRect(0, 0, width, height); ctx.fillStyle = room ? '#0e1418' : seasonColor(z.color); ctx.fillRect(0, 0, width, height);
   ctx.save(); ctx.translate(-camX, -camY);
   if (room) drawInterior(ctx, map, time, { x: camX, y: camY, width, height });
-  else { drawTerrain(ctx, map, time, { x: camX, y: camY, width, height, seabed: !!viewport.seabed }); for (const g of map.ground || []) drawGround(ctx, g, time); }
+  else { drawTerrain(ctx, map, time, { x: camX, y: camY, width, height, seabed: viewport.seabed || false }); for (const g of map.ground || []) drawGround(ctx, g, time); }
   if (target) { ctx.fillStyle = '#fff1b440'; ctx.fillRect(target.x * 32, target.y * 32, 32, 32); ctx.strokeStyle = '#f6d37d'; ctx.lineWidth = 2; ctx.strokeRect(target.x * 32 + 3, target.y * 32 + 3, 26, 26); }
   if (viewport.actors !== false) drawActors(ctx, state, view, time, motion, people, map);
   if (viewport.labels) for (const n of people) if (n.actor) drawNPCNameplate(ctx, n.name, (n.drawX ?? n.x) * 32 + 16, (n.drawY ?? n.y) * 32 + 35, camX, camY);
@@ -288,7 +294,7 @@ export function paintActor(ctx, n, env) {
   const { map, state, time, motion, wanted, seen } = env;
   if (n.scenery) { drawDecor(ctx, n, map, time); return; }
   const fx = n.x * 32 + (32 - CHARACTER_SIZE) / 2, fy = n.y * 32 + 28 - CHARACTER_SIZE;
-  if (n.furniture) drawFurniture(ctx, n.furniture, n.x, n.y, time, { open: n.used, glow: n.kind === 'rest' });
+  if (n.furniture) drawFurniture(ctx, n.furniture, n.x, n.y, time, { open: n.used, glow: n.kind === 'rest', map });
   else if (n.kind === 'board') drawIslandArt(ctx, 'record-board', n.x * 32 - 8, n.y * 32 - 16, 48, 54);
   else if (n.kind === 'wild' || n.kind === 'friend') { // 걸어 다니는 우산몬: 가는 쪽을 보고, 걸을 때 통통 튀어요 (사나워진 우산몬만 검은 기운)
     if (n.kind === 'wild') darkWisps(ctx, n.x, n.y, time);
@@ -299,17 +305,17 @@ export function paintActor(ctx, n, env) {
       const bob = Math.sin(time / 420 + n.x * 1.7) * 2, line = n.y * 32 + 20;
       ctx.save(); ctx.beginPath(); ctx.rect(n.x * 32 - 24, n.y * 32 - 60, 80, line - (n.y * 32 - 60)); ctx.clip();
       if (flip) { ctx.translate(n.x * 32 * 2 + 32, 0); ctx.scale(-1, 1); }
-      drawMonster(ctx, n.species, n.x * 32 - 6, n.y * 32 - 8 + bob, 44, time / 1000); ctx.restore();
+      drawMonsterField(ctx, n.species, n.x * 32 - 6, n.y * 32 - 8 + bob, 44, time / 1000); ctx.restore();
       ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1.5; const w = 14 + Math.sin(time / 300 + n.x) * 2;
       ctx.beginPath(); ctx.ellipse(n.x * 32 + 16, line, w, 4, 0, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = .45; ctx.beginPath(); ctx.ellipse(n.x * 32 + 16, line + 1, w + 6, 6, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
     } else {
     groundShadow(ctx, n.x * 32 + 16, n.y * 32 + 29, 13, hop); // 발밑 그림자: 통통 튈 때는 조금 작아져요
     ctx.save(); if (flip) { ctx.translate(n.x * 32 * 2 + 32, 0); ctx.scale(-1, 1); }
-    drawMonster(ctx, n.species, n.x * 32 - 6, n.y * 32 - 12 - hop, 44, time / 1000); ctx.restore();
+    drawMonsterField(ctx, n.species, n.x * 32 - 6, n.y * 32 - 12 - hop, 44, time / 1000); ctx.restore();
     }
   }
-  else if (n.kind === 'legend') { legendGlow(ctx, n.x, n.y, time); drawMonster(ctx, n.species, n.x * 32 - 10, n.y * 32 - 22 + Math.round(Math.sin(time / 300) * 2), 52, time / 1000); if (!n.used) marker(ctx, n.x, n.y, time, '#ffe9a0'); }
-  else if (PROP_KINDS.includes(n.kind)) drawProp(ctx, n.kind, n.x, n.y, { open: n.used, art: n.art, time, water: map[n.y]?.[n.x] === 0 });
+  else if (n.kind === 'legend') { legendGlow(ctx, n.x, n.y, time); drawMonsterField(ctx, n.species, n.x * 32 - 10, n.y * 32 - 22 + Math.round(Math.sin(time / 300) * 2), 52, time / 1000); if (!n.used) marker(ctx, n.x, n.y, time, '#ffe9a0'); }
+  else if (PROP_KINDS.includes(n.kind)) drawProp(ctx, n.kind, n.x, n.y, { open: n.used, art: n.art, name: n.name, region: n.region, rock: n.rock, time, water: map[n.y]?.[n.x] === 0 });
   else if (n.player) {
     const tx = Math.round(n.x), ty = Math.round(n.y), wet = map?.[ty]?.[tx] === 0 && !map.diving, deep = wet && !map.shallow?.has(`${tx},${ty}`); // v0.71 얕은 물: 무릎까지 · v0.82 깊은 물: 가슴까지 잠겨 헤엄쳐요(둥실 떠요)
     const bob = deep ? Math.round(Math.sin(time / 380) * 1.5) : 0, sink = deep ? 4 : 0, line = n.y * 32 + (deep ? 10 + bob : 22);
@@ -342,7 +348,7 @@ export function drawFlatDecor(ctx, map, time) {
 }
 function drawDecor(ctx, n, map, time) {
   if (n.building) return house(ctx, n.building, false, map);
-  if (n.scenery in FURNITURE_DEPTH) return drawFurniture(ctx, n.scenery, n.x, n.y, time);
+  if (n.scenery in FURNITURE_DEPTH) return drawFurniture(ctx, n.scenery, n.x, n.y, time, { map });
   switch (n.scenery) {
     case 'tree': return tree(ctx, n.x * 32, n.y * 32, map, time);
     case 'flower': return wildFlowers(ctx, n.x, n.y, time, n.common);

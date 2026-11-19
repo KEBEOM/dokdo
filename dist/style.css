@@ -62,8 +62,9 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
 #world{position:absolute;left:0;top:0;display:block;max-width:none;max-height:none;aspect-ratio:auto;image-rendering:pixelated;touch-action:none}
 .world-labels{position:absolute;inset:0;pointer-events:none;z-index:2;overflow:hidden;image-rendering:auto}
 /* 이름표: 사람은 머리 위, 건물은 문 위 간판. 가까이 갔을 때만 .show로 나타나서 다른 캐릭터를 가리지 않아요. */
-.world-nameplate,.building-label{position:absolute;transform:translate(-50%,-100%) translateY(4px);white-space:nowrap;font-family:var(--ui-font);font-size:13px;font-weight:700;line-height:1.35;letter-spacing:0;text-shadow:none;pointer-events:none;opacity:0;transition:opacity .18s ease,transform .18s ease}
-.world-nameplate.show,.building-label.show{opacity:1;transform:translate(-50%,-100%)}
+.world-nameplate,.building-label,.sign-label{position:absolute;transform:translate(-50%,-100%) translateY(4px);white-space:nowrap;font-family:var(--ui-font);font-size:13px;font-weight:700;line-height:1.35;letter-spacing:0;text-shadow:none;pointer-events:none;opacity:0;transition:opacity .18s ease,transform .18s ease}
+.world-nameplate.show,.building-label.show,.sign-label.show{opacity:1;transform:translate(-50%,-100%)}
+.sign-label{padding:2px 8px;background:#f4ead2f2;color:#3b2a1a;border:1px solid #8a6a44;border-radius:4px;box-shadow:0 2px 0 #5a4228;font-size:12px} /* v0.88 빈 안내판의 이름(판 면에 글자를 그리지 않아요) */
 .world-nameplate{padding:3px 9px;background:#213e48e8;color:#fff7df;border:1px solid #68877f;border-radius:10px;box-shadow:0 2px 0 #142a31}
 .world-nameplate::after{content:'';position:absolute;left:50%;bottom:-6px;margin-left:-5px;border:5px solid transparent;border-top-color:#213e48e8;border-bottom:0}
 .building-label{background:#6a4a30;color:#fff1cf;padding:2px 9px;border:2px solid #3f2a1a;border-radius:2px;font-size:12px;box-shadow:inset 0 1px #94704f,0 2px 0 #2c1d12}
@@ -1089,3 +1090,14 @@ button:focus-visible,a:focus-visible{outline:3px solid #d99c31;outline-offset:3p
 @media (pointer:coarse){.fp-hint{display:none}}
 @media (max-height:520px){.fp-cap{padding:8px 12px 6px}.fp-cap p{font-size:14px;margin-bottom:4px}.fp-top{padding:5px 10px}.fp-top strong{font-size:15px}.fp-top small{display:none}}
 .talk-extra{margin-right:6px;background:#2f5f8a!important;color:#fff7df!important;border-color:#1d3e5c!important}
+
+/* v0.86 세계 지도: 고시된 독도 지명(누르면 보여요) */
+.world-map .wm-name{position:absolute;transform:translate(-50%,-130%);font-size:9px;font-weight:700;line-height:1.1;padding:0 3px;border-radius:3px;background:#fffbe9dd;color:#3a2a14;white-space:nowrap;pointer-events:none;display:none}
+.world-map.show-names .wm-name{display:block}
+.wm-names-btn{margin:6px 0 2px}
+
+.wm-town.l,.wm-town.r{--ic:17px;flex-direction:row;gap:3px}.wm-town.l{flex-direction:row-reverse;transform:translate(calc(-100% + var(--ic)),-50%)}.wm-town.r{transform:translate(calc(var(--ic) * -1),-50%)}
+@media(max-width:600px){.wm-town.l,.wm-town.r{--ic:13px}}
+
+/* v0.87 바닷속: 물 위의 이름표·출구 표시는 숨겨요 */
+#gameApp.diving #worldLabels{display:none}

@@ -32,6 +32,8 @@ import { createRoamers } from './roamers.js';
 import { MOVE_DURATION, moveView } from './movement.js';
 import { selectBattleQuestion, shuffledChoices, quizFormat, oxShown } from './battle-quiz.js';
 import { pickRecord } from './records.js';
+import { seabedLayout, fishAt, UW_INFO, UW_NOTE, UW_MON_NOTE } from './seabed.js';
+import { UW_ATLAS, UW_FLOOR } from './uw-atlas.js';
 import { createMap, npcs, blocked, pathfind, drawWorld, drawActors, drawFlatDecor, TILE, W, H, wantedRole, VILLAIN_BY_ZONE, ROLE_ACTOR, buildingArt, doorColumns } from './world.js';
 import { MAPS, getMapDef, townId, nextMapId, prevMapId } from './maps.js';
 import { createCutscenePlayer } from './cutscene.js';
@@ -39,7 +41,7 @@ import { OPENING, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.85';
+const VERSION = '0.91';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -147,10 +149,10 @@ function paintWorldLabels(people = liveNPCs()) {
   if (labelKey !== key) {
     labelKey = key; const layer = $('#worldLabels'); layer.replaceChildren();
     // 건물 이름은 문 위 간판처럼, 사람 이름은 머리 위에 — 가까이 갔을 때만 나타나서 다른 캐릭터를 가리지 않아요.
-    const fixed = [...(map.kind === 'town' ? enterable() : []).map(b => { const c = doorCols(b), dx = (c[0] + c[c.length - 1]) / 2; return { name: b.name, x: dx * TILE + 16, y: (b.y + b.h) * TILE - 2, lift: 44, door: { x: dx, y: b.y + b.h }, building: true }; }), ...exitLabels()]; // v0.84 간판은 진짜 문 바로 위에(집·가게·터미널도)
+    const fixed = [...(map.kind === 'town' ? enterable() : []).map(b => { const c = doorCols(b), dx = (c[0] + c[c.length - 1]) / 2; return { name: b.name, x: dx * TILE + 16, y: (b.y + b.h) * TILE - 2, lift: 44, door: { x: dx, y: b.y + b.h }, building: true }; }), ...exitLabels(), ...(map.kind === 'room' ? [] : map.parsed.objects.filter(o => o.type === 'sign' && !o.furniture && o.name).map(o => ({ name: o.name, x: o.x * TILE + 16, y: o.y * TILE + 30, lift: 54, sign: { x: o.x, y: o.y } })))]; /* v0.88 빈 안내판 위 이름표(가까운 한 개) */ // v0.84 간판은 진짜 문 바로 위에(집·가게·터미널도)
     labelNodes = [...fixed, ...people.filter(n => n.actor).map(n => ({ name: n.name, uid: n.uid }))].map(n => {
       const el = document.createElement('span');
-      el.className = n.exit ? `exit-label${n.locked ? ' locked' : ''}` : n.building ? 'building-label' : 'world-nameplate';
+      el.className = n.exit ? `exit-label${n.locked ? ' locked' : ''}` : n.building ? 'building-label' : n.sign ? 'sign-label' : 'world-nameplate';
       if (n.building) { el.innerHTML = '<i class="door-ico" aria-hidden="true"></i>'; el.append(n.name); } else el.textContent = n.name; layer.append(el); return { ...n, el };
     });
   }
@@ -161,13 +163,15 @@ function paintWorldLabels(people = liveNPCs()) {
   for (const p of people) { if (!p.actor) continue; const px = p.drawX ?? p.x, py = p.drawY ?? p.y, d = Math.abs(px - view.x) + Math.abs(py - view.y); if (near(px, py, 2) && d < best) { best = d; closest = p.uid; } }
   let doorNear = null, doorBest = Infinity; // v0.84 문 간판도 한 개만: 3칸 안에서 가장 가까운 문
   for (const n of labelNodes) if (n.building && near(n.door.x, n.door.y, 3)) { const d = Math.abs(n.door.x - view.x) + Math.abs(n.door.y - view.y) * 1.5; if (d < doorBest) { doorBest = d; doorNear = n; } }
+  let signNear = null, signBest = Infinity; // v0.88 안내판 이름표도 한 개만: 2칸 안에서 가장 가까운 안내판
+  for (const n of labelNodes) if (n.sign && near(n.sign.x, n.sign.y, 2)) { const d = Math.abs(n.sign.x - view.x) + Math.abs(n.sign.y - view.y); if (d < signBest) { signBest = d; signNear = n; } }
   for (const n of labelNodes) {
-    const live = positions.get(n.uid), fixed = n.building || n.exit;
+    const live = positions.get(n.uid), fixed = n.building || n.exit || n.sign;
     const px = live?.drawX ?? live?.x ?? 0, py = live?.drawY ?? live?.y ?? 0;
     const at = fixed ? toScreen(n.x, n.y, n.lift || 0) : toScreen(px * TILE + 16, py * TILE + 28, 48 + 24); // 48 = 캐릭터 키, 그 위 ‘!’ 표시보다 위쪽
     const x = Math.round(at.x * sceneScale), y = Math.round(at.y * sceneScale);
     const onScreen = x >= 0 && x <= sceneWidth * sceneScale && y >= 20 && y < sceneHeight * sceneScale - 25;
-    const shown = onScreen && (n.exit || (!talking && (n.building ? n === doorNear : n.uid === closest)));
+    const shown = onScreen && (n.exit || (!talking && (n.building ? n === doorNear : n.sign ? n === signNear && !map.diving : n.uid === closest && !map.diving)));
     n.el.hidden = !onScreen; n.el.classList.toggle('show', shown);
     if (onScreen) { const half = (n.el.offsetWidth || n.name.length * 14 + 20) / 2; n.el.style.left = Math.round(Math.max(half + 5, Math.min(sceneWidth * sceneScale - half - 5, x))) + 'px'; n.el.style.top = y + 'px'; }
   }
@@ -274,7 +278,7 @@ function chooseAvatar(onChoose = null, canClose = true) {
 async function beginOpening(avatar) {
   resetTransient(); state = newState(); state.avatar = avatar; map = createMap('town0'); view = { x: state.x, y: state.y };
   $('#titleScreen').classList.add('hidden'); scene.classList.add('story');
-  preloadMonsters([67, 34, 55, 9, 3]); assetImage(PROFESSOR_PICTURE); assetImage(CUTSCENE_ATLAS.key); assetImage(PROPS_ATLAS.key); assetImage(TERRAIN_ATLAS.key);
+  preloadMonsters([67, 34, 55, 9, 3]); assetImage('monsters/dots'); /* v0.91 지도용 우산몬 도트 그림 */ assetImage(PROFESSOR_PICTURE); assetImage(CUTSCENE_ATLAS.key); assetImage(PROPS_ATLAS.key); assetImage(TERRAIN_ATLAS.key);
   await playStory(OPENING);
   await enterMeadow(avatar);
 }
@@ -404,9 +408,10 @@ function nearestNPC() {
     .sort((a, b) => (a.x === state.x + dir[0] && a.y === state.y + dir[1] ? -1 : 1) - (b.x === state.x + dir[0] && b.y === state.y + dir[1] ? -1 : 1))[0];
 }
 // v0.82 입체 바위의 모양을 얼마나 확인했는지(에셋 팩 기록) — 추정인 것은 추정이라고 말해요
-const LANDMARK_NOTE = { '보찰바위': '실제 지명 · 바위 모양은 추정(자세한 사진 확인 부족)', '상장군바위': '게임 속 임시 이름 · 바위 모양은 추정', '한반도바위': '실제 지명 · 사진 한 장을 참고한 단순한 모양' };
+const LANDMARK_NOTE = { '서도 주민숙소': '실제 시설 · 관찰용 외관(사진 참고 그림, 실측 아님) · 들어갈 수 없어요', '독도 등대': '실제 시설 · 관찰용 외관(사진 참고 그림, 실측 아님) · 들어갈 수 없어요', '보찰바위': '실제 지명 · 바위 모양은 추정(자세한 사진 확인 부족)', '지네바위': '실제 지명(국토지리정보원 고시) · 바위 모양은 게임용(사진 확인 안 함)', '한반도바위': '실제 지명 · 사진 한 장을 참고한 단순한 모양' };
 function guide() {
   if (!state.started || busy()) return;
+  if (map.diving) { toast('잠수 중이에요. ‘물 위로’(Q)로 올라온 뒤 길을 안내할게요.'); return; } // v0.91 바닷속에선 물 밖으로 길을 내지 않아요
   tutorialEvent('guide');
   const t = targetNPC(); if (!t) { toast('이 지역의 모험을 모두 마쳤어요. 도감을 채우거나 다른 지역을 다시 둘러봐요.'); return; }
   if (t.exit) {
@@ -439,12 +444,39 @@ function giveItems(give = {}) {
 }
 function setFlag(flag) { if (flag) state.flags[flag] = true; labelKey = ''; }
 // The person or object right in front of you (not just beside you).
+// v0.87 바닷속: 바로 앞(또는 지금 칸)의 바다 생물·바위·물고기
+function seabedAhead() {
+  if (!map.diving) return null; const [dx, dy] = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[state.dir] || [0, 1], L = seabedLayout(map), t = performance.now() / 1000;
+  const hit = it => (it.foot || [[it.x, it.y]]).some(([x, y]) => (x === state.x + dx && y === state.y + dy) || (x === state.x && y === state.y));
+  const ok = i => !i.edge && (i.mon || UW_INFO[i.group]), around = it => (it.foot || [[it.x, it.y]]).some(([x, y]) => Math.max(Math.abs(x - state.x), Math.abs(y - state.y)) <= 1); // v0.91 바로 앞이 아니어도 둘레 한 칸(대각선 포함)
+  const it = L.items.find(i => ok(i) && hit(i)) || L.items.filter(i => i.mon && around(i))[0] || L.items.find(i => ok(i) && around(i)); if (it) return it.mon ? uwMonInfo(it.mon) : { ...UW_INFO[it.group], group: it.group };
+  // 헤엄치는 물고기 우산몬: 실제 자리 또는 화면에 보이는 자리(바닥에서 떠 있는 만큼 북쪽으로 보여요) 가까이면
+  const f = L.fish.find(f => { const p = fishAt(f, t), vy = p.y - (f.lift || 0) / 32 * 1.4; return Math.hypot(p.x - state.x, p.y - state.y) < 1.8 || Math.hypot(p.x - state.x, vy - state.y) < 1.6; }); return f ? uwMonInfo(f.mon) : null;
+}
+// v0.91 잠수 중 가까운 야생·친구 우산몬(바로 앞이면 ahead)
+function diveMon() {
+  const [dx, dy] = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[state.dir] || [0, 1];
+  const list = liveNPCs().filter(n => n.id === 'wild' || n.id === 'friend'), at = (n, x, y) => Math.round(n.drawX ?? n.x) === x && Math.round(n.drawY ?? n.y) === y;
+  const a = list.find(n => at(n, state.x + dx, state.y + dy)); if (a) return { n: a, ahead: true };
+  const near = list.filter(n => Math.max(Math.abs((n.drawX ?? n.x) - state.x), Math.abs((n.drawY ?? n.y) - state.y)) <= 1.2).sort((p, q) => Math.hypot(p.x - state.x, p.y - state.y) - Math.hypot(q.x - state.x, q.y - state.y))[0];
+  return near ? { n: near, ahead: false } : null;
+}
+// v0.89 바닷속에서 쉬거나 헤엄치는 바다 생물 우산몬: 살펴보면 이름·사는 곳과 그 생물 이야기 · 도감에 ‘본 우산몬’으로
+function uwMonInfo(id) {
+  const sp = getSpecies(id); if (!sp) return null;
+  return { mon: id, group: `mon${id}`, name: sp.name, lines: [`바닷속에서 ${sp.name}${/[가-힣]/.test(sp.name.slice(-1)) && (sp.name.slice(-1).charCodeAt(0) - 44032) % 28 ? '이' : '가'} 쉬고 있어요. 다가가도 싸우지 않아요.`, ...(UW_MON_NOTE[id] ? [UW_MON_NOTE[id]] : []), `${sp.group || '바다 생물'} · ${sp.area || '바다'}. 기록 확인: ${sp.recordStatus}. 모습과 능력은 게임용 창작이에요.`] };
+}
+function lookSeabed(s) { if (s.mon) { talk(s.name, s.lines, () => { if (!state.seen.includes(s.mon)) state.seen.push(s.mon); const k = `uwm:${s.mon}`; if (!state.flags[k]) { setFlag(k); const n = Object.keys(state.flags).filter(f => f.startsWith('uwm:') && state.flags[f]).length; toast(`바닷속에서 만난 우산몬 ${n}종 · 도감에 적었어요`); } updateUI(); }, '바닷속 우산몬 · 게임용 창작'); return; } talk(s.name, s.lines, () => { const k = `uw:${s.group}`; if (!state.flags[k]) { setFlag(k); const n = Object.keys(UW_INFO).filter(g => state.flags[`uw:${g}`]).length; toast(`바닷속 관찰 ${n} / ${Object.keys(UW_INFO).length}`); } }, UW_NOTE); }
 function facingNPC() { const [dx, dy] = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[state.dir] || [0, 1]; return liveNPCs().find(n => n.x === state.x + dx && n.y === state.y + dy) || null; }
 function interact(n) {
   if (!n) { // E / ‘대화’: facing a door with nobody right in front of you means going in
+    const swimmer = map.diving ? diveMon() : null; // v0.91 잠수 중에도 헤엄치는 야생·친구 우산몬과는 물 위처럼(결투·만나기)
+    if (swimmer?.ahead) { n = swimmer.n; } else {
+    const sb = !busy() && seabedAhead(); if (sb) { lookSeabed(sb); return; } // v0.87 바닷속 관찰
     const b = !busy() && doorAhead();
     if (b && !facingNPC()) { enterBuilding(b); return; }
-    n = nearestNPC(); if (!n) return;
+    if (map.diving) { if (!swimmer) return; n = swimmer.n; } // 잠수 중엔 바닷속 생물·우산몬만(물 위의 사람·안내판은 안 보여요)
+    else { n = nearestNPC(); if (!n) return; } }
   }
   if (busy()) return;
   n = liveNPCs().find(p => p.uid === n.uid) || n; npcFocus = n.uid; npcMotion.face(npcFocus, state);
@@ -531,7 +563,7 @@ function move(dx, dy, now, keepDir = false) {
   if (exitLocked(nx, ny)) { if (!move.warned || now - move.warned > 1500) { toast(lockedMessage()); move.warned = now; } return false; }
   if (dy === -1 && !keepDir) { const b = buildingDoorAt(nx, ny); if (b) { enterBuilding(b); return true; } } // walking up into a door
   const wild = roamers.at(nx, ny); if (wild?.kind === 'friend') return false; if (wild) { path = []; pathAction = null; startBattle('wild', wild.species, { roamer: wild.uid }); return false; } // 걸어 다니는 우산몬과 부딪히면 결투
-  if (blocked(map, nx, ny, liveNPCs())) { if (!move.bumped || now - move.bumped > 380) { sfx('bump'); move.bumped = now; } return false; }
+  if (blocked(map, nx, ny, liveNPCs()) || diveWall(nx, ny)) { if (!move.bumped || now - move.bumped > 380) { sfx('bump'); move.bumped = now; } if (diveWall(nx, ny) && (!move.warned || now - move.warned > 2500)) { toast('물 밖으로 나가려면 먼저 ‘물 위로’(Q)로 올라와요.'); move.warned = now; } return false; }
   moving = { fromX: state.x, fromY: state.y, toX: nx, toY: ny, start: now }; return true;
 }
 // 한 걸음: 2D에서는 누른 쪽으로, 3D 보기에서는 ‘보는 방향’을 기준으로 앞(W)·왼쪽(A)·뒤(S)·오른쪽(D) 칸으로 걸어요
@@ -656,15 +688,17 @@ window.addEventListener('keydown', e => { // 1인칭일 때는 걷기 대신 둘
 let diveWanted = false;
 function inWater() { if (map.kind === 'room') return false; return map[Math.round(view.y)]?.[Math.round(view.x)] === 0; }
 function deepWater() { if (!inWater() || map.diving) return false; return !map.shallow?.has(`${Math.round(view.x)},${Math.round(view.y)}`); } // v0.82 깊은 물: 헤엄쳐요(조금 느리게)
+// v0.91 잠수 중엔 물 밖(땅·부두·물가)이 벽처럼 막혀요 — 물 위로 올라오는 건 ‘물 위로’(Q)로만
+function diveWall(x, y) { return !!map.diving && map.kind !== 'room' && map[y]?.[x] !== 0; }
 function isDiving() { if (!inWater()) diveWanted = false; return diveWanted; }
 function toggleDive() { if (!inWater() || busy() || battle) return; diveWanted = !diveWanted; sfx('toggle'); }
-function updateDiveButton() { const b = $('#diveBtn'), show = inWater() && !battle && state.started; b.classList.toggle('hidden', !show); if (!show) return; const label = map.diving ? '⬆ 물 위로' : '🫧 잠수하기'; if (b.dataset.label !== label) { b.dataset.label = label; b.innerHTML = `${label} <small>Q</small>`; b.setAttribute('aria-label', label); } b.classList.toggle('down', !!map.diving); }
+function updateDiveButton() { const b = $('#diveBtn'), show = inWater() && !battle && state.started; b.classList.toggle('hidden', !show); if (!show) return; assetImage(UW_ATLAS.key); assetImage(UW_FLOOR.key); assetImage('scenery/uw-walls'); assetImage('monsters/dots'); /* v0.87 물에 들어가면 바닷속 그림을 미리 불러요 */ const label = map.diving ? '⬆ 물 위로' : '🫧 잠수하기'; if (b.dataset.label !== label) { b.dataset.label = label; b.innerHTML = `${label} <small>Q</small>`; b.setAttribute('aria-label', label); } b.classList.toggle('down', !!map.diving); }
 $('#diveBtn').onclick = e => { toggleDive(); e.currentTarget.blur(); };
 function paintUnderwater(g, K, now) {
   const t = now / 1000, w = sceneWidth, h = sceneHeight;
   g.save(); g.setTransform(K, 0, 0, K, 0, 0);
-  g.fillStyle = 'rgba(14,92,138,.36)'; g.fillRect(0, 0, w, h);
-  if (!in3d() && lamp) { const r0 = 3 * TILE, r1 = 9 * TILE, gr = g.createRadialGradient(lamp.x, lamp.y, r0, lamp.x, lamp.y, r1); gr.addColorStop(0, 'rgba(8,46,74,0)'); gr.addColorStop(1, 'rgba(8,46,74,.9)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); } // 2D: 물속에선 멀리 안 보여요
+  const hd = hdOn(); g.fillStyle = hd ? 'rgba(14,92,138,.2)' : 'rgba(14,92,138,.36)'; g.fillRect(0, 0, w, h); // v0.87 HD-2D 바닷속은 조금 더 밝고 멀리 보여요(안개는 WebGL이)
+  if (lamp) { const r0 = (hd ? 5 : 3) * TILE, r1 = (hd ? 15 : 9) * TILE, gr = g.createRadialGradient(lamp.x, lamp.y, r0, lamp.x, lamp.y, r1); gr.addColorStop(0, 'rgba(8,46,74,0)'); gr.addColorStop(1, hd ? 'rgba(8,46,74,.55)' : 'rgba(8,46,74,.9)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); } // 2D: 물속에선 멀리 안 보여요
   for (let i = 0; i < 5; i++) { const x = ((i * 211 + t * 14) % (w + 200)) - 100, gr = g.createLinearGradient(x, 0, x + 60, h); gr.addColorStop(0, 'rgba(210,245,255,.16)'); gr.addColorStop(1, 'rgba(210,245,255,0)'); g.fillStyle = gr; g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 34, 0); g.lineTo(x + 110, h); g.lineTo(x + 50, h); g.closePath(); g.fill(); } // 빛줄기
   g.fillStyle = 'rgba(220,250,255,.09)'; // 일렁이는 빛무늬
   for (let i = 0; i < 46; i++) { const cx = ((i * 97) % w) + Math.sin(t * 1.3 + i) * 12, cy = ((i * 53) % h) + Math.cos(t * 1.1 + i * 1.7) * 9, r = 10 + (i % 5) * 4; g.beginPath(); g.ellipse(cx, cy, r, r * .45, Math.sin(t + i) * .5, 0, Math.PI * 2); g.fill(); }
@@ -720,7 +754,7 @@ function freeBlocked(ox, oy, nx, ny, vy, now) {
     if (vy < -.3 && tx === Math.round(nx)) { const b = buildingDoorAt(tx, ty); if (b) { enterBuilding(b); return true; } }
     const wild = roamers.at(tx, ty); if (wild?.kind === 'friend') return true;
     if (wild) { path = []; pathAction = null; startBattle('wild', wild.species, { roamer: wild.uid }); return true; }
-    if (blocked(map, tx, ty, people)) return true;
+    if (blocked(map, tx, ty, people) || diveWall(tx, ty)) return true;
   }
   return false;
 }
@@ -754,7 +788,7 @@ function freeFrame(dt, now) {
   if (path.length) {
     const [tx, ty] = path[0], p = freeXY(), dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy);
     if (d <= Math.max(.04, dt / MOVE_DURATION)) {
-      if (blocked(map, tx, ty, liveNPCs()) && (tx !== state.x || ty !== state.y)) { pathBlocked(); return; }
+      if ((blocked(map, tx, ty, liveNPCs()) || diveWall(tx, ty)) && (tx !== state.x || ty !== state.y)) { pathBlocked(); return; }
       walkDistance += d * 32; freeWalking = d > 1e-4; p.x = tx; p.y = ty; view = { x: tx, y: ty }; path.shift(); freeStuck = 0;
       if (tx !== state.x || ty !== state.y) { state.x = tx; state.y = ty; landed(); }
     } else if (freeWalk(dx / d, dy / d, dt, now)) freeStuck = 0;
@@ -792,6 +826,7 @@ function landed() {
   // v0.43: 풀숲을 걸어도 갑자기 나타나지 않아요. 야생 우산몬은 길 위에서 걸어 다녀요(roamers.js).
 }
 async function changeMap(id, spawnKey = 'a', { heal = false, instant = false, dir = null } = {}) {
+  if (fp) closeFP(); // v0.86 지도를 옮기면 1인칭 보기는 닫아요
   if (!id || transition) return;
   transition = true; settleMovement(); path = []; pathAction = null; keys.clear();
   if (!instant) { scene.classList.add('map-fading'); await wait(260); }
@@ -863,7 +898,7 @@ function frame(now) {
   let keyDir = null;
   const dt = Math.max(0, Math.min(now - lastTick, 100)); lastTick = now;
   if (state.started && !document.hidden) state.playMs += dt;
-  { const d = isDiving(); if (d !== !!map.diving) { map.diving = d; if (d && !frame.dived) { frame.dived = true; toast('🫧 바닷속으로 잠수했어요! ‘물 위로’ 단추(Q)로 올라와요.'); } frame.clockText = ''; } if (now - (frame.diveAt || 0) > 150) { frame.diveAt = now; updateDiveButton(); } } // v0.72 잠수는 단추로
+  { const d = isDiving(); if (d !== !!map.diving) { map.diving = d; scene.classList.toggle('diving', d); labelKey = ''; if (d && !frame.dived) { frame.dived = true; toast('🫧 바닷속으로 잠수했어요! 생물 앞에서 E로 살펴보고, ‘물 위로’(Q)로 올라와요.'); } frame.clockText = ''; } if (now - (frame.diveAt || 0) > 150) { frame.diveAt = now; updateDiveButton(); } } // v0.72 잠수는 단추로
   // v0.69 게임 시계: 결투·컷신·타이틀 화면에서는 멈춰요. 계절이 바뀌면 알려 주고, 시각은 위치 칸에 보여요.
   if (state.started && !document.hidden && !battle && !cutscenes.active() && titleEl.classList.contains('hidden')) {
     const ev = clockTick(dt); if (ev?.season) { toast(`${SEASON_ICON[ev.season]} ${SEASON_NAME[ev.season]}이 왔어요.`); sfx('toggle'); }
@@ -891,13 +926,13 @@ function frame(now) {
       ground3d ||= document.createElement('canvas'); if (ground3d.width !== gw || ground3d.height !== gh) { ground3d.width = gw; ground3d.height = gh; }
       const g = ground3d.getContext('2d'); g.imageSmoothingEnabled = false;
       // 땅 그림은 바뀔 때만 다시 그려요(지도·계절·누른 곳 표시·잠수) — 물결·풀 흔들림은 WebGL이 그려요. 늦어도 4초마다 한 번
-      const gkey = `${map.id}|${assetTintTag()}|${target ? target.x + ',' + target.y : ''}|${map.diving ? 1 : 0}|${gw}x${gh}|${Object.keys(state.flags || {}).length}`;
-      if (gkey !== groundCache.key || now - groundCache.at > 4000) { groundCache.camera = drawWorld(g, map, state, view, now, target, motion, { width: gw, height: gh, labels: false, actors: false, seabed: map.diving }, people); groundCache.key = gkey; groundCache.at = now; groundCache.ver++; }
+      const gkey = `${map.id}|${assetTintTag()}|${target ? target.x + ',' + target.y : ''}|${map.diving ? 1 + (assetImage(UW_FLOOR.key) ? 1 : 0) : 0}|${gw}x${gh}|${Object.keys(state.flags || {}).length}`;
+      if (gkey !== groundCache.key || now - groundCache.at > 4000) { groundCache.camera = drawWorld(g, map, state, view, now, target, motion, { width: gw, height: gh, labels: false, actors: false, seabed: map.diving ? 'floor' : false }, people); groundCache.key = gkey; groundCache.at = now; groundCache.ver++; }
       camera = groundCache.camera;
       const sc = map.diving ? ['#7fd6ec', '#2c8db5', FOG] : map.kind === 'room' ? ['#3b3448', '#3b3448', '#3b3448'] : skyColors(); ctx.fillStyle = sc[2]; ctx.fillRect(0, 0, sceneWidth, sceneHeight);
       const px = view.x * TILE + 16, py = view.y * TILE + 28;
       if (fp) { fpTick(now); hdView = fpCamera(fp.ex, fp.ez, fp.eh, fp.yaw, fp.pitch, fp.fov * Math.PI / 180, sceneWidth, sceneHeight); paintFPSky(ctx, hdView); sc[2] = fp.sky.horizon; } // v0.84 1인칭 관찰
-      else hdView = hdCamera(px, py, glView.groundAt(map, px, py), 0, sceneWidth, sceneHeight);
+      else hdView = hdCamera(px, py, glView.groundAt(map, px, py), 0, sceneWidth, sceneHeight, glCanvas.height / sceneHeight);
       const L = daylight(), room = map.kind === 'room', lt = fp ? { sun: fp.sky.sun, tint: fp.sky.tint } : room ? { sun: [.42, .82, .39], tint: [1, 1, 1] } : lightFor(L);
       glView.render({ map, ground: ground3d, groundVer: groundCache.ver, view: hdView, now, people, viewPos: view, state, motion, wanted: map.kind === 'town' ? wantedRole(state.progress[state.zone] || {}) : null, seen: d => seenDir(0, d), fogColor: sc[2], seaColor: map.diving ? '#1d6f96' : '#3d8fc4', sun: lt.sun, tint: map.diving ? [.72, .9, 1.05] : lt.tint, night: fp ? fp.sky.night : room ? 0 : L.night, light: fp ? fp.sky.light : room ? .5 : Math.max(0, 1 - (L.night || 0)), post: !fp, glit: !!fp?.sky.glit, glitCol: fp?.sky.glitCol, season: currentSeason(), quality: gfxQ });
       nightLamps = !room && L.night > .05 ? (glView.info.lamps || []).map(([x, h, z]) => hdView.project(x, z, h)).filter(Boolean).map(p => ({ x: p.x, y: p.y, r: 64 * p.k })) : [];
@@ -907,7 +942,7 @@ function frame(now) {
       glCanvas.hidden = true; setPixelSnap(true); nightLamps = [];
       camera = drawWorld(ctx, map, state, view, now, target, motion, { width: sceneWidth, height: sceneHeight, labels: false, actors: false, seabed: map.diving }, people);
       actorCtx.scale(K, K); actorCtx.translate(-camera.x, -camera.y);
-      drawActors(actorCtx, state, view, now, motion, people, map);
+      drawActors(actorCtx, state, view, now, motion, map.diving ? people.filter(n => !n.actor) : people, map); // v0.87 바닷속엔 사람이 없어요
       lamp = { x: view.x * TILE + 16 - camera.x, y: view.y * TILE + 8 - camera.y, r: 120 };
       if (map.kind !== 'room') paintMiniMap(now, people); else if (miniMap) miniMap.hidden = true; // v0.68: 2D에서도 작은 지도
     }
@@ -920,9 +955,10 @@ function frame(now) {
   music(musicFor());
   if (state.started && !document.hidden && now - (frame.legendAt || 0) > 700) { frame.legendAt = now; checkLegends(); }
   if (avatarChoice) $$('canvas[data-explorer-sprite]').forEach(c => paintExplorerCard(c, c.dataset.explorerSprite, now, avatarChoice.selected === c.dataset.explorerSprite));
-  const door = !busy() && !facingNPC() && doorAhead(), n = !door && !busy() && nearestNPC(); $('#interactionPrompt').classList.toggle('hidden', !n && !door);
+  const door = !busy() && !facingNPC() && doorAhead(), sb = !door && !busy() && seabedAhead(), n = !door && !sb && !busy() && !map.diving && nearestNPC(); $('#interactionPrompt').classList.toggle('hidden', !n && !door && !sb);
+  if (sb) $('#interactionPrompt').textContent = `${matchMedia('(pointer:coarse)').matches ? '대화' : 'E'} · ${sb.name} 살펴보기`;
   if (door) $('#interactionPrompt').textContent = `${matchMedia('(pointer:coarse)').matches ? '대화' : 'E'} · ${door.name} 들어가기${map.def.island !== '울릉도' && ['gym', 'lab', 'shop', 'home'].includes(door.kind) ? ' · 이야기 시설' : ''}`; // v0.82 독도의 수호관·연구소·상점·집은 창작 시설
-  else if (n) $('#interactionPrompt').textContent = `${matchMedia('(pointer:coarse)').matches ? '대화' : 'E'} · ${n.name}`;
+  else if (n && !sb) $('#interactionPrompt').textContent = `${matchMedia('(pointer:coarse)').matches ? '대화' : 'E'} · ${n.name}`;
   requestAnimationFrame(frame);
 }
 
@@ -1465,46 +1501,46 @@ function dexDetail(id, filter, view = 'dot') {
 }
 // ── 세계 지도: 두 섬을 그린 그림 지도. 가 본 마을을 누르면 바로 이동해요. ──
 // 자리(320×200 지도 칸)는 실제 지명의 대략적인 방향을 따랐어요. 섬 모양은 게임용 그림이에요.
-const WORLD_SPOTS = {
-  town0: [26, 24], town1: [222, 98], town2: [252, 116], town3: [148, 70], town4: [118, 16], town5: [52, 102], town6: [76, 64], town7: [110, 96]
-};
-const ROUTE_LABEL = { route0: [206, 150] };
-const ROUTE_BENDS = { route0: [[30, 60], [18, 186], [170, 190], [204, 146]], route1: [[246, 80]], route2: [[170, 152], [150, 112]], route3: [[136, 40]], route4: [[62, 36]], route6: [[90, 82]] };
+// v0.86 세계 지도: 국토지리정보원 독도 지명 고시 좌표로 섬 모양·지명 자리를 그려요(울릉도만 왼쪽 위에 작게).
+//   [이름, 경도 초(131°51′40″부터), 위도 초(37°14′20″부터)] — 1초 ≈ 동서 24.6m · 남북 30.9m
+const DOKDO_NAMES = [['우산봉', 30.4, 6.8], ['대한봉', 14.6, 10.6], ['탕건봉', 15.9, 16.8], ['물골', 11.9, 13.0], ['천장굴', 30.3, 4.5], ['큰가제바위', 9.9, 29.9], ['작은가제바위', 11.6, 28.6], ['지네바위', 7.3, 16.6], ['넙덕바위', 2.5, 8.6], ['군함바위', 5.1, 10.3],
+  ['김바위', 18.1, 16.8], ['보찰바위', 2.4, 2.6], ['삼형제굴바위', 22.6, 13.1], ['닭바위', 27.2, 8.8], ['춧발바위', 29.8, -2.8], ['촛대바위', 22.1, 8.0], ['미역바위', 20.8, 8.4], ['물오리바위', 39.9, 4.5], ['숫돌바위', 24.3, 1.4],
+  ['부채바위', 24.6, -0.5], ['얼굴바위', 32.1, 0.6], ['독립문바위', 38.4, 3.9], ['한반도바위', 34.5, 6.2], ['코끼리바위', 7.2, 6.1], ['해녀바위', 27.8, -1.8], ['전차바위', 30.2, -0.8]];
+const wmM = ([lo, la]) => [lo * 24.57, la * 30.87], wmPx = ([mx, my]) => [Math.round(104 + mx * .17), Math.round(193 - (my + 124) * .17)];
+const WM_SIDE = { town1: 'l', town2: 'r', town3: 'r', town4: 'l', town5: 'l', town6: 'l', town7: 'r' }; // 가까운 마을끼리 이름표가 겹치지 않게 옆으로
+const WM_AT = Object.fromEntries(DOKDO_NAMES.map(([n, lo, la]) => [n, wmPx(wmM([lo, la]))]));
+// 섬 둘레(미터, 고시 좌표의 바위·봉우리를 둘러 그린 대략 모양)
+const WM_ISLANDS = [{ name: '서도', peak: '대한봉', poly: [[230, 190], [300, 165], [390, 170], [460, 200], [495, 260], [500, 330], [470, 400], [440, 470], [420, 540], [380, 555], [345, 520], [320, 470], [285, 420], [255, 370], [230, 300], [215, 240]] },
+  { name: '동도', peak: '우산봉', poly: [[610, 40], [640, -20], [700, -60], [735, -80], [780, -10], [840, 40], [900, 80], [935, 120], [900, 170], [840, 215], [780, 260], [700, 275], [650, 240], [615, 170], [600, 100]] }];
+const WORLD_SPOTS = { town0: [26, 24], town1: WM_AT['우산봉'], town2: WM_AT['한반도바위'], town3: WM_AT['탕건봉'], town4: wmPx(wmM([13.5, 19.6])), town5: wmPx(wmM([9.2, 7.0])), town6: WM_AT['물골'], town7: WM_AT['대한봉'] };
+const ROUTE_SPOTS = { route0: WM_AT['숫돌바위'], route1: WM_AT['천장굴'], route2: WM_AT['독립문바위'], route3: WM_AT['촛대바위'], route4: WM_AT['보찰바위'], route5: WM_AT['군함바위'], route6: wmPx(wmM([13.2, 11.8])) };
+const ROUTE_BENDS = { route0: [[30, 60], [44, 170]] };
 function drawWorldMap(c) {
   const g = c.getContext('2d'), W = c.width, H = c.height; g.imageSmoothingEnabled = false;
   const img = g.createImageData(W, H), px = img.data;
   const rnd = (x, y) => { const v = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return v - Math.floor(v); };
-  const islands = [{ cx: 98, cy: 82, rx: 66, ry: 60, peak: [110, 92] }, { cx: 222, cy: 112, rx: 46, ry: 40, peak: [222, 100] }];
+  const isl = WM_ISLANDS.map(s => ({ ...s, pts: s.poly.map(wmPx), pk: s.peak && DOKDO_NAMES.find(n => n[0] === s.peak) && WM_AT[s.peak] }));
+  const inside = (pts, x, y) => { let o = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const [xi, yi] = pts[i], [xj, yj] = pts[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) o = !o; } return o; };
+  const edge = (pts, x, y) => { let d = 1e9; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const [ax, ay] = pts[j], [bx, by] = pts[i], vx = bx - ax, vy = by - ay, t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / (vx * vx + vy * vy || 1))); d = Math.min(d, Math.hypot(x - ax - vx * t, y - ay - vy * t)); } return d; };
   const set = (i, c) => { px[i] = c[0]; px[i + 1] = c[1]; px[i + 2] = c[2]; px[i + 3] = 255; };
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const i = (y * W + x) * 4; let land = -1, isl = null;
-    for (const s of islands) {
-      const dx = (x - s.cx) / s.rx, dy = (y - s.cy) / s.ry, ang = Math.atan2(dy, dx);
-      const r = 1 + .12 * Math.sin(ang * 5 + s.cx) + .07 * Math.sin(ang * 11 + s.cy) + .05 * (rnd(Math.round(ang * 30), s.cx) - .5);
-      const d = 1 - Math.hypot(dx, dy) / r; if (d > land) { land = d; isl = s; }
-    }
-    // v0.39 선명한 외곽선 도트 느낌: 밝고 평평한 색, 섬 둘레 진한 선과 흰 물거품
+    const i = (y * W + x) * 4; let land = -1, at = null;
+    for (const s of isl) { const e = edge(s.pts, x + .5, y + .5) + (rnd(x >> 1, y >> 1) - .5) * .7, d = (inside(s.pts, x + .5, y + .5) ? e : -e) / 25; if (d > land) { land = d; at = s; } }
     if (land < 0) {
       const wave = (x % 14 < 5) && (y + (x >> 3) * 3) % 11 === 0 && rnd(x >> 4, y) > .45;
-      if (land > -.016) set(i, [43, 38, 34]);                      // outline
-      else if (land > -.04) set(i, [255, 255, 255]);               // surf
-      else if (land > -.1) set(i, [142, 212, 239]);                // shallows
-      else set(i, wave ? [166, 220, 242] : [74, 169, 216]);        // open sea with little wave marks
+      if (land > -.03) set(i, [43, 38, 34]); else if (land > -.07) set(i, [255, 255, 255]); else if (land > -.16) set(i, [142, 212, 239]); else set(i, wave ? [166, 220, 242] : [74, 169, 216]);
       continue;
     }
-    const pk = Math.hypot(x - isl.peak[0], y - isl.peak[1]) / 30;
-    if (land < .03) set(i, [108, 85, 71]);                                                   // cliff foot
-    else if (land < .07) set(i, (x + y) % 5 === 0 ? [142, 112, 90] : [155, 125, 101]);       // cliffs
-    else if (land < .085) set(i, [95, 158, 71]);                                             // grass edge line
-    else if (pk < .3) set(i, (x * 3 + y) % 7 === 0 ? [142, 112, 90] : [179, 160, 138]);       // rocky peak
-    else if (pk < .36) set(i, [108, 85, 71]);
-    else set(i, (x * 7 + y * 3) % 23 === 0 ? [108, 179, 80] : [143, 209, 106]);             // bright grass with tufts
+    const pk = at.pk ? Math.hypot(x - at.pk[0], y - at.pk[1]) / 12 : 9;
+    if (land < .05) set(i, [108, 85, 71]); else if (land < .1) set(i, (x + y) % 5 === 0 ? [142, 112, 90] : [155, 125, 101]); else if (land < .12) set(i, [95, 158, 71]);
+    else if (pk < .35) set(i, (x * 3 + y) % 7 === 0 ? [142, 112, 90] : [179, 160, 138]); else if (pk < .45) set(i, [108, 85, 71]);
+    else set(i, (x * 7 + y * 3) % 23 === 0 ? [108, 179, 80] : [143, 209, 106]);
   }
-  // little rocks around the islands
-  for (const [x, y, r] of [[20, 150, 3], [28, 158, 2], [180, 30, 3], [290, 160, 3], [300, 150, 2], [170, 180, 2], [140, 172, 3], [280, 60, 2], [44, 20, 2]])
-    for (let yy = -r - 1; yy <= r + 1; yy++) for (let xx = -r - 1; xx <= r + 1; xx++) { const d = xx * xx + yy * yy; if (d <= r * r) set(((y + yy) * W + x + xx) * 4, xx + yy < 0 ? [179, 160, 138] : [124, 99, 80]); else if (d <= (r + 1) * (r + 1)) set(((y + yy) * W + x + xx) * 4, [43, 38, 34]); }
+  // 고시된 바위(섬 밖에 있는 것)는 작은 바위 점으로
+  for (const [n] of DOKDO_NAMES) { const [x, y] = WM_AT[n]; if (isl.some(s => inside(s.pts, x, y)) || /봉$|물골|천장굴/.test(n)) continue; const r = /가제|군함/.test(n) ? 2 : 1;
+    for (let yy = -r - 1; yy <= r + 1; yy++) for (let xx = -r - 1; xx <= r + 1; xx++) { const d = xx * xx + yy * yy, k = ((y + yy) * W + x + xx) * 4; if (k < 0 || k >= px.length) continue; if (d <= r * r) set(k, xx + yy < 0 ? [179, 160, 138] : [124, 99, 80]); else if (d <= (r + 1) * (r + 1)) set(k, [43, 38, 34]); } }
   g.putImageData(img, 0, 0);
-  // 울릉도 (작게 줄인 그림): 왼쪽 위 네모 안. 실제로는 독도에서 서북쪽으로 약 87.4km 떨어져 있어요.
+  // 울릉도 (작게 줄인 그림): 왼쪽 위 네모 안. 실제로는 독도에서 서북서쪽으로 약 87.4km 떨어져 있어요.
   g.fillStyle = '#2b2622'; g.fillRect(0, 0, 66, 48); g.fillStyle = '#4aa9d8'; g.fillRect(2, 2, 62, 44); g.fillStyle = '#ffffff'; g.fillRect(2, 2, 62, 1);
   g.fillStyle = '#2b2622'; g.beginPath(); g.ellipse(28, 24, 22, 17, -.3, 0, Math.PI * 2); g.fill();
   g.fillStyle = '#9b7d65'; g.beginPath(); g.ellipse(28, 24, 21, 16, -.3, 0, Math.PI * 2); g.fill();
@@ -1512,32 +1548,32 @@ function drawWorldMap(c) {
   g.fillStyle = '#78ad5c'; g.beginPath(); g.ellipse(25, 20, 10, 7, -.3, 0, Math.PI * 2); g.fill();
   g.fillStyle = '#2f5e3e'; g.fillRect(25, 18, 4, 3);
   g.fillStyle = '#ffffff'; g.fillRect(36, 34, 4, 2);
-  // the walking routes between towns (and the ferry)
+  // 마을 → 길(대표 바위 자리) → 다음 마을을 잇는 점선(섬 사이는 배)
   const towns = MAPS.filter(m => m.kind === 'town');
   g.lineWidth = 2; g.setLineDash([3, 3]);
   towns.slice(0, -1).forEach((t, i) => {
     const route = `route${i}`, a = WORLD_SPOTS[t.id], b = WORLD_SPOTS[`town${i + 1}`];
     const walked = state.visited.includes(i + 1);
     g.strokeStyle = map.id === route ? '#ffe28a' : walked ? '#fff6dc' : '#ffffff88';
-    g.beginPath(); g.moveTo(...a); for (const p of ROUTE_BENDS[route] || []) g.lineTo(...p); g.lineTo(...b); g.stroke();
+    g.beginPath(); g.moveTo(...a); for (const p of ROUTE_BENDS[route] || []) g.lineTo(...p); if (ROUTE_SPOTS[route]) g.lineTo(...ROUTE_SPOTS[route]); g.lineTo(...b); g.stroke();
   });
   g.setLineDash([]);
 }
 function showMap() {
   const towns = MAPS.filter(m => m.kind === 'town'), routes = MAPS.filter(m => m.kind === 'route');
   const pct = ([x, y]) => `left:${Math.min(92, Math.max(8, x / 320 * 100)).toFixed(2)}%;top:${Math.min(87, Math.max(13, y / 200 * 100)).toFixed(2)}%`; // markers stay inside the picture
-  const routeSpot = r => { const a = WORLD_SPOTS[`town${r.zone}`], b = WORLD_SPOTS[`town${r.zone + 1}`], bend = ROUTE_LABEL[r.id] || ROUTE_BENDS[r.id]?.[0]; return bend || [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; };
+  const routeSpot = r => ROUTE_SPOTS[r.id] || WORLD_SPOTS[`town${r.zone}`];
   const townMarks = towns.map((t, i) => {
     const visited = state.visited.includes(t.zone), here = (map.def.town || map.id) === t.id, badge = state.badges.includes(t.zone);
     const status = here ? '지금 여기' : visited ? '눌러서 바로 이동' : '아직 가 보지 않은 곳';
-    return `<button class="wm-town ${here ? 'here' : ''} ${visited ? 'visited' : 'locked'}" style="${pct(WORLD_SPOTS[t.id])}" data-zone="${t.zone}" ${!visited || here ? 'disabled' : ''} aria-label="${esc(t.name)} · ${status}"><i>${here ? '★' : visited ? (badge ? '✓' : ZONES[t.zone].icon) : '?'}</i><span>${String(i + 1).padStart(2, '0')} ${esc(visited ? t.name : '???')}</span></button>`;
+    return `<button class="wm-town ${WM_SIDE[t.id] || ''} ${here ? 'here' : ''} ${visited ? 'visited' : 'locked'}" style="${pct(WORLD_SPOTS[t.id])}" data-zone="${t.zone}" ${!visited || here ? 'disabled' : ''} aria-label="${esc(t.name)} · ${status}"><i>${here ? '★' : visited ? (badge ? '✓' : ZONES[t.zone].icon) : '?'}</i><span>${String(i + 1).padStart(2, '0')} ${esc(visited ? t.name : '???')}</span></button>`;
   }).join('');
   const routeMarks = routes.map(r => `<span class="wm-route ${map.id === r.id ? 'here' : ''}" style="${pct(routeSpot(r))}">${map.id === r.id ? '★ ' : ''}${esc(state.visited.includes(r.zone + 1) || map.id === r.id ? r.name : '…')}</span>`).join('');
   openModal(head('울릉도·독도 탐험 지도', '실제 지명 · 마을과 길은 게임 속 창작') + `<p>가 본 마을을 누르면 바로 이동해요(동료도 회복). 처음 가는 곳은 점선 길을 따라 걸어가요.</p>
-    <div class="world-map"><canvas id="worldMapArt" width="320" height="200" aria-hidden="true"></canvas><span class="wm-island small" style="left:10%;top:27%">울릉도</span><span class="wm-ferry" style="left:6%;top:64%">⛴ 약 87.4km</span><span class="wm-island" style="left:28%;top:94%">서도</span><span class="wm-island" style="left:70%;top:94%">동도</span><span class="wm-compass" aria-hidden="true">N<br>▲</span>${routeMarks}${townMarks}</div>
+    <div class="world-map"><canvas id="worldMapArt" width="320" height="200" aria-hidden="true"></canvas><span class="wm-island small" style="left:10%;top:27%">울릉도</span><span class="wm-ferry" style="left:6%;top:64%">⛴ 약 87.4km</span><span class="wm-island" style="left:51%;top:66%">서도</span><span class="wm-island" style="left:75%;top:82%">동도</span>${DOKDO_NAMES.map(([n]) => `<span class="wm-name" style="${pct(WM_AT[n])}">${esc(n)}</span>`).join('')}<span class="wm-compass" aria-hidden="true">N<br>▲</span>${routeMarks}${townMarks}</div>
     <div class="wm-legend"><span><i class="here">★</i> 지금 여기</span><span><i class="visited">✓</i> 인증 받은 마을</span><span><i class="visited">≈</i> 가 본 마을</span><span><i class="locked">?</i> 아직 못 가 본 곳</span></div>
-    <p class="footer-note">지명은 실제 울릉도·독도의 이름이고 대략적인 방향을 따랐지만, 섬 모양·마을·건물은 게임용 그림이에요. 울릉도는 실제로 훨씬 크고 멀리(약 87.4km) 있어서 왼쪽 위에 작게 줄여 그렸어요.</p>`, () => {
-    drawWorldMap($('#worldMapArt'));
+    <button class="text-button wm-names-btn" id="wmNames">📍 고시된 독도 지명 ${DOKDO_NAMES.length}곳 보기</button><p class="footer-note">독도의 섬 모양과 지명 자리는 국토지리정보원 독도 지명 고시 좌표를 따랐어요(섬 둘레는 대략). 마을·건물·길은 게임 속 창작이에요. 울릉도는 실제로 훨씬 크고 멀리(약 87.4km) 있어서 왼쪽 위에 작게 줄여 그렸어요.</p>`, () => {
+    drawWorldMap($('#worldMapArt')); $('#wmNames').onclick = e => { const on = $('.world-map').classList.toggle('show-names'); e.currentTarget.textContent = on ? '📍 지명 숨기기' : `📍 고시된 독도 지명 ${DOKDO_NAMES.length}곳 보기`; };
     $$('[data-zone]').forEach(b => b.onclick = () => travel(Number(b.dataset.zone)));
   });
 }
@@ -1680,7 +1716,7 @@ if (typeof location !== 'undefined' && new URLSearchParams(location.search).has(
     get longestQuestion() { return QUESTIONS.reduce((m, q) => (q.prompt.length + q.options.join('').length + q.explanation.length > m.prompt.length + m.options.join('').length + m.explanation.length ? q : m)); },
     set forceQuestion(q) { testQuestion = q; }, questionById: id => QUESTIONS.find(q => q.id === id), closeBattleForTest: () => { if (battle) closeBattle(); },
     screenOf(x, y) { const r = canvas.getBoundingClientRect(), p = toScreen(x * TILE + 16, y * TILE + 16); return { x: r.left + p.x * sceneScale, y: r.top + p.y * sceneScale }; },
-    get view3d() { return hdOn(); }, get fp() { return fp ? { name: fp.name, mode: fp.mode, yaw: fp.yaw, pitch: fp.pitch, fov: fp.fov, phase: fp.phase } : null; }, startFirstPerson, closeFP, setView3d, get look() { return { yaw, pitch }; }, setGL, get gl() { return { wanted: !force2D, mode: hdOn() ? 'hd' : '2d', ...(glView?.info || {}) }; }, setQuality, get quality() { return gfxQ; }, setWeather: v => setWeather(v), get pos() { return { x: view.x, y: view.y }; }, setLook(y, p = 0) { yaw = y; pitch = clampPitch(p); }, setHand, setClock: ms => setClock(ms), get diving() { return !!map.diving; }, toggleDive, get inWater() { return inWater(); }, get clock() { return { ms: gameClock(), hour: daylight().hour, night: isNight(), day: DAY_MS, weather: weatherNow() }; }, get music() { return musicFor(); }, setSeason: v => { const r = setSeason(v); updateUI(); return r; }, get season() { return currentSeason(); },
+    get view3d() { return hdOn(); }, seabed: () => seabedLayout(map), seabedAhead, get fp() { return fp ? { name: fp.name, mode: fp.mode, yaw: fp.yaw, pitch: fp.pitch, fov: fp.fov, phase: fp.phase } : null; }, startFirstPerson, closeFP, setView3d, get look() { return { yaw, pitch }; }, setGL, get gl() { return { wanted: !force2D, mode: hdOn() ? 'hd' : '2d', ...(glView?.info || {}) }; }, setQuality, get quality() { return gfxQ; }, setWeather: v => setWeather(v), get pos() { return { x: view.x, y: view.y }; }, setLook(y, p = 0) { yaw = y; pitch = clampPitch(p); }, setHand, setClock: ms => setClock(ms), get diving() { return !!map.diving; }, toggleDive, get inWater() { return inWater(); }, get clock() { return { ms: gameClock(), hour: daylight().hour, night: isNight(), day: DAY_MS, weather: weatherNow() }; }, get music() { return musicFor(); }, setSeason: v => { const r = setSeason(v); updateUI(); return r; }, get season() { return currentSeason(); },
     standAtDoor(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b); settleMovement(); freePos = null; state.x = f.x; state.y = f.y; view = { x: f.x, y: f.y }; state.dir = 'up'; return f; },
     goInside(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b), p = pathfind(map, state.x, state.y, f.x, f.y, liveNPCs()); if (state.x === f.x && state.y === f.y) enterBuilding(b); else { path = p; pathAction = () => enterBuilding(b); } return p.length; },
     legendRadio: false, dexDetail, showDex, showQuest, checkLegends, place(x, y, dir = 'right') { settleMovement(); freePos = null; path = []; state.x = x; state.y = y; view = { x, y }; state.dir = dir; },

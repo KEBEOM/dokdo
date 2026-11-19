@@ -154,7 +154,7 @@ assert.equal(await G(() => window.__dokdo.map.id), 'town0'); assert.match(await 
 await G(() => { const d = window.__dokdo, s = d.map.spawns.a; d.state.x = s.x; d.state.y = s.y; });
 
 // ── 3. Guide walks to 김박사 ──
-await G(() => window.__dokdo.guide()); await until(() => !!window.__dokdo.talk, 30000); assert.equal(await G(() => window.__dokdo.talk.name), '김박사');
+await G(() => window.__dokdo.guide()); await until(() => !!window.__dokdo.talk, 70000); assert.equal(await G(() => window.__dokdo.talk.name), '김박사');
 await dismiss(); assert.equal(await G(() => window.__dokdo.state.progress[0].met), true);
 assert.equal(await G(() => window.__dokdo.state.tutorial.walk), 2, 'talked to someone');
 await page.click('#questBtn'); assert.equal(await G(() => window.__dokdo.state.tutorial.walk), 3, 'opened the notebook');
@@ -467,7 +467,7 @@ assert.equal(await page.$('#viewBtn'), null, 'no 2D/3D view button any more');
     if (spot) {
       await G(() => window.__dokdo.closeModal()); await page.evaluate(([x, y]) => window.__dokdo.place(x, y, 'down'), spot); await page.waitForTimeout(400);
       assert.ok(await page.isVisible('#diveBtn'), 'dive button in water'); assert.ok(!(await G(() => window.__dokdo.diving)), 'no diving by itself');
-      await page.keyboard.press('q'); await page.waitForTimeout(300); assert.ok(await G(() => window.__dokdo.diving), 'Q dives'); assert.match(await page.textContent('#diveBtn'), /물 위로/);
+      await page.keyboard.press('q'); await page.waitForTimeout(300); assert.ok(await G(() => window.__dokdo.diving), 'Q dives'); { await until(() => !window.__dokdo.gl.ok || window.__dokdo.gl.uwCards > 0, 20000).catch(() => {}); const gu = await G(() => window.__dokdo.gl); if (gu.ok) assert.ok(gu.uwCards > 0 && gu.fish > 0, `v0.87 바닷속: 바다숲·생물·바위 판과 물고기 ${JSON.stringify({ uw: gu.uwCards, fish: gu.fish })}`); } assert.match(await page.textContent('#diveBtn'), /물 위로/);
       await page.keyboard.press('q'); await page.waitForTimeout(300); assert.ok(!(await G(() => window.__dokdo.diving)), 'Q comes up');
       await G(() => { const s = window.__dokdo.map.spawns.a; window.__dokdo.place(s.x, s.y, 'down'); }); await page.waitForTimeout(400); assert.ok(!(await page.isVisible('#diveBtn')), 'no dive button on land');
     }

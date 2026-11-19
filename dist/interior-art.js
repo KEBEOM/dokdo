@@ -1,4 +1,5 @@
 // 건물 안 그림: 바닥·벽·문·계단과 가구를 2픽셀 도트로 그립니다 (그림 파일 없이 코드로).
+import { drawPackFurniture } from './furniture.js';
 const T = 32;
 const THEME = {
   shop: { wall: '#f0e2c8', trim: '#8a5a3a', rug: ['#b5533c', '#d7745a', '#f1c27d'] },
@@ -89,6 +90,7 @@ function outlineFor(kind, opts) {
   outlineCache.set(key, o); return o;
 }
 export function drawFurniture(ctx, kind, x, y, time = 0, opts = {}) {
+  if (opts.map && drawPackFurniture(ctx, opts.map, kind, x, y, { ...opts, time })) return; // v0.88 가구 팩 그림(같은 가구 칸을 묶어 한 장)
   const o = kind !== 'window' && outlineFor(kind, opts);
   if (o) ctx.drawImage(o, x * T - 2, y * T - 2 * T);
   drawFurnitureRaw(ctx, kind, x, y, time, opts);

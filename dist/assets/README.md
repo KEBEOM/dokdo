@@ -23,3 +23,6 @@
 ## 배경
 - `scenery/terrain-bw-v39.png`(지형 타일), `scenery/props-bw-v39.png`(지도 소품), `scenery/island-art-v36.png`(건물·나무), `scenery/cutscene-art-v47.png`(컷신 배경) 등.
 - 각 그림은 `scripts/draw-*.py`로 다시 만들 수 있고, 자리 좌표는 `dist/*-atlas.js`에 있어요.
+- `scenery/furniture-atlas.png` (v0.88): 「가구·표지판·해안 벽 확장팩」 가구 16·빈 안내판 4·항구 소품 4 (1배 크기 + 1px 테두리). `dist/furniture-atlas.js`의 `FURN_ATLAS`.
+- `scenery/region-atlas.png` (v0.88): 「울릉도·독도 지상·수중 v2」 지역 그림 12. 지금은 동도 등대(관찰용 외관)만 써요. `REGION_ATLAS`.
+- `scenery/uw-walls.png` (v0.88): 바닷속 항구 콘크리트 안벽·자연 암벽 재질 2장(팩 벽 그림에서 잘라 128×128). `UW_WALLS`.

@@ -1,6 +1,13 @@
 import {getSpecies} from './data.js';
-import {drawAsset,monsterAssetKey,assetStatus} from './assets.js';
+import {drawAsset,monsterAssetKey,assetStatus,assetImage} from './assets.js';
+import {MONSTER_DOTS} from './monster-dots.js';
 // Pending or failed assets never display the retired monster design.
+// v0.91 지도용 우산몬: 원래 도트를 정수 배로 키운 그림을 1:1로(512 그림을 44px로 줄이면 도트가 빠지거나 굵기가 들쭉날쭉해요). 자리·크기는 drawMonster(…, size)와 같은 상자 기준
+export const fieldMonsterFrame=id=>MONSTER_DOTS.frames[monsterAssetKey(id).slice(9)]||null;
+export function drawMonsterField(ctx,id,x,y,size=44,t=0){
+ const f=fieldMonsterFrame(id),img=f&&assetImage(MONSTER_DOTS.key);if(!img)return drawMonster(ctx,id,x,y,size,t);
+ const k=size/512,cx=Math.round(x+f[5]*k),fy=Math.round(y+f[6]*k);ctx.save();ctx.imageSmoothingEnabled=false;ctx.drawImage(img,f[0],f[1],f[2],f[3],cx-Math.floor(f[2]/2),fy-f[3],f[2],f[3]);ctx.restore();return true;
+}
 export function drawMonster(ctx,id,x,y,size=64,t=0,back=false){
  const key=monsterAssetKey(id);if(drawAsset(ctx,key,x,y,size))return true;
  ctx.save();ctx.fillStyle=assetStatus(key)==='failed'?'#ad8060':'#789b93';

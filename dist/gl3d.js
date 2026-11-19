@@ -32,13 +32,20 @@
 import { buildingKit, buildingBox } from './box3d.js';
 import { LEVEL_H, cliffWalls, cliffTextures, shoreWalls, shoreTextures } from './heights.js';
 import { V2_TERRAIN } from './tileset-v2.js';
-import { assetImage, assetTintTag } from './assets.js';
+import { assetImage, assetTintTag, monsterAssetKey } from './assets.js';
+import { facing, fieldMonsterFrame } from './sprites.js';
+import { MONSTER_DOTS } from './monster-dots.js';
 import { sceneDrawOrder, paintActor, buildingArt, PROP_KINDS, doorColumns } from './world.js';
 import { HD2D_ATLAS, HD2D_TEXTURES } from './hd2d-atlas.js';
 import { HD2D_GROUND, HD2D_TREES } from './hd2d-nature.js';
 import { TILE_CODES as TC } from './maps.js';
 import { glbModel, GLB_SURF, GLB_MODELS as GLB_MODELS_META } from './glb-models.js';
 import { STORY_ATLAS, INTERIOR_HD } from './story-atlas.js';
+import { UW_ATLAS } from './uw-atlas.js';
+import { FURN_ATLAS, UW_WALLS, REGION_ATLAS } from './furniture-atlas.js';
+import { furnitureGroups, pieceSize } from './furniture.js';
+import { seabedLayout, fishAt, uwBlock, uwQuay } from './seabed.js';
+const UW_FLOOR_H = -58, UW_CEIL_H = -3; // v0.87 바닷속: 바닥 높이 · 섬 밑동·안벽 윗면(물낯 바로 아래)
 
 const T = 32, WATER = -6;
 // HD-2D 시점: 내려다보는 각도(라디안) · 카메라 거리 · 세로 화각 · 판 기울기
@@ -172,8 +179,8 @@ const FS_POST = `precision mediump float; uniform sampler2D uScene, uSmall; unif
 void main(){
   vec4 s = texture2D(uScene, vUV);
   vec2 o = uTexel; vec4 b = texture2D(uSmall, vUV) * .36 + (texture2D(uSmall, vUV + vec2(o.x, 0.0)) + texture2D(uSmall, vUV - vec2(o.x, 0.0)) + texture2D(uSmall, vUV + vec2(0.0, o.y)) + texture2D(uSmall, vUV - vec2(0.0, o.y))) * .16;
-  float dof = smoothstep(.16, .52, abs(vUV.y - uFocus)) * uDof;
-  vec3 c = mix(s.rgb, b.rgb, dof * .9);
+  float dof = smoothstep(.3, .62, abs(vUV.y - uFocus)) * uDof; /* v0.91 내 둘레(가까운 우산몬·물건)는 또렷하게, 화면 끝만 흐리게 */
+  vec3 c = mix(s.rgb, b.rgb, dof * .7);
   c += max(b.rgb - .6, 0.0) * 1.5 * uLight;                                            // 블룸
   c = c * vec3(1.04, 1.01, .95) + vec3(.01, .006, 0.0);                                 // 따뜻한 색
   float sh = pow(.5 + .5 * sin((vUV.x * 1.2 - vUV.y * .8) * 8.0 + uTime * .15), 10.0);   // 빛줄기(비스듬한 띠)
@@ -194,11 +201,13 @@ export function chaseView(cam, P) {
   return { M, eye: [cam.x, eye, cam.y], right: [cam.rx, 0, cam.ry], fwd: [cam.fx, cam.fy], tilt: 0, hd: false, W, H };
 }
 // HD-2D 시점: (tx, ty) 높이 th 를 비스듬히 내려다봐요. project·unproject 는 화면(장면 픽셀) ↔ 지도
-export function hdCamera(tx, ty, th, yaw, W, H) {
+export function hdCamera(tx, ty, th, yaw, W, H, pxScale = 1) { // pxScale: 이 장면 1단위가 그림판(캔버스) 몇 px인지
   const s = Math.sin(yaw), c = Math.cos(yaw), cp = Math.cos(HD.pitch), sp = Math.sin(HD.pitch);
   const f = [s * cp, -sp, -c * cp], r = [c, 0, s], u = [s * sp, cp, -c * sp], tgt = [tx, th + 22, ty];
-  const eye = [tgt[0] - f[0] * HD.dist, tgt[1] - f[1] * HD.dist, tgt[2] - f[2] * HD.dist];
-  const t = Math.tan(HD.fov / 2), sy = 1 / t, sx = sy * H / W, near = 20, far = 7000, A = (far + near) / (far - near), Bn = -2 * far * near / (far - near);
+  // v0.91 도트가 고르게: 내 캐릭터 자리에서 지도 1px이 화면 정수 px(1·2·3…)이 되게 카메라 거리를 살짝 맞춰요(굵기가 들쭉날쭉하지 않게)
+  const t = Math.tan(HD.fov / 2), sy = 1 / t, px0 = H / 2 * sy / HD.dist * pxScale, pxk = Math.max(1, Math.round(px0)), dist = H / 2 * sy * pxScale / pxk;
+  const eye = [tgt[0] - f[0] * dist, tgt[1] - f[1] * dist, tgt[2] - f[2] * dist];
+  const sx = sy * H / W, near = 20, far = 7000, A = (far + near) / (far - near), Bn = -2 * far * near / (far - near);
   const tr = -dot3(r, eye), tu = -dot3(u, eye), tfw = -dot3(f, eye);
   const M = rowsToMat([sx * r[0], sx * r[1], sx * r[2], sx * tr], [sy * u[0], sy * u[1], sy * u[2], sy * tu], [A * f[0], A * f[1], A * f[2], A * tfw + Bn], [f[0], f[1], f[2], tfw]);
   const view = (x, h, y) => { const d = [x - eye[0], h - eye[1], y - eye[2]]; return [dot3(d, r), dot3(d, u), dot3(d, f)]; };
@@ -254,9 +263,10 @@ export function createGL(canvas) {
   const ROOM_WALL = 48;
   const lv = (map, x, y) => { const v = map[y]?.[x]; if (v === undefined) return 0;
     if (map.kind === 'room') return v === TC.WALL ? (map[y + 1]?.[x] === undefined || map[y + 1][x] === TC.VOID ? 8 : ROOM_WALL) : v === TC.VOID ? -6 : 0; // 건물 안: 벽은 서 있고 앞(아래) 벽만 낮게 → 방 안이 보여요
+    if (map.diving) return uwBlock(map, x, y) ? UW_CEIL_H : UW_FLOOR_H; // v0.87 바닷속: 바닥과 섬 밑동만
     return v === 0 ? WATER : (map.cliff?.base.get(`${x},${y}`) || 0) * LEVEL_H; };
   function cornerHeights(map, x, y) {
-    const h = lv(map, x, y), c = map.cliff, k = `${x},${y}`; let nw = h, ne = h, sw = h, se = h;
+    const h = lv(map, x, y), c = map.diving ? null : map.cliff, k = `${x},${y}`; let nw = h, ne = h, sw = h, se = h;
     if (c?.stairs.has(k)) { // 계단은 비탈: 높은 쪽에서 낮은 쪽으로
       if (c.face.has(k)) { const top = c.faceTop.get(k) * LEVEL_H; nw = ne = top; }
       else { const sides = c.rim.get(k) || '', base = (c.base.get(k) || 0) * LEVEL_H;
@@ -273,13 +283,68 @@ export function createGL(canvas) {
   }
 
   // ── 지도마다 한 번: 땅·벽·건물·물 (그림자는 해가 움직이면 그것만 다시) ──
-  let scene = null;
+  let scene = null, fishBuf = null, fishN = 0; // v0.87 바닷속 물고기(매 장면)
+  // v0.87 바닷속 장면: 물 위의 것은 하나도 없이 — 바닥(해저 타일) · 섬 밑동 바위벽 · 항구 콘크리트 안벽 · 바다숲·생물·바위 판
+  let quayCv = null;
+  function quayCanvas() { // 안벽 블록(가로 32 · 세로 16, 엇갈려 쌓기) + 아래쪽 물때
+    if (quayCv || typeof document === 'undefined') return quayCv; const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+    for (let r = 0; r < 4; r++) for (let i = -1; i < 3; i++) { const x = i * 32 + (r % 2 ? 16 : 0), y = r * 16, v = 132 + ((i * 7 + r * 13) % 5) * 6; g.fillStyle = `rgb(${v - 8},${v},${v + 4})`; g.fillRect(x, y, 32, 16); g.fillStyle = '#5c666c'; g.fillRect(x, y + 15, 32, 1); g.fillRect(x + 31, y, 1, 16); g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(x, y, 31, 1); }
+    for (let i = 0; i < 90; i++) { const x = (i * 37) % 64, y = (i * 53) % 64; g.fillStyle = i % 3 ? 'rgba(40,60,50,.18)' : 'rgba(90,120,80,.22)'; g.fillRect(x, y, 2, 1); }
+    return (quayCv = c);
+  }
+  // v0.89 바닷속 우산몬: 이 지도에 나오는 종만 44px로 줄여 한 장에 모아요(바닥 우산몬 판 · 헤엄치는 물고기 우산몬)
+  let uwMon = null;
+  const UWM = 44;
+  function uwMonAtlas(map) {
+    const L = seabedLayout(map), ids = [...new Set([...L.items.filter(i => i.mon).map(i => i.mon), ...L.fish.map(f => f.mon).filter(Boolean)])].sort((a, b) => a - b), key = ids.join(',') + '|' + assetTintTag();
+    if (uwMon?.key === key && uwMon.ok) return uwMon; if (typeof document === 'undefined') return null;
+    const per = 11, c = document.createElement('canvas'); c.width = per * (UWM + 8); c.height = Math.max(1, Math.ceil(ids.length / per)) * (UWM + 10); const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+    const frames = {}, dots = assetImage(MONSTER_DOTS.key); let ok = !!dots;
+    ids.forEach((id, i) => { const x = (i % per) * (UWM + 8), y = Math.floor(i / per) * (UWM + 10), f = fieldMonsterFrame(id); // v0.91 원래 도트 그림 1:1(도트가 빠지지 않게)
+      if (f) { frames[id] = [x, y, f[2], f[3]]; if (dots) g.drawImage(dots, f[0], f[1], f[2], f[3], x, y, f[2], f[3]); }
+      else { frames[id] = [x, y, UWM, UWM]; const img = assetImage(monsterAssetKey(id)); if (img) g.drawImage(img, x, y, UWM, UWM); else ok = false; } });
+    if (uwMon?.c) { const t = texOf.get(uwMon.c); if (t) { gl.deleteTexture(t); texOf.delete(uwMon.c); } }
+    return (uwMon = { key, c, frames, ok, width: c.width, height: c.height });
+  }
+  const monFlip = (id, wantRight) => { const f = facing(id); return f === 'front' ? false : (f === 'right') !== wantRight; };
+  function uwMonCards(map, cards, floorH) { // 바닥에서 쉬는 우산몬 판(살펴볼 수 있어요)
+    const A = uwMonAtlas(map); if (!A) return 1;
+    for (const it of seabedLayout(map).items) if (it.mon && A.frames[it.mon]) cards.push({ key: `mon${it.mon}`, f: A.frames[it.mon], x: (it.x + .5) * T + (((it.x * 7 + it.y * 3) % 7) - 3), z: it.y * T + 24, h: floorH ?? lv(map, it.x, it.y), mon: true, flip: monFlip(it.mon, !!it.flip) });
+    return A.ok ? 0 : 1;
+  }
+  const uwWallCv = {}; // v0.88 「해안 벽 확장팩」 안벽·자연 암벽 그림에서 자른 이어 붙이기 재질(128×128)
+  function uwWall(kind) {
+    if (uwWallCv[kind] || typeof document === 'undefined') return uwWallCv[kind] || null; const img = assetImage(UW_WALLS.key); if (!img) return null;
+    const r = UW_WALLS[kind], c = document.createElement('canvas'); c.width = r[2]; c.height = r[3]; c.getContext('2d').drawImage(img, r[0], r[1], r[2], r[3], 0, 0, r[2], r[3]); return (uwWallCv[kind] = c);
+  }
+  function buildUnderwater(map, ground) {
+    const W = map[0].length, H = map.length, gw = W * T, gh = H * T, floor = new Batch(), rock = new Batch(), quay = new Batch(), rockImg = uwWall('cliff') || assetImage(HD2D_TEXTURES.rock), qc = uwWall('quay') || quayCanvas(), uwImg = assetImage(UW_ATLAS.key), packWalls = !!uwWallCv.quay, S = packWalls ? 128 : 64; /* 팩 재질은 1px = 지도 1px로 */
+    const blk = (x, y) => uwBlock(map, x, y), F = UW_FLOOR_H, C = UW_CEIL_H;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const X0 = x * T, X1 = X0 + T, Z0 = y * T, Z1 = Z0 + T;
+      if (!blk(x, y)) { floor.quad([[X0, F, Z0], [X1, F, Z0], [X1, F, Z1], [X0, F, Z1]], [[X0 / gw, Z0 / gh], [X1 / gw, Z0 / gh], [X1 / gw, Z1 / gh], [X0 / gw, Z1 / gh]], [0, 1, 0]); continue; }
+      const b = uwQuay(map, x, y) ? quay : rock;
+      b.quad([[X0, C, Z0], [X1, C, Z0], [X1, C, Z1], [X0, C, Z1]], [[X0 / S, Z0 / S], [X1 / S, Z0 / S], [X1 / S, Z1 / S], [X0 / S, Z1 / S]], [0, 1, 0]);
+      for (const [dx, dy, a, c2, n] of [[0, 1, [X1, Z1], [X0, Z1], [0, 1]], [0, -1, [X0, Z0], [X1, Z0], [0, -1]], [-1, 0, [X0, Z1], [X0, Z0], [-1, 0]], [1, 0, [X1, Z0], [X1, Z1], [1, 0]]]) {
+        if (blk(x + dx, y + dy) || map[y + dy]?.[x + dx] === undefined) continue; const u0 = (a[0] + a[1]) / S, u1 = (c2[0] + c2[1]) / S, vb = packWalls ? (C - F) / S : -F / 64, vt = packWalls ? 0 : -C / 64; // 팩 재질은 윗변(물낯 쪽)부터
+        b.quad([[a[0], F, a[1]], [c2[0], F, c2[1]], [c2[0], C, c2[1]], [a[0], C, a[1]]], [[u0, vb], [u1, vb], [u1, vt], [u0, vt]], [n[0], 0, n[1]]); }
+    }
+    const B = 6000; for (const [x0, z0, x1, z1] of [[-B, -B, gw + B, 0], [-B, gh, gw + B, gh + B], [-B, 0, 0, gh], [gw, 0, gw + B, gh]]) floor.quad([[x0, F, z0], [x1, F, z0], [x1, F, z1], [x0, F, z1]], [[0, 0], [0, 0], [0, 0], [0, 0]], [0, 1, 0]); // 지도 밖도 바닥(안개 속)
+    const meshes = [{ tex: ground, buf: upload(floor.v), n: floor.v.length / 8, ground: true }];
+    if (rockImg && rock.v.length) meshes.push({ tex: rockImg, buf: upload(rock.v), n: rock.v.length / 8, wrap: true });
+    if (qc && quay.v.length) meshes.push({ tex: qc, buf: upload(quay.v), n: quay.v.length / 8, wrap: true });
+    const cards = []; if (uwImg) for (const it of seabedLayout(map).items) { if (it.edge) continue; const f = UW_ATLAS.frames[it.id]; if (f) cards.push({ key: it.id, f, x: (it.x + (it.w || 1) / 2) * T + (it.big ? 0 : (((it.x * 7 + it.y * 3) % 9) - 4)), z: it.y * T + (it.big ? 30 : 24), h: F, uw: true }); }
+    const monMissing = uwMonCards(map, cards, F), missing = (!rockImg || !uwImg || !qc || !packWalls || monMissing) ? 1 : 0;
+    return { id: map.id, tag: assetTintTag(), hd2d: true, uw: true, meshes, missing, gw, gh, statics: { buf: null, n: 0, atlas: null, flat: { n: 0 }, blobs: { n: 0 } }, casters: [], shade: null, sunKey: '', water: null, cards: cardBuffer(cards, map), lamps: [],
+      models: null, hideStatic: new Set(), hideLandmarks: new Set(), interior: false, pier: false, doorMats: 0, rockCaps: 0, landmarks: {} };
+  }
   function buildScene(map, ground, o) {
+    if (map.diving && o.hd2d && map.kind !== 'room') return buildUnderwater(map, ground);
     const W = map[0].length, H = map.length, gw = W * T, gh = H * T, top = new Batch(), sea = new Batch(), wet = new Batch(), casters = []; let scene_caps = 0;
     const card = o.hd2d, rockImg = map.kind !== 'room' ? assetImage(HD2D_TEXTURES.rock) : null, atlasImg = card ? assetImage(HD2D_ATLAS.key) : null, storyImg = card ? assetImage(STORY_ATLAS.key) : null;
     const room = map.kind === 'room', interImg = room ? assetImage(INTERIOR_HD.key) : null;
     const waterImgs = [HD2D_TEXTURES.sea_deep, HD2D_TEXTURES.sea_shallow, HD2D_TEXTURES.foam].map(k => assetImage(k)), useWater = !map.diving && map.kind !== 'room' && waterImgs.every(Boolean);
-    const outdoor = map.kind !== 'room' && !map.diving; let missing = (card && !atlasImg) || (map.kind !== 'room' && !rockImg) || (outdoor && !useWater) || (card && !storyImg) || (room && !interImg) ? 1 : 0; // 그림이 아직 안 왔으면 조금 뒤 다시 만들어요
+    const outdoor = map.kind !== 'room' && !map.diving; let missing = (card && !atlasImg) || (map.kind !== 'room' && !rockImg) || (outdoor && !useWater) || (card && !storyImg) || (room && !interImg) || (room && !assetImage(FURN_ATLAS.key)) ? 1 : 0; // 그림이 아직 안 왔으면 조금 뒤 다시 만들어요
     const isWater = (x, y) => map[y]?.[x] === undefined || map[y][x] === 0;
     // v0.82 동도 선착장 GLB 자리(지도 # 칸): 땅 윗면·물가 벽을 빼서 겹쳐 깜빡이지 않게
     const pier = o.hd2d && map.id === 'route0' && glbModel('dongdo_pier') ? new Set() : null;
@@ -287,12 +352,13 @@ export function createGL(canvas) {
     // v0.82 건물 안: 바닥·벽 윗면은 실내 재질 그림으로(한 칸 = 그림 한 장, 1:1)
     const IR = INTERIOR_HD.rects, ikind = room ? (/^(shop|block|terminal)/.test(map.def?.building || '') ? 'shop' : /^lab/.test(map.def?.building || '') ? 'lab' : /^gym/.test(map.def?.building || '') ? 'gym' : 'home') : null;
     const iuv = (r, px0, py0, px1, py1) => [(r[0] + px0) / INTERIOR_HD.width, (r[1] + py0) / INTERIOR_HD.height, (r[0] + px1) / INTERIOR_HD.width, (r[1] + py1) / INTERIOR_HD.height];
-    const inter = new Batch(), interFloor = new Batch(); // 벽(가림 도트 무늬 받음) · 바닥과 벽 윗면(땅처럼 비치지 않음)
+    const inter = new Batch(), interFloor = new Batch(), rimTop = new Batch(); // 벽(가림 도트 무늬 받음) · 바닥과 벽 윗면(땅처럼 비치지 않음)
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const c = cornerHeights(map, x, y), X0 = x * T, X1 = X0 + T, Z0 = y * T, Z1 = Z0 + T;
       if (pier?.has(`${x},${y}`)) continue;
       if (interImg && [TC.FLOOR, TC.STONE, TC.WALL].includes(map[y][x])) { const [u0, v0, u1, v1] = iuv(IR[`${ikind}_${map[y][x] === TC.WALL ? 'walltop' : 'floor'}`], 0, 0, 32, 32), h = c.nw;
         interFloor.quad([[X0, h, Z0], [X1, h, Z0], [X1, h, Z1], [X0, h, Z1]], [[u0, v0], [u1, v0], [u1, v1], [u0, v1]], [0, 1, 0]); continue; }
+      const kk = `${x},${y}`; if (rockImg && !room && map.cliff?.rim.has(kk) && !map.cliff.face.has(kk) && !map.cliff.stairs.has(kk) && map.solid.has(kk)) { rimTop.quad([[X0, c.nw, Z0], [X1, c.ne, Z0], [X1, c.se, Z1], [X0, c.sw, Z1]], [[X0 / 64, Z0 / 64], [X1 / 64, Z0 / 64], [X1 / 64, Z1 / 64], [X0 / 64, Z1 / 64]], [0, 1, 0]); continue; } // v0.84 절벽 끝 비탈은 바위(풀·눈 길처럼 보이지 않게)
       top.quad([[X0, c.nw, Z0], [X1, c.ne, Z0], [X1, c.se, Z1], [X0, c.sw, Z1]], [[X0 / gw, Z0 / gh], [X1 / gw, Z0 / gh], [X1 / gw, Z1 / gh], [X0 / gw, Z1 / gh]], [0, 1, 0]);
     }
     const B = 6000;
@@ -346,7 +412,7 @@ export function createGL(canvas) {
     const boxShadow = (x0, z0, x1, z1, hh, fl) => { for (const [ax, az, bx2, bz, nx, nz] of [[x0, z0, x1, z0, 0, -1], [x1, z1, x0, z1, 0, 1], [x0, z1, x0, z0, -1, 0], [x1, z0, x1, z1, 1, 0]]) casters.push([ax, az, bx2, bz, nx, nz, hh, fl]); };
     if (o.hd2d) {
       // 바위 지명: 지도의 바위 무더기(또는 큰 바위 칸)에 맞춰 크기를 정해요. 말 걸기 자리는 지명 칸 그대로
-      const LANDMARK = { '숫돌바위': 'sutdol', '독립문바위': 'independence', '촛대바위': 'candle', '코끼리바위': 'elephant', '삼형제굴바위': 'three_caves' };
+      const LANDMARK = { '숫돌바위': 'sutdol', '독립문바위': 'independence', '촛대바위': 'candle', '코끼리바위': 'elephant', '삼형제굴바위': 'three_caves', '지네바위': 'bochal' }; // 지네바위: 일반 갯바위 모양(사진 확인 안 함)
       const regions = rockRegions(map);
       const placeRock = (id, R, fallback) => {
         const m = glbModel(id); if (!m) return false; const w = m.max[0] - m.min[0], d = m.max[2] - m.min[2];
@@ -361,13 +427,14 @@ export function createGL(canvas) {
       for (const ob of map.parsed?.objects || []) {
         const id = ob.type === 'landmark' && LANDMARK[ob.name]; if (!id) continue;
         let best = null, bd2 = 1e9; for (const R of regions) { const dx = Math.max(R.x0 - ob.x, 0, ob.x - R.x1), dy = Math.max(R.y0 - ob.y, 0, ob.y - R.y1), dd = dx * dx + dy * dy; if (dd < bd2 && dd <= 36) { bd2 = dd; best = R; } }
+        if (ob.rock) best = { x0: ob.rock[0], y0: ob.rock[1], x1: ob.rock[2], y1: ob.rock[3] }; // v0.86 지명 고증 자리
         const at = placeRock(id, best, seaSpot(map, ob) || { x0: ob.x - 1, x1: ob.x + 1, y0: ob.y - 2, y1: ob.y }); if (at) { hideLandmarks.add(ob.name); lmk[ob.name] = at; } // 바위 무더기가 없으면 가까운 바다(바다의 바위라서)
       }
       if (map.id === 'town3' && regions.length) lmk['탕건봉'] = placeRock('tanggeon', regions.slice().sort((a, b) => b.n - a.n)[0]) || undefined; // 탕건봉: 가장 큰 바위 무더기
       // v0.82 바위 지명·천장굴 둘레·동도 선착장: 팩이 정한 자리(칸 경계 기준 실수 좌표)에 1단위 = 1칸으로
-      const ANCHORED = { bochal: '보찰바위', sangjanggun: '상장군바위', hanbando: '한반도바위', cheonjanggul: null, dongdo_pier: null };
+      const ANCHORED = { bochal: '보찰바위', sangjanggun: null, hanbando: '한반도바위', cheonjanggul: null, dongdo_pier: null };
       for (const [id, name] of Object.entries(ANCHORED)) {
-        const m = glbModel(id), meta = m && GLB_META(id); if (!m || meta.map !== map.id) continue; const [ax, az] = meta.anchor, tx = Math.floor(ax), ty = Math.floor(az);
+        const m = glbModel(id), meta = m && GLB_META(id); if (!m || meta.map !== map.id) continue; const fix = name && (map.parsed?.objects || []).find(o => o.name === name && o.rock), [ax, az] = fix ? [(fix.rock[0] + fix.rock[2] + 1) / 2, (fix.rock[1] + fix.rock[3] + 1) / 2] : meta.anchor, tx = Math.floor(ax), ty = Math.floor(az);
         const fl = id === 'dongdo_pier' ? 0 : Math.max(WATER, lv(map, tx, ty)) - (map[ty]?.[tx] === 0 ? 2 : 0);
         put(id, { x: ax * T, z: az * T, h: fl, sx: T });
         glbSkip.push([Math.floor(ax + m.min[0]), Math.floor(az + m.min[2]), Math.ceil(ax + m.max[0]) - 1, Math.ceil(az + m.max[2]) - 1]);
@@ -397,15 +464,15 @@ export function createGL(canvas) {
     if (map.kind === 'room') for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (map[y][x] === TC.UP) put('stairs', { x: x * T + 16, z: y * T + 30, h: 0, sx: 30 / 1.62, sy: 40 / 3.03, sz: 30 / 4.51 });
     // v0.84 못 지나가는 칸을 눈에 보이게: 바위 칸(맨바위 산·갯바위)은 울퉁불퉁한 바위 덩어리, 절벽 끝 턱(막힌 가장자리)은 낮은 바위 턱.
     //   예전에는 HD-2D 땅 재질이 풀·눈으로만 그려서, 아무것도 없어 보이는데 막히는 칸이 있었어요(2D 그림에는 턱 선이 있었어요).
-    if (rockImg && map.kind !== 'room' && !map.diving) {
+    if (rockImg && map.kind !== 'room') { // (바닷속에서도 바위섬은 바위로)
       const cl = map.cliff, hsh = (x, y, s) => { const v = Math.sin(x * 127.1 + y * 311.7 + s * 74.7) * 43758.5453; return v - Math.floor(v); };
       const under = new Set(); for (const bd of [...map.buildings, ...(map.structures || [])]) for (let i = 0; i < bd.w; i++) for (let j = 0; j < bd.h; j++) under.add(`${bd.x + i},${bd.y + j}`);
       for (const d of map.decor) under.add(`${d.x},${d.y}`);
       const skip = (x, y) => glbSkip.some(([a, b, c2, d2]) => x >= a && x <= c2 && y >= b && y <= d2);
-      const capH = new Map();
-      for (const k of map.solid) { const [x, y] = k.split(',').map(Number); if (map[y]?.[x] === undefined || map[y][x] === 0 || under.has(k) || skip(x, y) || pier?.has(k)) continue;
-        if (map.rockTiles?.has(k)) capH.set(k, 7 + Math.round(hsh(x, y, 1) * 7)); // 바위 덩어리 7~14px
-        else if (cl?.rim.has(k) && !cl.face.has(k) && !cl.stairs.has(k)) capH.set(k, 5); } // 절벽 끝 턱 5px
+      const capH = new Map(), rims = [];
+      for (const k of map.solid) { const [x, y] = k.split(',').map(Number); if (map[y]?.[x] === undefined || (map[y][x] === 0 && !map.rockTiles?.has(k)) || under.has(k) || skip(x, y) || pier?.has(k)) continue;
+        if (map.rockTiles?.has(k)) capH.set(k, map[y][x] === 0 ? 16 + Math.round(hsh(x, y, 1) * 8) : 7 + Math.round(hsh(x, y, 1) * 7)); // 바위 덩어리 7~14px · 바다의 바위섬(군함바위 등)은 물 위로 16~24px
+        else if (cl?.rim.has(k) && !cl.face.has(k) && !cl.stairs.has(k)) rims.push([x, y, cl.rim.get(k)]); } // 절벽 끝 칸: 낮은 돌담(아래)
       const capTop = (x, y) => { const h = capH.get(`${x},${y}`); if (h === undefined) return null; const c = cornerHeights(map, x, y); return Math.max(c.nw, c.ne, c.sw, c.se) + h; };
       for (const [k, h] of capH) { const [x, y] = k.split(',').map(Number), top = capTop(x, y), c = cornerHeights(map, x, y), X0 = x * T, X1 = X0 + T, Z0 = y * T, Z1 = Z0 + T;
         add(rockImg, b => { b.quad([[X0, top, Z0], [X1, top, Z0], [X1, top, Z1], [X0, top, Z1]], [[X0 / 64, Z0 / 64], [X1 / 64, Z0 / 64], [X1 / 64, Z1 / 64], [X0 / 64, Z1 / 64]], [0, 1, 0]);
@@ -413,10 +480,25 @@ export function createGL(canvas) {
             const nt = capTop(x + dx, y + dy); if (nt !== null && nt >= top) continue; const f0 = Math.max(lo0, nt ?? -1e9), f1 = Math.max(lo1, nt ?? -1e9); if (f0 >= top && f1 >= top) continue;
             const u0 = (a[0] + a[1]) / 64, u1 = (bb[0] + bb[1]) / 64; b.quad([[a[0], f0, a[1]], [bb[0], f1, bb[1]], [bb[0], top, bb[1]], [a[0], top, a[1]]], [[u0, -f0 / 64], [u1, -f1 / 64], [u1, -top / 64], [u0, -top / 64]], [n[0], 0, n[1]]); } });
         if (h >= 7) casters.push([X0, Z1, X1, Z1, 0, 1, h, top - h]); }
-      scene_caps = capH.size;
+      // v0.84 고침: 절벽 끝 칸(막힌 가장자리)은 칸 전체 바위 덩어리 대신, 걸을 수 있는 높은 쪽 가장자리를 따라 낮은 돌담(폭 9 · 높이 8px).
+      //   계단 칸에서는 돌담이 끊겨서 내려가는 곳이 보여요(칸 전체를 덮으면 비탈 위에 바위 기둥이 솟아 계단 둘레가 이상했어요)
+      for (const [x, y, sides] of rims) { const base = lv(map, x, y), X0 = x * T, X1 = X0 + T, Z0 = y * T, Z1 = Z0 + T, lo = base - 2, hi = base + 8, Wd = 9;
+        const boxes = []; if (sides.includes('n')) boxes.push([X0, Z1 - Wd, X1, Z1 - 1]); if (sides.includes('e')) boxes.push([X0 + 1, Z0, X0 + Wd, Z1]); if (sides.includes('w')) boxes.push([X1 - Wd, Z0, X1 - 1, Z1]);
+        for (const [a0, b0, a1, b1] of boxes) add(rockImg, b => { b.quad([[a0, hi, b0], [a1, hi, b0], [a1, hi, b1], [a0, hi, b1]], [[a0 / 64, b0 / 64], [a1 / 64, b0 / 64], [a1 / 64, b1 / 64], [a0 / 64, b1 / 64]], [0, 1, 0]);
+          for (const [p0, p1, n] of [[[a1, b1], [a0, b1], [0, 1]], [[a0, b0], [a1, b0], [0, -1]], [[a0, b1], [a0, b0], [-1, 0]], [[a1, b0], [a1, b1], [1, 0]]]) { const u0 = (p0[0] + p0[1]) / 64, u1 = (p1[0] + p1[1]) / 64; b.quad([[p0[0], lo, p0[1]], [p1[0], lo, p1[1]], [p1[0], hi, p1[1]], [p0[0], hi, p0[1]]], [[u0, -lo / 64], [u1, -lo / 64], [u1, -hi / 64], [u0, -hi / 64]], [n[0], 0, n[1]]); } }); }
+      for (const d of map.decor) if (d.kind === 'crag') { let hit = false; for (let i = 0; i < d.w && !hit; i++) for (let j = 0; j < d.h && !hit; j++) hit = capH.has(`${d.x + i},${d.y - j}`); if (hit) hideStatic.add(`crag|${d.x},${d.y}`); } // 바위 덩어리로 그린 곳의 예전 바위 그림은 빼요
+      scene_caps = capH.size + rims.length;
     }
     const roofs = new Set(), cards = [], lamps = [], F = HD2D_ATLAS.frames;
     const pushCard = (key, fx, fz, h) => { const f = cardFrame(key); if (f) cards.push({ key, f, x: fx, z: fz, h, story: key.startsWith('story_') }); return f; };
+    const uwImg = map.diving ? assetImage(UW_ATLAS.key) : null; if (map.diving && !uwImg) missing++;
+    if (uwImg) for (const it of seabedLayout(map).items) { const f = UW_ATLAS.frames[it.id]; if (f) cards.push({ key: it.id, f, x: (it.x + (it.w || 1) / 2) * T + (it.big || it.edge ? 0 : (((it.x * 7 + it.y * 3) % 9) - 4)), z: it.y * T + (it.edge ? 6 : it.big ? 30 : 24), h: lv(map, it.x, it.y), uw: true }); } // v0.87 바닷속 판
+    if (map.diving) missing += uwMonCards(map, cards); // v0.89 바닷속 우산몬
+    if (o.hd2d && !map.diving) for (const ob of map.parsed?.objects || []) { // v0.88 실제 시설의 관찰용 외관(「지상·수중 v2」): 지명 자리 칸 위에 그림 판 하나 · 들어가는 문 없음
+      const f = ob.region && REGION_ATLAS.frames[ob.region]; if (!f) continue; if (!assetImage(REGION_ATLAS.key)) { missing++; continue; }
+      const r = ob.rock || [ob.x - 1, ob.y - 1, ob.x + 1, ob.y], cx = (r[0] + r[2] + 1) / 2 * T, cz = (r[3] + 1) * T - 2, L = lv(map, ob.x, ob.y);
+      cards.push({ key: ob.region, f, x: cx, z: cz, h: L, rg: true }); hideLandmarks.add(ob.name); lmk[ob.name] = { x: cx, z: (r[1] + r[3] + 1) / 2 * T, h: L, top: f[3] * .8 };
+      boxShadow(r[0] * T, r[1] * T, (r[2] + 1) * T, (r[3] + 1) * T, f[3] * .35, Math.max(0, L)); }
     for (const bd of [...map.buildings, ...(map.structures || [])]) {
       let ck = atlasImg ? hd2dCard(map, bd) : null; if (ck?.startsWith('story_') && !storyImg) ck = STORY_CARDS[buildingArt(map, bd)] || null; // 이야기 건물 그림이 아직이면 예전 그림
       if (ck) { // 그림 판: 아랫변 = 건물 앞줄. 그림자는 건물 칸 둘레를 그림 높이의 40%로
@@ -437,7 +519,7 @@ export function createGL(canvas) {
       for (const [ax, az, bx2, bz, nx, nz] of [[x0, yB, x1, yB, 0, -1], [x1, yF, x0, yF, 0, 1], [x0, yF, x0, yB, -1, 0], [x1, yB, x1, yF, 1, 0]]) casters.push([ax, az, bx2, bz, nx, nz, h, L]);
     }
     if (atlasImg) for (const d of map.decor) { // 여객선은 옆모습 판(배 가운데 줄에), 물가 난간 네 칸마다 가로등
-      if (d.kind === 'ferry') pushCard('ul_ferry', d.x * T + 16, d.y * T + 150, SURF);
+      if (d.kind === 'ferry' && !map.diving) pushCard('ul_ferry', d.x * T + 16, d.y * T + 150, SURF);
       if ((d.kind === 'railv' || d.kind === 'rail') && (d.kind === 'rail' ? d.x : d.y) % 4 === 0) { const fz = d.y * T + 22, h = groundAt(map, d.x * T + 16, fz), f = pushCard(d.y % 8 ? 'ul_lamp_a' : 'ul_lamp_b', d.x * T + 16, fz, h); lamps.push([d.x * T + 16 + (f[2] > 40 ? 0 : 6), h + f[3] - 8, fz]); }
     }
     const mats = new Batch(), matCv = map.kind === 'town' ? doorMatCanvas() : null; // v0.84 문 앞 발판
@@ -450,6 +532,7 @@ export function createGL(canvas) {
     if (interFloor.v.length) meshes.push({ tex: interImg, buf: upload(interFloor.v), n: interFloor.v.length / 8, ground: true }); // 건물 안 바닥·벽 윗면(실내 재질)
     if (inter.v.length) meshes.push({ tex: interImg, buf: upload(inter.v), n: inter.v.length / 8 }); // 건물 안 벽(실내 재질)
     if (mats.v.length) meshes.push({ tex: matCv, buf: upload(mats.v), n: mats.v.length / 8, ground: true });
+    if (rimTop.v.length) meshes.push({ tex: rockImg, buf: upload(rimTop.v), n: rimTop.v.length / 8, ground: true, wrap: true }); // 절벽 끝 비탈(바위)
     return { id: map.id, tag: assetTintTag(), hd2d: !!atlasImg, meshes, missing, gw, gh, statics: null, casters, shade: null, sunKey: '', water: useWater ? { buf: upload(wet.v), n: wet.v.length / 8 } : null, cards: cardBuffer(cards, map), lamps,
       models: mv.length ? { buf: upload(mv), n: mv.length / 10 } : null, hideStatic, hideLandmarks, interior: !!(interImg && interFloor.v.length), pier: !!pier, doorMats: mats.v.length / 48, rockCaps: scene_caps, landmarks: lmk };
   }
@@ -491,12 +574,12 @@ export function createGL(canvas) {
   }
   // 그림 판 → 세운 판 꼭짓점(발 자리는 그림 아랫변 가운데, 1픽셀 = 지도 1픽셀)
   function cardBuffer(cards, map) { // 그림 모음 두 장(에셋팩 · v0.81 팩 이야기 건물)마다 한 묶음
-    const part = story => { const arr = [], A = story ? STORY_ATLAS : HD2D_ATLAS, AW = A.width, AH = A.height;
-      for (const c of cards.filter(c => !!c.story === story)) { const [fx, fy, w, h] = c.f, u0 = fx / AW, u1 = (fx + w) / AW, v0 = fy / AH, v1 = (fy + h) / AH, L = -w / 2, R = w / 2;
+    const part = story => { const arr = [], A = story === 'mon' ? (uwMon || { width: 1, height: 1 }) : story === 'rg' ? REGION_ATLAS : story === 'uw' ? UW_ATLAS : story ? STORY_ATLAS : HD2D_ATLAS, AW = A.width, AH = A.height;
+      for (const c of cards.filter(c => story === 'mon' ? c.mon : story === 'rg' ? c.rg : story === 'uw' ? c.uw : !c.uw && !c.rg && !c.mon && !!c.story === story)) { const [fx, fy, w, h] = c.f, [u0, u1] = c.flip ? [(fx + w) / AW, fx / AW] : [fx / AW, (fx + w) / AW], v0 = fy / AH, v1 = (fy + h) / AH, L = -w / 2, R = w / 2;
         const q = [[L, -1, u0, v1], [R, -1, u1, v1], [R, h - 1, u1, v0], [L, h - 1, u0, v0]]; for (const i of [0, 1, 2, 0, 2, 3]) arr.push(c.x, c.h, c.z, q[i][0], q[i][1], q[i][2], q[i][3], 0, 0, 0); } // 아랫줄 1px은 테두리라 땅 밑으로
       return { buf: upload(arr), n: arr.length / 10 }; };
-    const hd = part(false), st = part(true);
-    return { buf: hd.buf, n: hd.n, story: st, count: cards.length, keys: cards.map(c => c.key) };
+    const hd = part(false), st = part(true), uw = part('uw'), region = part('rg'), mon = part('mon');
+    return { buf: hd.buf, n: hd.n, story: st, uw, region, mon, count: cards.length, keys: cards.map(c => c.key) };
   }
   // 그림자: 해를 등진 면의 위쪽 모서리를 땅에 눕힌 판(해가 움직이면 이것만 다시)
   function buildShade(casters, sun) {
@@ -509,7 +592,9 @@ export function createGL(canvas) {
   // ── 그림 칸(아틀라스) ──
   function atlas(size, h = size) { const c = document.createElement('canvas'); c.width = size; c.height = h; return { c, g: c.getContext('2d'), x: 0, y: 0, row: 0, size, h }; }
   function place(A, w, h) { if (A.x + w > A.size) { A.x = 0; A.y += A.row + 1; A.row = 0; } if (A.y + h > A.h) return null; const r = { x: A.x, y: A.y }; A.x += w + 1; A.row = Math.max(A.row, h); return r; }
-  function cellOf(n) {
+  function cellOf(n, map) {
+    const fg = FURNITURE.has(n.scenery) && map ? furnitureGroups(map)?.get(`${n.x},${n.y}`)?.draw : null; // v0.88 가구 팩: 여러 칸 가구 한 장이 들어가게 넓혀요
+    if (fg) { const { w: pw, h: ph } = pieceSize(fg), w = 2 * (Math.max(fg.w * 32, pw) + 32), h = ph + fg.h * 32 + 48; return { w, h, ax: w / 2, ay: h - 24 }; }
     if (n.scenery === 'crag') return { w: n.w * 32 + 64, h: n.h * 32 + 112, ax: (n.w * 32 + 64) / 2, ay: n.h * 32 + 88 };
     if (n.scenery === 'flower' || n.scenery === 'tuft') return { w: 60, h: 60, ax: 30, ay: 54 };
     if (FURNITURE.has(n.scenery)) { const w = (n.w || 1) * 32 + 64, h = (n.h || 1) * 32 + 112; return { w, h, ax: w / 2, ay: h - 24 }; }
@@ -519,7 +604,7 @@ export function createGL(canvas) {
   }
   const footOf = n => ({ x: n.x * T + (n.w ? n.w * 16 : 16), y: n.depth });
   function drawCell(A, n, env) {
-    const c = cellOf(n), r = place(A, c.w, c.h); if (!r) return null; const f = footOf(n);
+    const c = cellOf(n, env.map), r = place(A, c.w, c.h); if (!r) return null; const f = footOf(n);
     A.g.save(); A.g.beginPath(); A.g.rect(r.x, r.y, c.w, c.h); A.g.clip(); A.g.imageSmoothingEnabled = false;
     A.g.translate(r.x + c.ax - f.x, r.y + c.ay - f.y);
     const tf = n.scenery === 'tree' && env.trees ? HD2D_TREES.frames[treeName(env.map, n)] : null, fk = n.scenery === 'flower' && env.cards ? flowerName(env.map, n, env.season, !!env.story) : null, ff = fk ? cardFrame(fk) : null, fimg = fk && STORY_ATLAS.frames[fk] ? env.story : env.cards;
@@ -574,7 +659,7 @@ export function createGL(canvas) {
     const A = atlas(2048), keyOf = n => n.scenery === 'tree' ? `tree|${env.trees ? treeName(map, n) : (n.x * 7 + n.y * 13) % 3}` : n.scenery === 'flower' && env.cards ? `flower|${flowerName(map, n, env.season, !!env.story)}` : n.scenery === 'tuft' ? `tuft|${n.v}` : ['rock', 'tetrapods', 'planter', 'beacon', 'barrier'].includes(n.scenery) ? n.scenery : `${n.scenery}|${n.x},${n.y}|${n.w || ''}`;
     const cells = new Map(), arr = [], flats = [], blobs = new Batch(), todo = [], wallDecor = [];
     for (const n of [...items, ...tufts(map)]) {
-      if (n.scenery === 'boat' || n.scenery === 'ferry') { if (!(opt.hd2d && n.scenery === 'ferry')) flats.push(n); continue; } // HD-2D 지도의 여객선은 옆모습 판으로
+      if (n.scenery === 'boat' || n.scenery === 'ferry') { if (map.diving) continue; /* v0.87 바닷속엔 배가 없어요 */ if (!(opt.hd2d && n.scenery === 'ferry')) flats.push(n); continue; } // HD-2D 지도의 여객선은 옆모습 판으로
       if (n.scenery === 'window') { if (!opt.interior) wallDecor.push(n); continue; } // v0.82 실내 재질의 창문 벽이 대신해요
       if (!STATIC.has(n.scenery) || n.building || opt.hide?.has(n.scenery) || opt.hide?.has(`${n.scenery}|${n.x},${n.y}`)) continue; // GLB 모델로 그린 것(난간·소파블록·큰 바위)은 판을 빼요
       const key = keyOf(n); let cell = cells.get(key);
@@ -638,21 +723,21 @@ export function createGL(canvas) {
   //      tint(빛 색), night(0..1, 가로등), quality(0 낮음 · 1 보통 · 2 높음) }
   function render(o) {
     const t0 = performance.now(), { map, view: V } = o, sun = o.sun, fbw = canvas.width, fbh = canvas.height, q = o.quality ?? 1, hd2d = !!V.hd && hd2dMap(map);
-    if (!scene || scene.id !== map.id || scene.tag !== assetTintTag() || scene.want !== hd2d || (scene.missing && frames % 30 === 0)) {
-      if (scene) { if (scene.models) gl.deleteBuffer(scene.models.buf); for (const m of scene.meshes) { gl.deleteBuffer(m.buf); if (m.mat) { const t = texOf.get(m.mat.canvas); if (t) { gl.deleteTexture(t); texOf.delete(m.mat.canvas); } } } if (scene.shade) gl.deleteBuffer(scene.shade.buf); if (scene.water) gl.deleteBuffer(scene.water.buf); gl.deleteBuffer(scene.cards.buf); gl.deleteBuffer(scene.cards.story.buf); }
-      scene = buildScene(map, o.ground, { hd2d }); scene.want = hd2d; groundAtMs = o.now;
+    if (!scene || scene.id !== map.id || scene.tag !== assetTintTag() || scene.want !== hd2d || scene.dive !== !!map.diving || (scene.missing && frames % 30 === 0)) {
+      if (scene) { if (scene.models) gl.deleteBuffer(scene.models.buf); for (const m of scene.meshes) { gl.deleteBuffer(m.buf); if (m.mat) { const t = texOf.get(m.mat.canvas); if (t) { gl.deleteTexture(t); texOf.delete(m.mat.canvas); } } } if (scene.shade) gl.deleteBuffer(scene.shade.buf); if (scene.water) gl.deleteBuffer(scene.water.buf); gl.deleteBuffer(scene.cards.buf); if (scene.cards.uw) gl.deleteBuffer(scene.cards.uw.buf); if (scene.cards.region) gl.deleteBuffer(scene.cards.region.buf); if (scene.cards.mon) gl.deleteBuffer(scene.cards.mon.buf); gl.deleteBuffer(scene.cards.story.buf); }
+      scene = buildScene(map, o.ground, { hd2d }); scene.want = hd2d; scene.dive = !!map.diving; groundAtMs = o.now;
     }
     if (scene.sunKey !== sun.join()) { if (scene.shade) gl.deleteBuffer(scene.shade.buf); scene.shade = buildShade(scene.casters, sun); scene.sunKey = sun.join(); }
     if (o.groundVer !== undefined ? o.groundVer !== groundVer : o.now - groundAtMs > 220) { texture(o.ground, true); groundAtMs = o.now; groundVer = o.groundVer; } else texture(o.ground); // 땅 그림이 바뀐 때만 올려요
     const env = { map, state: o.state, time: o.now, motion: o.motion, wanted: o.wanted, seen: o.seen, season: o.season };
     const order = sceneDrawOrder(o.people, o.viewPos, map);
     if (!scene.statics || scene.statics.season !== o.season || (scene.statics.noTrees && frames % 30 === 0 && assetImage(HD2D_TREES.key))) {
-      const trees = assetImage(HD2D_TREES.key), cards = scene.hd2d ? assetImage(HD2D_ATLAS.key) : null, story = scene.hd2d ? assetImage(STORY_ATLAS.key) : null; scene.statics = buildStatics(map, { ...env, time: 0, trees, cards, story }, order, { hd2d: scene.hd2d, hd: !!V.hd, water: !!scene.water, hide: scene.hideStatic, interior: scene.interior }); scene.statics.season = o.season; scene.statics.noTrees = !trees || (scene.hd2d && !story); texture(scene.statics.atlas, true); texture(scene.statics.flat.tex, true); }
+      const trees = assetImage(HD2D_TREES.key), cards = scene.hd2d ? assetImage(HD2D_ATLAS.key) : null, story = scene.hd2d ? assetImage(STORY_ATLAS.key) : null; scene.statics = scene.uw ? { buf: null, n: 0, atlas: null, flat: { n: 0 }, blobs: { n: 0 } } : buildStatics(map, { ...env, time: 0, trees, cards, story }, order, { hd2d: scene.hd2d, hd: !!V.hd, water: !!scene.water, hide: scene.hideStatic, interior: scene.interior }); scene.statics.season = o.season; scene.statics.noTrees = !trees || (scene.hd2d && !story); if (!scene.uw) { texture(scene.statics.atlas, true); texture(scene.statics.flat.tex, true); } }
     let A = dyn.A; A.g.clearRect(0, 0, A.size, A.h); A.x = A.y = A.row = 0; const arr = [], sh = new Batch(); let player = null;
     // v0.82 고침: 사람·우산몬이 많으면(나리분지처럼) 그림 칸이 모자라 내 캐릭터가 빠지던 것 → 내 캐릭터를 먼저 그리고,
     //   화면에서 먼 것은 건너뛰고, 그래도 모자라면 그림 칸을 두 배로 늘려요. 그리는 순서(깊이)는 깊이 버퍼가 정하니 바뀌어도 괜찮아요.
     const vx = o.viewPos.x, vy = o.viewPos.y, near = n => n.player || (Math.abs(n.x - vx) <= 22 && n.y - vy <= 14 && vy - n.y <= 26);
-    const live = order.filter(n => !(n.scenery || n.building || (n.kind === 'landmark' && scene.hideLandmarks.has(n.name))) && near(n)); // GLB 바위로 그린 지명은 작은 그림을 빼요(말 걸기 자리는 그대로)
+    const live = order.filter(n => !(map.diving && !n.player && (n.actor || map[Math.round(n.y)]?.[Math.round(n.x)] !== 0 || PROP_KINDS.includes(n.kind))) && !(n.scenery || n.building || (n.kind === 'landmark' && scene.hideLandmarks.has(n.name))) && near(n)); // GLB 바위로 그린 지명은 작은 그림을 빼요(말 걸기 자리는 그대로)
     live.sort((a, b) => (b.player ? 1 : 0) - (a.player ? 1 : 0));
     for (const n of live) {
       if (n.player && V.fp) continue; // v0.84 1인칭: 내 눈이라 내 몸은 안 그려요
@@ -669,15 +754,18 @@ export function createGL(canvas) {
     let cutU = [0, 0, 0, 0], cutY = 1e6;
     if (player) { const f = footOf(player), h = groundAt(map, f.x, f.y) + 24; cutY = h - 24 + 6; const M = V.M, p = [f.x, h, f.y, 1], cl = [0, 1, 2, 3].map(r => M[r] * p[0] + M[4 + r] * p[1] + M[8 + r] * p[2] + M[12 + r] * p[3]);
       const g0 = h - 24, wRef = M[3] * f.x + M[7] * g0 + M[11] * (f.y - 8) + M[15]; // 깊이 기준: 발 높이 · 발보다 조금 뒤(그 앞에 있는 것이 나를 가려요)
-      if (cl[3] > 1) cutU = [(cl[0] / cl[3] * .5 + .5) * fbw, (cl[1] / cl[3] * .5 + .5) * fbh, fbh * (V.hd ? .2 : .17), wRef]; }
+      // v0.87 비침 둘레: 캐릭터 크기만큼만(예전엔 화면 높이의 20%라 가리지 않는 앞 벽에도 둥근 무늬가 보였어요). 앞에 가리는 것이 있을 때만 보여요
+      const scr = hh => { const c = [0, 1, 2, 3].map(r => M[r] * f.x + M[4 + r] * hh + M[8 + r] * f.y + M[12 + r]); return c[3] > 1 ? [(c[0] / c[3] * .5 + .5) * fbw, (c[1] / c[3] * .5 + .5) * fbh] : null; };
+      const ft = scr(h - 24), hd = scr(h + 30); // 발 · 머리 위 → 그 사이 가운데, 반지름은 키의 절반 남짓
+      if (ft && hd) cutU = [(ft[0] + hd[0]) / 2, (ft[1] + hd[1]) / 2, Math.max(12, Math.abs(hd[1] - ft[1]) * .62), wRef]; }
 
     const usePost = o.post && q >= 1 && target(fbw, fbh).ok;
     if (usePost) gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.a.fb); else gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, fbw, fbh); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.disable(gl.CULL_FACE); gl.disable(gl.BLEND); disableAll();
-    const fogCol = hex(o.fogColor), fog = V.fp ? [2400, 12000] : V.hd ? [950, 3400] : [520, 2300], camPos = V.eye;
+    const fogCol = hex(o.fogColor), fog = V.fp ? [2400, 12000] : map.diving ? [520, 2100] : V.hd ? [950, 3400] : [520, 2300], camPos = V.eye;
     const tint = o.tint || [1, 1, 1];
-    const common = (P) => { gl.uniformMatrix4fv(P.u.uMVP, false, V.M); gl.uniform3fv(P.u.uCam, camPos); gl.uniform3fv(P.u.uFogCol, fogCol); gl.uniform2fv(P.u.uFog, fog); if (P.u.uSun) gl.uniform3fv(P.u.uSun, sun); if (P.u.uCut) gl.uniform4fv(P.u.uCut, cutU); if (P.u.uCutGap) gl.uniform1f(P.u.uCutGap, P === mesh ? 0 : 38); /* 땅·벽·바위 턱은 바로 앞 것도 비워요 */ if (P.u.uTex) gl.uniform1i(P.u.uTex, 0); if (P.u.uTint) gl.uniform3fv(P.u.uTint, tint); };
+    const common = (P) => { gl.uniformMatrix4fv(P.u.uMVP, false, V.M); gl.uniform3fv(P.u.uCam, camPos); gl.uniform3fv(P.u.uFogCol, fogCol); gl.uniform2fv(P.u.uFog, fog); if (P.u.uSun) gl.uniform3fv(P.u.uSun, sun); if (P.u.uCut) gl.uniform4fv(P.u.uCut, cutU); if (P.u.uCutGap) gl.uniform1f(P.u.uCutGap, P === mesh ? 0 : 16); /* 땅·벽·바위 턱은 바로 앞 것도 비워요 */ if (P.u.uTex) gl.uniform1i(P.u.uTex, 0); if (P.u.uTint) gl.uniform3fv(P.u.uTint, tint); };
     let draws = 0; gl.activeTexture(gl.TEXTURE0);
     gl.useProgram(mesh.p); common(mesh); gl.uniform1f(mesh.u.uMode, 0);
     for (const m of scene.meshes) {
@@ -719,8 +807,15 @@ export function createGL(canvas) {
     gl.uniform1f(sprite.u.uCutOn, 1);
     gl.uniform1f(sprite.u.uGlow, 0);
     if (scene.statics.n) { gl.bindTexture(gl.TEXTURE_2D, texture(scene.statics.atlas)); bindSprite(scene.statics.buf); gl.drawArrays(gl.TRIANGLES, 0, scene.statics.n); draws++; }
-    for (const [cb, key] of [[scene.cards, HD2D_ATLAS.key], [scene.cards.story, STORY_ATLAS.key]]) if (cb.n && assetImage(key)) { // 그림 판: 카메라와 수직(깊이 = 아랫변 줄) · 내 캐릭터를 가리면 도트 무늬로 비쳐요
-      gl.uniform1f(sprite.u.uTilt, V.fp ? 0 : HD.pitch); gl.bindTexture(gl.TEXTURE_2D, texture(assetImage(key))); bindSprite(cb.buf); gl.drawArrays(gl.TRIANGLES, 0, cb.n); draws++; gl.uniform1f(sprite.u.uTilt, V.tilt);
+    if (map.diving && uwMon?.c) { // v0.87 물고기 → v0.89 물고기 우산몬: 매 장면 자리를 다시(가는 쪽을 보게 뒤집어요)
+      const arr = [], AW = uwMon.width, AH = uwMon.height, t = o.now / 1000; let nf = 0;
+      for (const fsh of seabedLayout(map).fish) { const f = uwMon.frames[fsh.mon]; if (!f) continue; const p = fishAt(fsh, t), [fx, fy, w, h] = f, u0 = fx / AW, u1 = (fx + w) / AW, v0 = fy / AH, v1 = (fy + h) / AH, [a, b] = monFlip(fsh.mon, p.dir > 0) ? [u1, u0] : [u0, u1];
+        const X = p.x * T + 16, Z = p.y * T + 24, Hh = lv(map, Math.round(p.x), Math.round(p.y)) + fsh.lift + Math.sin(t * 1.3 + fsh.phase) * 3, L = -w / 2, R = w / 2;
+        const q = [[L, 0, a, v1], [R, 0, b, v1], [R, h, b, v0], [L, h, a, v0]]; for (const i of [0, 1, 2, 0, 2, 3]) arr.push(X, Hh, Z, q[i][0], q[i][1], q[i][2], q[i][3], 0, 0, 0); nf++; }
+      fishBuf = upload(arr, fishBuf); fishN = arr.length / 10; info.fish = nf;
+    } else fishN = 0;
+    for (const [cb, key] of [[scene.cards, HD2D_ATLAS.key], [scene.cards.story, STORY_ATLAS.key], [scene.cards.uw, UW_ATLAS.key], [scene.cards.region, REGION_ATLAS.key], [scene.cards.mon, uwMon?.c], [{ n: fishN, buf: fishBuf }, uwMon?.c]]) if (cb?.n && key && (typeof key !== 'string' || assetImage(key))) { // 그림 판: 카메라와 수직(깊이 = 아랫변 줄) · 내 캐릭터를 가리면 도트 무늬로 비쳐요
+      gl.uniform1f(sprite.u.uTilt, V.fp ? 0 : HD.pitch); gl.bindTexture(gl.TEXTURE_2D, texture(typeof key === 'string' ? assetImage(key) : key)); bindSprite(cb.buf); gl.drawArrays(gl.TRIANGLES, 0, cb.n); draws++; gl.uniform1f(sprite.u.uTilt, V.tilt);
     }
     gl.uniform1f(sprite.u.uCutOn, 0);
     if (dyn.n) { gl.bindTexture(gl.TEXTURE_2D, texture(A.c)); bindSprite(dyn.buf); gl.drawArrays(gl.TRIANGLES, 0, dyn.n); draws++; }
@@ -751,7 +846,7 @@ export function createGL(canvas) {
       gl.uniform1f(post.u.uFocus, cutU[3] ? cutU[1] / fbh : .45); gl.uniform1f(post.u.uTime, o.now / 1000); gl.uniform1f(post.u.uLight, o.light); gl.uniform1f(post.u.uDof, V.hd ? 1 : .55);
       gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf); gl.enableVertexAttribArray(post.a.aP); gl.vertexAttribPointer(post.a.aP, 2, gl.FLOAT, false, 8, 0); gl.drawArrays(gl.TRIANGLES, 0, 6); draws += 2; disableAll();
     }
-    frames++; Object.assign(info, { frames, meshes: scene.meshes.length, statics: scene.statics.n / 6, dynamic: dyn.n / 6, draws, post: usePost, shadows: q >= 1 ? scene.shade.n / 6 : 0, cards: scene.cards.count, cardKeys: scene.cards.keys, water: !!scene.water, quality: q, lamps: scene.lamps, hd2d: scene.hd2d, models: scene.models ? scene.models.n / 3 : 0, glbLandmarks: [...scene.hideLandmarks], interior: scene.interior, pier: scene.pier, doorMats: scene.doorMats || 0, rockCaps: scene.rockCaps || 0, storyCards: scene.cards.story.n / 6, playerDrawn: !!player, dynCap: dyn.A.h, ms: Math.round((performance.now() - t0) * 10) / 10 });
+    frames++; Object.assign(info, { frames, meshes: scene.meshes.length, statics: scene.statics.n / 6, dynamic: dyn.n / 6, draws, post: usePost, shadows: q >= 1 ? scene.shade.n / 6 : 0, cards: scene.cards.count, cardKeys: scene.cards.keys, water: !!scene.water, quality: q, lamps: scene.lamps, hd2d: scene.hd2d, models: scene.models ? scene.models.n / 3 : 0, glbLandmarks: [...scene.hideLandmarks], interior: scene.interior, pier: scene.pier, doorMats: scene.doorMats || 0, uwCards: scene.cards.uw?.n ? scene.cards.uw.n / 6 : 0, uwMons: scene.cards.mon?.n ? scene.cards.mon.n / 6 : 0, fish: map.diving ? info.fish || 0 : 0, rockCaps: scene.rockCaps || 0, storyCards: scene.cards.story.n / 6, playerDrawn: !!player, dynCap: dyn.A.h, ms: Math.round((performance.now() - t0) * 10) / 10 });
     return true;
   }
   return { ok: true, render, info, groundAt: (map, x, y) => groundAt(map, x, y), landmark: name => scene?.landmarks?.[name] || null, reset() { scene = null; } };

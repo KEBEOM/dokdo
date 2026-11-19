@@ -25,7 +25,7 @@ assert.ok(/const doorCols = b => doorColumns\(b\)/.test(game), '들어가기·�
 assert.ok(/enterable\(\) : \[\]\)\.map[\s\S]{0,240}lift: 44/.test(game), '간판은 집·가게·터미널까지 문 바로 위에');
 assert.ok(/\.building-label \.door-ico/.test(css), '간판에 작은 도트 문 그림');
 const gl3 = readFileSync(new URL('../dist/gl3d.js', import.meta.url), 'utf8');
-assert.ok(/capH\.set\(k, 7 \+/.test(gl3) && /capH\.set\(k, 5\)/.test(gl3), '바위 칸 · 절벽 끝 턱에 바위 덩어리');
+assert.ok(/capH\.set\(k, map\[y\]\[x\] === 0 \? 16/.test(gl3) && /rims\.push\(\[x, y, cl\.rim\.get\(k\)\]\)/.test(gl3), '바위 칸 · 절벽 끝 턱에 바위 덩어리');
 assert.ok(/uCutG < \.5 \|\| vWP\.y > uCutY/.test(gl3), '앞 언덕(내 발보다 높은 땅)도 도트 무늬로 비쳐요');
 assert.ok(!/\/\/[^\n`]*uCutG/.test(gl3.split('FS_MESH')[1]?.slice(0, 3000) || ''), '셰이더 줄 가운데 주석 없음');
 // 막힌 칸 중 보이는 것이 없던 칸(절벽 끝 턱·바위 칸) 수

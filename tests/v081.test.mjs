@@ -14,7 +14,7 @@ assert.ok(Object.keys(GLB_MODELS).every(k => need.includes(k)), 'only models the
 // 표면 무늬 4칸(층리 절벽·응회암·콘크리트·황토 바위)
 const b = fs.readFileSync(new URL(`assets/${GLB_SURF}.png`, dist)); assert.deepEqual([b.readUInt32BE(16), b.readUInt32BE(20)], [320, 64]); assert.match(GLB_SURF, /^scenery\/[a-z0-9-]+$/);
 // 바위 지명이 지도에 있어요(말 걸기 자리는 지도 칸 그대로)
-for (const [id, name] of [['route0', '숫돌바위'], ['route2', '독립문바위'], ['route3', '촛대바위'], ['town5', '코끼리바위'], ['route5', '삼형제굴바위']]) assert.ok(createMap(id).parsed.objects.some(o => o.type === 'landmark' && o.name === name), `${id} ${name}`);
+for (const [id, name] of [['route0', '숫돌바위'], ['route2', '독립문바위'], ['route3', '촛대바위'], ['town5', '코끼리바위'], ['route3', '삼형제굴바위']]) assert.ok(createMap(id).parsed.objects.some(o => o.type === 'landmark' && o.name === name), `${id} ${name}`);
 // 지형은 덮어쓰지 않아요: 지도 크기·출구·막힌 칸 수가 v0.80과 같아요
 const KEEP = { route0: [52, 34], town0: [72, 58], town3: [42, 30] };
 for (const [id, [w, h]] of Object.entries(KEEP)) { const m = createMap(id); assert.deepEqual([m[0].length, m.length], [w, h]); }
