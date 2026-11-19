@@ -6,22 +6,21 @@ import { worldScale } from './layout.js';
 import { createJoystick, createLookStick } from './joystick.js';
 import { createDirectionInput, KEY_VECTORS } from './input.js';
 import { roomId, parseRoomId } from './interiors.js';
+import { createGL, hdCamera } from './gl3d.js';
 import { MONSTERS, ZONES, TYPES, getSpecies, isUnique, pickStarterField, STARTER_LEVEL, keeperName } from './data.js';
 import { CONCEPTS, QUESTIONS, SOURCES } from './learning.js';
 import { STUDY_PAGES } from './study.js';
 import { stampSVG } from './stamps.js';
+import { heartText, toHalves } from './engine.js';
 import { newState, validateSave, createMonster, damage, enemyHit, attackHit, advantage, TYPE_RING, TYPE_REASON, healAll, gainXP, PARTY_MAX, captureChance, runChance, xpForDefeat, BENCH_RATE, addMonster, recordAnswer, BOSS_KINDS, PIERCE_CHANCE, QUESTION_POWER } from './engine.js';
 import { portrait, look } from './sprites.js';
 import { LEGENDS, ALL_LEGEND_IDS, legendProgress, legendScene, openFlag, metFlag, ownsSpecies } from './legends.js';
 import { PHOTO_CREDITS, LICENSE_TEXT, photoKey } from './photo-credits.js';
-import { onAssetReady, preloadMonsters, assetImage, assetURL } from './assets.js';
+import { onAssetReady, preloadMonsters, assetImage, assetURL, assetTintTag } from './assets.js';
 import { VILLAIN_ATLASES } from './villain-atlases.js';
 import { music, sfx, jingle, setOn, setVolume, isOn, audioPrefs, currentMusic, wantedMusic } from './audio.js';
 import { TRACKS } from './music-data.js';
-import { makeChase, cameraStep, seenDir, clampPitch, DIR_ANGLE, BACK } from './view3d.js';
-import { boxPainter, drawFace, drawSlab, SLAB } from './box3d.js';
-import { levelAt, LEVEL_H, cliffWalls, cliffTextures, regionMask, landMask, shoreWalls, shoreTextures } from './heights.js';
-import { V2_TERRAIN } from './tileset-v2.js';
+import { cameraStep, seenDir, clampPitch, DIR_ANGLE } from './view3d.js';
 import { weatherNow, weatherChoice, setWeather, currentSeason, seasonChoice, setSeason, seasonColor, seasonWind, SEASON_NAME, SEASON_ICON, seasonOfMonth, clockTick, setClock, gameClock, daylight, isNight, clockLabel, dayNightChoice, setDayNight, DAY_MS } from './season.js';
 import { whenNote, timeTalk } from './roamers.js';
 import { TRAITS, TRAIT_KINDS, traitOf } from './traits.js';
@@ -40,45 +39,28 @@ import { OPENING, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.74';
+const VERSION = '0.83';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const KEY = 'dokdomon-save-v1';
 
 let state = newState(), saved = null, map = createMap('town0');
-// 입체 시점(v0.59): ‘3D’ 단추로 지도 화면을 바꿔요(건물 안은 늘 2D). view3d.js가 계산하고, 이 기기에 기억해요.
-const elevCache = { tag: '', list: [] }; let rot3d = null, far3d = null, elev3d = null, rotElev = null, view3d = false; try { view3d = localStorage.getItem('dokdo-view3d') === '1'; } catch { /* 기본 2D */ }
-let proj3d = null, ground3d = null;
-const in3d = () => view3d && map.kind !== 'room';
-function projection() { if (!proj3d || proj3d.W !== sceneWidth || proj3d.H !== sceneHeight) proj3d = makeChase(sceneWidth, sceneHeight); return proj3d; }
-// 3D 카메라(v0.62): 내 캐릭터 뒤·위에서 따라가요. yaw(좌우)·pitch(위아래)는 마우스·오른쪽 조이스틱·방향키로 돌려요.
-let yaw = null, pitch = 0, lookDrag = null; const lookKeys = new Set();
-const LOOK = { mouse: .0035, drag: .006, stick: .0026, keys: .0022 }; // 돌리는 빠르기(픽셀당 · 밀리초당 라디안)
-// v0.70: 언덕 위에 서면 카메라도 한 층 올라가요(계단을 오르내릴 때 부드럽게)
-let camLift = 0, camLiftMap = null;
-// v0.71 바닷속 3D(마크처럼): 잠수하면 땅은 한 단(64) 위로 올라가 물가가 흙벽으로 보이고, 머리 위엔 물낯, 멀수록 푸른 안개
-let diveT = 0; const DIVE_LAND = 64, FOG = '#0e4f73', FOG_RGB = '14,79,115';
-const fogA = d => diveT > .01 ? Math.max(0, Math.min(.95, (d - 110) / 420)) * diveT : 0; // 4칸까지는 또렷, 16칸쯤이면 거의 안 보여요
-function liftAt(wx, wy) {
-  const tx = Math.round((wx - 16) / TILE), ty = Math.round((wy - 28) / TILE), lv = map.level ? levelAt(map, tx, ty) : 0;
-  if (diveT < .01) return lv * LEVEL_H;
-  return map[ty]?.[tx] === 0 ? 10 * diveT : DIVE_LAND * diveT + lv * LEVEL_H;
-}
-function fpCamera() {
-  if (yaw === null) { yaw = DIR_ANGLE[state.dir] ?? Math.PI; pitch = 0; }
-  const want = map.diving ? -8 : levelAt(map, view.x, view.y) * LEVEL_H; if (camLiftMap !== map.id) { camLiftMap = map.id; camLift = want; } else camLift += (want - camLift) * .12;
-  return projection().camera(view.x * TILE + 16, view.y * TILE + 28, yaw, pitch, camLift);
-}
-function lookBy(dx, dy, k) { if (yaw === null) fpCamera(); yaw += dx * k; if (yaw > Math.PI * 2) yaw -= Math.PI * 2; if (yaw < -Math.PI * 2) yaw += Math.PI * 2; pitch = clampPitch(pitch - dy * k * 1.1); }
+// v0.79 보기는 HD-2D 하나예요(2D·3D 보기 단추를 없앴어요). 들판·마을·건물 안·바닷속 모두 gl3d.js가 그려요.
+//   카메라는 북쪽을 보며 비스듬히 내려다보고 돌리지 않아요 → 걷기·누르기는 2D와 같아요(위 = 북쪽).
+//   WebGL이 안 되는 기기만 예전 2D 그리기가 자동으로 대신해요(고르는 메뉴는 없어요).
+let ground3d = null; const groundCache = { key: '', at: 0, ver: 0, camera: { x: 0, y: 0 } };
+const in3d = () => false; // 돌리는 3D 카메라(v0.59~0.78)는 없어졌어요
+let yaw = null, pitch = 0; // 시험 고리(setLook)용으로만 남겨 둬요
+const FOG = '#0e4f73'; // 바닷속 안개 색
 // 지도 위의 점(픽셀) → 화면 위의 점(지도 칸 단위 픽셀, sceneScale을 곱하기 전). lift: 땅에서 띄울 높이
 function toScreen(wx, wy, lift = 0) {
-  if (!in3d()) return { x: wx - camera.x, y: wy - lift - camera.y, k: 1 };
-  const p = projection().project(fpCamera(), wx, wy); return p ? { x: p.x, y: p.y - lift * p.k, k: p.k } : { x: -9999, y: -9999, k: 0 };
+  if (hdOn() && hdView) { const p = hdView.project(wx, wy, glView.groundAt(map, wx, wy) + lift); return p ? { x: p.x, y: p.y, k: p.k } : { x: -9999, y: -9999, k: 0 }; } // HD-2D
+  return { x: wx - camera.x, y: wy - lift - camera.y, k: 1 };
 }
 function fromScreen(sx, sy) {
-  if (!in3d()) return { x: sx + camera.x, y: sy + camera.y };
-  return projection().unproject(fpCamera(), sx, sy);
+  if (hdOn() && hdView) return hdView.unproject(sx, sy, glView.groundAt(map, view.x * TILE + 16, view.y * TILE + 28));
+  return { x: sx + camera.x, y: sy + camera.y };
 }
 let camera = { x: 0, y: 0 }, view = { x: state.x, y: state.y }, moving = null, path = [], pathAction = null;
 let walks = 0, lastEncounter = 0, walkDistance = 0, battle = null, dialogueState = null, modalReturn = null, avatarChoice = null;
@@ -89,6 +71,30 @@ const keys = createDirectionInput(); // 방향키: 나중에 누른 방향 우�
 
 const canvas = $('#world'), ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
 const actorCanvas = $('#actors'), actorCtx = actorCanvas.getContext('2d');
+// v0.77 새 3D(시험판): WebGL 캔버스는 하늘(#world)과 날씨·이름표(#actors) 사이에 놓여요
+const glCanvas = document.createElement('canvas'); glCanvas.id = 'gl3d'; glCanvas.setAttribute('aria-hidden', 'true'); glCanvas.hidden = true; canvas.after(glCanvas);
+// v0.79 그리기: HD-2D 하나(WebGL). WebGL이 없으면 2D로
+let glView = null, hdView = null, force2D = false; // force2D: 시험용(WebGL이 없는 기기 흉내)
+function glOn() {
+  if (force2D) return false;
+  if (!glView) { glView = createGL(glCanvas); if (glView.ok && glView.info.software && !gqSaved) { gfxQ = 0; resizeScene(); } } // 그래픽 카드 없이 그리는 기기는 ‘낮음’부터
+  return glView.ok;
+}
+const hdOn = () => glOn();
+function setGL(on) { force2D = !on; hdView = null; glView?.reset?.(); labelKey = ''; }
+const moveYaw = () => 0, lookYaw = () => 0; // HD-2D 카메라는 늘 북쪽을 봐요
+// 그래픽 품질(이 기기에 기억): 0 낮음(0.6배 해상도·그림자·화면 효과·물거품 끔) · 1 보통 · 2 높음(빛 먼지·물 반짝임, 선명하게)
+let gfxQ = 1, gqSaved = false; try { const q = localStorage.getItem('dokdo-gq'); if (q !== null) { gfxQ = Math.max(0, Math.min(2, Math.round(+q) || 0)); gqSaved = true; } } catch { /* 보통 */ }
+function setQuality(q) { gfxQ = Math.max(0, Math.min(2, Math.round(+q) || 0)); gqSaved = true; try { localStorage.setItem('dokdo-gq', String(gfxQ)); } catch { /* 괜찮아요 */ } resizeScene(); }
+// v0.79 해 방향·빛 색: 아침엔 동쪽, 낮엔 남쪽 하늘 높이, 저녁엔 서쪽에서 비춰요(그림자는 반대쪽). 밤엔 서늘한 달빛.
+function lightFor(L) {
+  const h = L.hour, mix = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
+  let sun; if (h < 5.5 || h > 19) sun = [-.3, .85, .42]; else { const a = Math.max(0, Math.min(1, (h - 6) / 12)) * Math.PI; sun = [Math.cos(a) * .8, .35 + Math.sin(a) * .55, .45]; }
+  const n = Math.hypot(...sun); sun = sun.map(v => Math.round(v / n * 20) / 20); // 조금씩만 바뀌어요(그림자를 너무 자주 다시 만들지 않게)
+  let tint = mix([1, 1, 1], [1.1, .9, .74], L.warm || 0); tint = mix(tint, [.8, .86, 1.05], L.night || 0);
+  return { sun, tint };
+}
+let nightLamps = [];
 const scene = $('#gameApp');
 let actorPixelRatio = 1, sceneScale = 1, sceneWidth = 768, sceneHeight = 480, labelKey = '', labelNodes = [], activePanel = null;
 
@@ -114,6 +120,8 @@ function resizeScene() {
   canvas.width = sceneWidth; canvas.height = sceneHeight; canvas.style.width = sceneWidth * sceneScale + 'px'; canvas.style.height = sceneHeight * sceneScale + 'px'; ctx.imageSmoothingEnabled = false;
   actorPixelRatio = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
   actorCanvas.width = Math.ceil(w * actorPixelRatio); actorCanvas.height = Math.ceil(h * actorPixelRatio); actorCanvas.style.width = w + 'px'; actorCanvas.style.height = h + 'px';
+  const gq = [.6, 1, Math.min(1.5, actorPixelRatio)][gfxQ] ?? 1; // HD-2D 그리는 해상도(품질 따라)
+  glCanvas.width = Math.ceil(sceneWidth * sceneScale * gq); glCanvas.height = Math.ceil(sceneHeight * sceneScale * gq); glCanvas.style.width = canvas.style.width; glCanvas.style.height = canvas.style.height;
 }
 resizeScene(); window.addEventListener('resize', resizeScene); if (typeof ResizeObserver !== 'undefined') new ResizeObserver(resizeScene).observe(scene);
 
@@ -346,13 +354,13 @@ function updateUI() {
   $('#badgeCount').textContent = `${state.badges.length} / 8`; $('#partyCount').textContent = `${state.party.length} / ${PARTY_MAX}`;
   $('#dexProgress').textContent = `${state.caught.length} / 100`; $('#learningProgress').textContent = `${studyRead()} / ${STUDY_PAGES.length}`; $('#dailyNote').textContent = z().fact;
   $('#soundBtn').setAttribute('aria-label', isOn() ? '소리 끄기' : '소리 켜기'); $('#soundBtn').title = isOn() ? '소리 끄기' : '소리 켜기'; $('#soundBtn').innerHTML = `♪ <span>소리 ${isOn() ? '켜짐' : '꺼짐'}</span>`;
-  $('#partyCards').innerHTML = state.party.length ? state.party.map((m, i) => `<button class="party-card ${i === state.active ? 'active' : ''}" data-party="${i}"><canvas data-portrait="${m.id}" width="64" height="64"></canvas><strong>${name(m)}</strong><small>Lv.${m.level} · ${m.hp}/${m.maxHp}</small><div class="hp-track"><i style="width:${m.hp / m.maxHp * 100}%"></i></div></button>`).join('') + Array.from({ length: 6 - state.party.length }, () => '<div class="party-slot">+</div>').join('') : '<p class="empty-party">첫 번째 동료가 당신을 기다리고 있어요.</p>';
+  $('#partyCards').innerHTML = state.party.length ? state.party.map((m, i) => `<button class="party-card ${i === state.active ? 'active' : ''}" data-party="${i}"><canvas data-portrait="${m.id}" width="64" height="64"></canvas><strong>${name(m)}</strong><small>Lv.${m.level} · ♥ ${heartText(m.hp)}/${heartText(m.maxHp)}</small><div class="hp-track"><i style="width:${m.hp / m.maxHp * 100}%"></i></div></button>`).join('') + Array.from({ length: 6 - state.party.length }, () => '<div class="party-slot">+</div>').join('') : '<p class="empty-party">첫 번째 동료가 당신을 기다리고 있어요.</p>';
   $$('[data-party]').forEach(b => b.onclick = () => partyDetail(Number(b.dataset.party)));
   $('#quickQuestText').textContent = $('#questTitle').textContent; $('#dockPartyCount').textContent = state.storage.length ? `${state.party.length} / ${PARTY_MAX} · 보관 ${state.storage.length}` : `${state.party.length} / ${PARTY_MAX}`;
   const buddy = state.party[state.active] || state.party[0];
   paintLegendList(); preloadMonsters(LEGENDS.filter(q => q.map === map.id).map(q => q.id));
   $('.buddy-peek')?.classList.toggle('hidden', !buddy); // 첫 동료를 고르기 전(나리분지 초원)에는 숨겨요
-  if (buddy) { $('#buddyName').textContent = name(buddy); $('#buddyStatus').textContent = `Lv.${buddy.level} · ${buddy.hp}/${buddy.maxHp}`; $('#buddyImage').dataset.portrait = buddy.id; }
+  if (buddy) { $('#buddyName').textContent = name(buddy); $('#buddyStatus').textContent = `Lv.${buddy.level} · ♥ ${heartText(buddy.hp)}/${heartText(buddy.maxHp)}`; $('#buddyImage').dataset.portrait = buddy.id; }
   paintPortraits();
 }
 function showPlaceBanner(def) {
@@ -392,12 +400,15 @@ function nearestNPC() {
   return all.filter(n => Math.abs(n.x - state.x) + Math.abs(n.y - state.y) <= 1)
     .sort((a, b) => (a.x === state.x + dir[0] && a.y === state.y + dir[1] ? -1 : 1) - (b.x === state.x + dir[0] && b.y === state.y + dir[1] ? -1 : 1))[0];
 }
+// v0.82 입체 바위의 모양을 얼마나 확인했는지(에셋 팩 기록) — 추정인 것은 추정이라고 말해요
+const LANDMARK_NOTE = { '보찰바위': '실제 지명 · 바위 모양은 추정(자세한 사진 확인 부족)', '상장군바위': '게임 속 임시 이름 · 바위 모양은 추정', '한반도바위': '실제 지명 · 사진 한 장을 참고한 단순한 모양' };
 function guide() {
   if (!state.started || busy()) return;
   tutorialEvent('guide');
   const t = targetNPC(); if (!t) { toast('이 지역의 모험을 모두 마쳤어요. 도감을 채우거나 다른 지역을 다시 둘러봐요.'); return; }
   if (t.exit) {
-    const p = pathfind(map, moving?.toX ?? state.x, moving?.toY ?? state.y, t.x, t.y, liveNPCs());
+    const sx = moving?.toX ?? state.x, sy = moving?.toY ?? state.y; let p = pathfind(map, sx, sy, t.x, t.y, liveNPCs());
+    if (!p.length) p = pathfind(map, sx, sy, t.x, t.y, []); // v0.81 누가 잠깐 길을 막고 있어도 안내는 시작해요(걷다가 막히면 다시 찾아요)
     if (p.length) { path = p; pathAction = null; npcFocus = null; toast(`${josa(t.name, '으로/로')} 가는 길을 안내할게요.`); }
     else toast('가까운 길로 조금 더 이동해 보세요.');
     return;
@@ -408,7 +419,7 @@ function moveToNPC(n) {
   if (busy()) return;
   n = liveNPCs().find(p => p.uid === n.uid) || n; npcFocus = n.uid;
   const sx = moving?.toX ?? state.x, sy = moving?.toY ?? state.y, people = liveNPCs();
-  const paths = [[0, 1], [1, 0], [-1, 0], [0, -1]].map(([dx, dy]) => { const x = n.x + dx, y = n.y + dy; return { x, y, path: pathfind(map, sx, sy, x, y, people) }; })
+  const paths = [[0, 1], [1, 0], [-1, 0], [0, -1]].map(([dx, dy]) => { const x = n.x + dx, y = n.y + dy; let path = pathfind(map, sx, sy, x, y, people); if (!path.length) path = pathfind(map, sx, sy, x, y, people.filter(p => p.uid === n.uid)); return { x, y, path }; }) // v0.81 지나가는 사람이 막아도
     .filter(v => v.path.length || (v.x === sx && v.y === sy)).sort((a, b) => a.path.length - b.path.length);
   if (paths.length) { path = paths[0].path; pathAction = () => interact(n); if (!path.length && !moving) { pathAction = null; interact(n); } }
   else toast('가까운 길로 조금 더 이동해 보세요.');
@@ -462,7 +473,7 @@ function interact(n) {
     case 'wild': return startBattle('wild', n.species, { roamer: n.uid });
     case 'friend': return meetFriend(n);
     case 'sign': return talk(n.name, n.lines, () => setFlag(n.flag), '안내판 · 실제 지명 정보');
-    case 'landmark': return talk(n.name, n.lines, () => setFlag(n.flag), '실제 지명 · 지도 위 그림은 게임용');
+    case 'landmark': return talk(n.name, n.lines, () => setFlag(n.flag), LANDMARK_NOTE[n.name] || '실제 지명 · 지도 위 그림은 게임용');
     case 'person':
       if (n.give && !n.used) return talk(n.name, n.lines, () => { giveItems(n.give); setFlag(n.flag); }, '길에서 만난 사람 · 창작 대화', n.actor);
       return talk(n.name, n.used && n.after ? n.after : n.lines, () => setFlag(n.flag), '길에서 만난 사람 · 창작 대화', n.actor);
@@ -491,13 +502,14 @@ function interact(n) {
 // ── buildings: doors, floors and stairs ────────────────────────────────────────
 // A building's door is the middle of its bottom row (both middle columns for even widths).
 const doorCols = b => b.w % 2 ? [b.x + Math.floor(b.w / 2)] : [b.x + b.w / 2 - 1, b.x + b.w / 2];
-function buildingDoorAt(x, y) { return map.kind === 'town' ? map.buildings.find(b => y === b.y + b.h - 1 && doorCols(b).includes(x)) : null; }
+const enterable = () => [...map.buildings, ...(map.structures || [])]; // v0.75 시가지의 집·가게·터미널도 들어가요
+function buildingDoorAt(x, y) { return map.kind === 'town' ? enterable().find(b => y === b.y + b.h - 1 && doorCols(b).includes(x)) : null; }
 function doorAhead() { return map.kind === 'town' && state.dir === 'up' ? buildingDoorAt(state.x, state.y - 1) : null; }
 function doorFront(b, people = liveNPCs()) { return doorCols(b).map(x => ({ x, y: b.y + b.h })).find(p => !blocked(map, p.x, p.y, people)) || { x: doorCols(b)[0], y: b.y + b.h }; }
 let stairHold = false; // after stairs, wait until the stick / keys are let go (no bouncing between floors)
-function enterBuilding(b) { sfx('door'); changeMap(roomId(state.zone, b.kind, 1), 'a', { dir: 'up' }); }
+function enterBuilding(b) { sfx('door'); changeMap(roomId(state.zone, b.room || b.kind, 1), 'a', { dir: 'up' }); }
 function leaveBuilding() {
-  const def = map.def, town = createMap(def.town), b = town.buildings.find(b => b.kind === def.building);
+  const def = map.def, town = createMap(def.town), b = [...town.buildings, ...(town.structures || [])].find(b => (b.room || b.kind) === def.building);
   const front = b ? doorCols(b).map(x => ({ x, y: b.y + b.h })).find(p => !blocked(town, p.x, p.y)) : null;
   sfx('door'); changeMap(def.town, front ? { ...front, dir: 'down' } : 'a');
 }
@@ -522,7 +534,7 @@ function move(dx, dy, now, keepDir = false) {
 // 한 걸음: 2D에서는 누른 쪽으로, 3D 보기에서는 ‘보는 방향’을 기준으로 앞(W)·왼쪽(A)·뒤(S)·오른쪽(D) 칸으로 걸어요
 function step(v, now) {
   if (!in3d()) return move(v[0], v[1], now);
-  if (yaw === null) fpCamera(); const [dx, dy] = cameraStep(yaw, v); return move(dx, dy, now);
+  const [dx, dy] = cameraStep(moveYaw(), v); return move(dx, dy, now);
 }
 // ── 바람에 날리는 나뭇잎·꽃잎 (v0.64, 건물 밖) ── 시간으로만 자리를 정해서 따로 기억할 것이 없어요.
 // ox, oy: 화면이 움직인 만큼(2D는 카메라, 3D는 보는 방향) 함께 밀려서 제자리에 떠 있는 것처럼 보여요.
@@ -533,21 +545,6 @@ const mixHex = (a, b, t) => { const p = h => [1, 3, 5].map(i => parseInt(h.slice
 function skyColors() {
   const L = daylight(), dusk = L.hour > 12, warm = dusk ? ['#3c3f80', '#f0846a', '#ffc46e'] : ['#4a5a96', '#ee9fb0', '#ffd49a'], night = ['#16224e', '#24336a', '#3a4c7e'];
   let c = ['#4f9fd6', '#8fcbe6', '#e4f4f6'].map((d, i) => mixHex(d, warm[i], L.warm * .9)); c = c.map((d, i) => mixHex(d, night[i], L.night)); return c;
-}
-function paintSunMoon(g, P, hz, yaw) {
-  const L = daylight(), h = L.hour, u = sceneHeight / 100, f = P.f;
-  const body = (t, az, elev, sun) => { // t: 떠 있는 정도 0..1 · az: 방위(0 북 · π/2 동 · π 남) · elev: 높이 0..1
-    let a = az - yaw; a = ((a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI; if (Math.abs(a) > 1.35) return;
-    const x = sceneWidth / 2 + Math.tan(a) * f, y = hz - elev * sceneHeight * .85 - 2 * u, low = 1 - Math.min(1, elev * 3), r = (sun ? 5.5 : 4.5) * u * (1 + low * .25);
-    const glow = g.createRadialGradient(x, y, r * .4, x, y, r * (sun ? 4.5 : 3));
-    glow.addColorStop(0, sun ? `rgba(255,${Math.round(236 - low * 90)},${Math.round(170 - low * 110)},${.55 * t})` : `rgba(220,230,255,${.35 * t})`); glow.addColorStop(1, 'rgba(255,200,120,0)');
-    g.fillStyle = glow; g.fillRect(x - r * 5, y - r * 5, r * 10, r * 10);
-    g.globalAlpha = t; g.fillStyle = sun ? mixHex('#fff4c8', '#ff8a3c', low) : '#eef2ff'; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
-    if (!sun) { g.fillStyle = 'rgba(160,170,200,.5)'; g.beginPath(); g.arc(x - r * .3, y - r * .2, r * .25, 0, Math.PI * 2); g.arc(x + r * .35, y + r * .25, r * .18, 0, Math.PI * 2); g.fill(); }
-    g.globalAlpha = 1;
-  };
-  if (h > 5 && h < 19.5) { const p = (h - 5.6) / 13; body(Math.min(1, Math.max(0, Math.min(h - 5, 19.5 - h) / .7)), Math.PI / 2 + Math.PI * p, Math.max(0, Math.sin(Math.PI * Math.max(0, Math.min(1, p)))) * .9, true); }
-  if (h > 18 || h < 6.5) { const p = ((h - 18.4 + 24) % 24) / 11.6; body(Math.min(1, L.night * 1.4), Math.PI / 2 + Math.PI * p, Math.max(0, Math.sin(Math.PI * Math.max(0, Math.min(1, p)))) * .75, false); }
 }
 function weatherText() { if (map.diving) return `🫧 바닷속 · ${SEASON_NAME[currentSeason()]} · ${clockLabel()}`; const L = daylight(), w = weatherNow(), sky = w.kind === 'rain' && w.amount > .3 ? '☂ 비' : w.kind === 'snow' && w.amount > .3 ? '❄ 눈' : L.night > .5 ? '☾ 밤' : z().sky; return `${sky} · ${SEASON_NAME[currentSeason()]} · ${clockLabel()}`; }
 function paintDaylight(g, K) {
@@ -561,6 +558,7 @@ function paintDaylight(g, K) {
   }
   if (L.night > .01) {
     n.fillStyle = `rgba(8,16,54,${(.6 * L.night).toFixed(3)})`; n.fillRect(0, 0, w, h);
+    for (const l of nightLamps) { const x = l.x * K, y = l.y * K, r = l.r * K, gr = n.createRadialGradient(x, y, r * .1, x, y, r); gr.addColorStop(0, `rgba(0,0,0,${(.7 * L.night).toFixed(3)})`); gr.addColorStop(1, 'rgba(0,0,0,0)'); n.globalCompositeOperation = 'destination-out'; n.fillStyle = gr; n.fillRect(x - r, y - r, r * 2, r * 2); n.globalCompositeOperation = 'source-over'; } // v0.79 가로등 둘레는 밝게
     if (lamp) { const x = lamp.x * K, y = lamp.y * K, r = lamp.r * K, gr = n.createRadialGradient(x, y, r * .12, x, y, r); gr.addColorStop(0, `rgba(0,0,0,${(.8 * L.night).toFixed(3)})`); gr.addColorStop(1, 'rgba(0,0,0,0)'); n.globalCompositeOperation = 'destination-out'; n.fillStyle = gr; n.fillRect(x - r, y - r, r * 2, r * 2); n.globalCompositeOperation = 'source-over'; }
   }
   g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.drawImage(nightCanvas, 0, 0); g.restore();
@@ -569,6 +567,7 @@ function paintDaylight(g, K) {
 // v0.72: 저절로 잠수하지 않아요. 물에 있을 때 ‘잠수하기’ 단추(또는 Q)로 들어가고 ‘물 위로’로 나와요. 땅에 오르면 저절로 물 위예요.
 let diveWanted = false;
 function inWater() { if (map.kind === 'room') return false; return map[Math.round(view.y)]?.[Math.round(view.x)] === 0; }
+function deepWater() { if (!inWater() || map.diving) return false; return !map.shallow?.has(`${Math.round(view.x)},${Math.round(view.y)}`); } // v0.82 깊은 물: 헤엄쳐요(조금 느리게)
 function isDiving() { if (!inWater()) diveWanted = false; return diveWanted; }
 function toggleDive() { if (!inWater() || busy() || battle) return; diveWanted = !diveWanted; sfx('toggle'); }
 function updateDiveButton() { const b = $('#diveBtn'), show = inWater() && !battle && state.started; b.classList.toggle('hidden', !show); if (!show) return; const label = map.diving ? '⬆ 물 위로' : '🫧 잠수하기'; if (b.dataset.label !== label) { b.dataset.label = label; b.innerHTML = `${label} <small>Q</small>`; b.setAttribute('aria-label', label); } b.classList.toggle('down', !!map.diving); }
@@ -639,7 +638,7 @@ function freeBlocked(ox, oy, nx, ny, vy, now) {
 }
 // (vx, vy): 지도 위에서 갈 방향(길이 1 이하). 움직였으면 true
 function freeWalk(vx, vy, dt, now) {
-  const p = freeXY(), sp = dt / MOVE_DURATION, ox = p.x, oy = p.y, nx = ox + vx * sp, ny = oy + vy * sp;
+  const p = freeXY(), sp = dt / MOVE_DURATION * (deepWater() ? .6 : 1), ox = p.x, oy = p.y, nx = ox + vx * sp, ny = oy + vy * sp;
   state.dir = Math.abs(vx) > Math.abs(vy) ? (vx > 0 ? 'right' : 'left') : (vy > 0 ? 'down' : 'up');
   if (vx && !freeBlocked(ox, oy, nx, oy, vy, now)) p.x = nx; if (battle || transition || busy()) return false;
   if (vy && !freeBlocked(p.x, oy, p.x, ny, vy, now)) p.y = ny; if (battle || transition || busy()) { p.x = ox; p.y = oy; return false; }
@@ -661,7 +660,7 @@ function freeFrame(dt, now) {
     path = []; pathAction = null; pathRetry = 0;
     const l = Math.hypot(ix, iy), k = l > 1 ? 1 / l : 1; ix *= k; iy *= k;
     if (!d3) { freeWalk(ix, iy, dt, now); return; }
-    if (yaw === null) fpCamera(); const sn = Math.sin(yaw), cs = Math.cos(yaw);
+    const my = moveYaw(), sn = Math.sin(my), cs = Math.cos(my);
     freeWalk(cs * ix - sn * iy, sn * ix + cs * iy, dt, now); return;
   }
   if (path.length) {
@@ -722,33 +721,15 @@ async function changeMap(id, spawnKey = 'a', { heal = false, instant = false, di
   if (first && def.zone > 0) { await playStory(arrivalScene(def.zone, ZONES[def.zone], def)); updateUI(); }
 }
 
-// 3D 보기에서 둘러보기: 마우스는 화면을 한 번 누르면 잠겨서 움직이는 대로 둘러봐요(Esc로 풀기, 잠긴 동안 누르면 말 걸기).
-// 손가락은 화면을 끌면 둘러보고, 톡 누르면 그곳으로 걸어가요.
-canvas.addEventListener('pointerdown', e => {
-  if (busy()) return;
-  if (!in3d()) { tapAt(e); return; }
-  if (e.pointerType === 'mouse') { if (document.pointerLockElement === canvas) { interact(); return; } try { canvas.requestPointerLock?.()?.catch?.(() => {}); } catch { /* 잠그지 못하면 끌어서 둘러봐요 */ } }
-  lookDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, mouse: e.pointerType === 'mouse' }; try { canvas.setPointerCapture?.(e.pointerId); } catch { /* 괜찮아요 */ }
-  canvas.focus({ preventScroll: true });
-});
-canvas.addEventListener('pointermove', e => {
-  if (!in3d() || busy()) return;
-  if (document.pointerLockElement === canvas) { const lim = v => Math.max(-120, Math.min(120, v || 0)); lookBy(lim(e.movementX), lim(e.movementY), LOOK.mouse); return; } // 가끔 튀는 값은 잘라 내요
-  if (!lookDrag || e.pointerId !== lookDrag.id) return;
-  const dx = e.clientX - lookDrag.x, dy = e.clientY - lookDrag.y; lookDrag.x = e.clientX; lookDrag.y = e.clientY; lookDrag.moved += Math.abs(dx) + Math.abs(dy);
-  if (lookDrag.moved > 8) lookBy(dx, dy, LOOK.drag);
-});
-for (const type of ['pointerup', 'pointercancel']) canvas.addEventListener(type, e => {
-  if (!lookDrag || e.pointerId !== lookDrag.id) return;
-  const tap = type === 'pointerup' && lookDrag.moved <= 8 && !lookDrag.mouse; lookDrag = null; if (tap && in3d() && !busy()) tapAt(e);
-});
+// 지도 화면을 누르면 그곳으로 걸어가요(사람을 누르면 말 걸기, 건물을 누르면 문으로 가서 들어가요)
+canvas.addEventListener('pointerdown', e => { if (busy()) return; tapAt(e); });
 function tapAt(e) {
   const bounds = canvas.getBoundingClientRect();
   const hit = fromScreen((e.clientX - bounds.left) * sceneWidth / bounds.width, (e.clientY - bounds.top) * sceneHeight / bounds.height); if (!hit) return;
   const tx = Math.floor(hit.x / 32), ty = Math.floor(hit.y / 32);
   const people = liveNPCs(), n = people.find(n => Math.abs((n.drawX ?? n.x) - tx) <= .65 && Math.abs((n.drawY ?? n.y) - ty) <= 1);
   if (n) { moveToNPC(n); return; }
-  const b = map.kind === 'town' && map.buildings.find(b => tx >= b.x && tx < b.x + b.w && ty >= b.y - 1 && ty < b.y + b.h);
+  const b = map.kind === 'town' && enterable().find(b => tx >= b.x && tx < b.x + b.w && ty >= b.y - 1 && ty < b.y + b.h);
   if (b) { // tap a building: walk to its door and go in
     const f = doorFront(b, people), sx = moving?.toX ?? state.x, sy = moving?.toY ?? state.y;
     if (sx === f.x && sy === f.y) { if (!moving) enterBuilding(b); else { path = []; pathAction = () => enterBuilding(b); } return; }
@@ -775,7 +756,6 @@ window.addEventListener('keydown', e => {
     return;
   }
   if (battle) { battleUI.handleKey(e); return; }
-  if (in3d() && e.key.startsWith('Arrow')) { e.preventDefault(); lookKeys.add(e.key); return; } // 3D 보기: 방향키는 둘러보기, 걷기는 W A S D
   if (vectors[e.key]) { e.preventDefault(); if (!e.repeat) keys.press(e.key, performance.now()); path = []; pathAction = null; }
   if ((e.key === 'q' || e.key === 'Q') && !e.repeat && $('#modal').classList.contains('hidden') && !dialogueState) { toggleDive(); return; } // v0.72 잠수·물 위로
   if (['e', 'E', ' ', 'Enter'].includes(e.key) && !e.repeat) {
@@ -784,7 +764,7 @@ window.addEventListener('keydown', e => {
     e.preventDefault(); if (dialogueState) nextTalk(); else interact();
   }
 });
-window.addEventListener('keyup', e => { keys.release(e.key); lookKeys.delete(e.key); }); window.addEventListener('blur', () => { keys.clear(); lookKeys.clear(); });
+window.addEventListener('keyup', e => { keys.release(e.key); }); window.addEventListener('blur', () => { keys.clear(); });
 // 가상 조이스틱: 누른 채로 밀면 그쪽으로 한 칸씩 걸어요. 대각선으로 밀면 막힌 쪽 대신 다른 쪽으로 미끄러지듯 걸어요.
 const joystick = createJoystick($('#joystick'), dir => { if (dir) { path = []; pathAction = null; } });
 const lookStick = createLookStick($('#lookStick'));
@@ -795,7 +775,6 @@ function frame(now) {
   let keyDir = null;
   const dt = Math.max(0, Math.min(now - lastTick, 100)); lastTick = now;
   if (state.started && !document.hidden) state.playMs += dt;
-  diveT += ((map.diving ? 1 : 0) - diveT) * Math.min(1, dt / 220); if (diveT < .005) diveT = 0;
   { const d = isDiving(); if (d !== !!map.diving) { map.diving = d; if (d && !frame.dived) { frame.dived = true; toast('🫧 바닷속으로 잠수했어요! ‘물 위로’ 단추(Q)로 올라와요.'); } frame.clockText = ''; } if (now - (frame.diveAt || 0) > 150) { frame.diveAt = now; updateDiveButton(); } } // v0.72 잠수는 단추로
   // v0.69 게임 시계: 결투·컷신·타이틀 화면에서는 멈춰요. 계절이 바뀌면 알려 주고, 시각은 위치 칸에 보여요.
   if (state.started && !document.hidden && !battle && !cutscenes.active() && titleEl.classList.contains('hidden')) {
@@ -817,84 +796,25 @@ function frame(now) {
     const walking = (!!moving || freeWalking) && !busy(), people = liveNPCs();
     const target = path.length ? { x: path.at(-1)[0], y: path.at(-1)[1] } : null, motion = { walking, distance: walkDistance }, K = sceneScale * actorPixelRatio;
     actorCtx.setTransform(1, 0, 0, 1, 0, 0); actorCtx.clearRect(0, 0, actorCanvas.width, actorCanvas.height); actorCtx.save();
-    if (in3d()) {
-      // 3D 보기(v0.62): 카메라 둘레의 땅을 따로 그리고 → 보는 쪽이 위로 가게 돌린 뒤 → 가로줄마다 원근을 주어 눕히고 → 서 있는 것들을 먼 것부터 세워 그려요
-      const P = projection(), lk = lookStick.vector;
-      if (!busy()) {
-        if (lk) lookBy(lk.x * Math.abs(lk.x) * dt, lk.y * Math.abs(lk.y) * dt * .7, LOOK.stick);
-        if (lookKeys.size) lookBy(((lookKeys.has('ArrowRight') ? 1 : 0) - (lookKeys.has('ArrowLeft') ? 1 : 0)) * dt, ((lookKeys.has('ArrowDown') ? 1 : 0) - (lookKeys.has('ArrowUp') ? 1 : 0)) * dt * .6, LOOK.keys);
-      } else if (document.pointerLockElement === canvas) document.exitPointerLock?.();
-      const cam = fpCamera(), gw = map[0].length * TILE, gh = map.length * TILE, hz = cam.hz; // 땅은 지도 전체를 그려 두고, 가까운 곳은 또렷하게·먼 곳은 줄여서 지도 끝까지 보여요(v0.64)
+    if (hdOn()) {
+      // v0.79 HD-2D: 땅 그림(지도 전체, 2D와 같은 그림) → WebGL이 땅·절벽·건물 그림 판·물결·사람 판을 진짜 3D 공간에 세워요
+      glCanvas.hidden = false; setPixelSnap(false);
+      const gw = map[0].length * TILE, gh = map.length * TILE;
       ground3d ||= document.createElement('canvas'); if (ground3d.width !== gw || ground3d.height !== gh) { ground3d.width = gw; ground3d.height = gh; }
       const g = ground3d.getContext('2d'); g.imageSmoothingEnabled = false;
-      camera = drawWorld(g, map, state, { x: (cam.x - 16) / TILE, y: (cam.y - 16) / TILE }, now, target, motion, { width: gw, height: gh, labels: false, actors: false, seabed: map.diving }, people);
-      drawFlatDecor(g, map, now); // v0.68: 배는 물 위에 눕혀요
-      rot3d ||= document.createElement('canvas'); if (rot3d.width !== P.RW || rot3d.height !== P.RH) { rot3d.width = P.RW; rot3d.height = P.RH; }
-      far3d ||= document.createElement('canvas'); if (far3d.width !== P.FW || far3d.height !== P.FH) { far3d.width = P.FW; far3d.height = P.FH; }
-      const r = rot3d.getContext('2d'), fr = far3d.getContext('2d'), sn = Math.sin(yaw), cs = Math.cos(yaw), ux = cam.x - camera.x, uy = cam.y - camera.y, fs = P.farScale;
-      r.setTransform(1, 0, 0, 1, 0, 0); r.fillStyle = seasonColor(z().color); r.fillRect(0, 0, P.RW, P.RH); r.imageSmoothingEnabled = false;
-      r.setTransform(cs, -sn, sn, cs, P.RW / 2 - (cs * ux + sn * uy), P.RH - (-sn * ux + cs * uy)); r.drawImage(ground3d, 0, 0);
-      fr.setTransform(1, 0, 0, 1, 0, 0); fr.fillStyle = seasonColor(z().color); fr.fillRect(0, 0, P.FW, P.FH); fr.imageSmoothingEnabled = true;
-      fr.setTransform(cs * fs, -sn * fs, sn * fs, cs * fs, P.FW / 2 - (cs * ux + sn * uy) * fs, P.FH - (-sn * ux + cs * uy) * fs); fr.drawImage(ground3d, 0, 0);
-      // 하늘: 위로 볼수록 짙은 파랑, 지평선 쪽은 옅게. 구름은 보는 방향에 따라 흘러가요.
-      const sky = ctx.createLinearGradient(0, hz - sceneHeight * 1.4, 0, hz), sc = map.diving ? ['#7fd6ec', '#2c8db5', FOG] : skyColors(); sky.addColorStop(0, sc[0]); sky.addColorStop(.55, sc[1]); sky.addColorStop(1, sc[2]); ctx.fillStyle = sky; ctx.fillRect(0, 0, sceneWidth, sceneHeight);
-      const u = sceneHeight / 100; ctx.fillStyle = '#ffffffd9';
-      for (let i = 0; i < (map.diving ? 0 : 9); i++) {
-        let a = (i * .7 + .35 - yaw + now * .000016) % (Math.PI * 2); // 구름은 바람을 타고 천천히 흘러가요 if (a > Math.PI) a -= Math.PI * 2; if (a < -Math.PI) a += Math.PI * 2; if (Math.abs(a) > 1.3) continue;
-        const x = sceneWidth / 2 + Math.tan(a) * P.f, y = hz - (14 + (i * 37 % 60)) * u, w = (16 + i % 3 * 7) * u;
-        ctx.fillRect(Math.round(x - w / 2), Math.round(y), Math.round(w), Math.round(3 * u)); ctx.fillRect(Math.round(x - w * .3), Math.round(y - 2 * u), Math.round(w * .55), Math.round(2 * u)); ctx.fillRect(Math.round(x - w * .1), Math.round(y - 3.4 * u), Math.round(w * .3), Math.round(1.5 * u));
-      }
-      if (!map.diving) paintSunMoon(ctx, P, hz, yaw); // v0.71 일출·일몰: 해와 달이 동쪽에서 떠서 서쪽으로 져요
-      { const L = daylight(); if (L.night > .2 && !map.diving) { ctx.fillStyle = '#ffffff'; for (let i = 0; i < 70; i++) { let a = (i * 2.399) % (Math.PI * 2) - Math.PI - yaw; a = ((a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI; if (Math.abs(a) > 1.3) continue; const sy = hz - (6 + (i * 53 % 90)) * u; if (sy < 0) continue; ctx.globalAlpha = L.night * (.45 + .55 * Math.abs(Math.sin(now / 900 + i))); const sz = i % 5 === 0 ? 3 : 2; ctx.fillRect(Math.round(sceneWidth / 2 + Math.tan(a) * P.f), Math.round(sy), sz, sz); } ctx.globalAlpha = 1; } } // v0.69 밤하늘 별
-      if (hz < sceneHeight) { ctx.fillStyle = seasonColor(z().color); ctx.fillRect(0, Math.max(0, hz), sceneWidth, sceneHeight - Math.max(0, hz)); }
-      actorCtx.scale(K, K); actorCtx.imageSmoothingEnabled = false;
-      for (let y = Math.max(0, Math.floor(hz) + 1); y < sceneHeight; y++) {
-        const d0 = Math.min(P.rowDepth(cam, y), P.far), d1 = P.rowDepth(cam, y + 1); if (d1 >= P.far) continue;
-        const k = P.f / ((d0 + d1) / 2), hw = sceneWidth / 2 / k;
-        if (d0 <= P.RH) { const sx = Math.max(0, P.RW / 2 - hw), sw = Math.min(P.RW, P.RW / 2 + hw) - sx; actorCtx.drawImage(rot3d, sx, P.RH - d0, sw, Math.max(.5, d0 - d1), sceneWidth / 2 + (sx - P.RW / 2) * k, y, sw * k, 1.03); }
-        else { const sx = Math.max(0, P.FW / 2 - hw * fs), sw = Math.min(P.FW, P.FW / 2 + hw * fs) - sx; actorCtx.drawImage(far3d, sx, Math.max(0, P.FH - d0 * fs), sw, Math.max(.5, (d0 - d1) * fs), sceneWidth / 2 + (sx - P.FW / 2) / fs * k, y, sw / fs * k, 1.03); }
-        if (diveT > .01) { actorCtx.fillStyle = `rgba(${FOG_RGB},${fogA((d0 + d1) / 2).toFixed(3)})`; actorCtx.fillRect(0, y, sceneWidth, 1.03); } // 바닷속 안개
-      }
-      if (map.cliff || diveT > .01) { // v0.70 언덕 위 땅(v0.71 바닷속에선 물 밖 땅 전체가 한 단 위 · v0.74 층마다 따로: 낮은 층부터 차례로)
-        const dive = DIVE_LAND * diveT, layers = []; // 층 칸만 오려 내어 그 높이의 땅으로 다시 눕혀요(가까운 16칸)
-        if (diveT > .01) layers.push({ mask: landMask(map), up: dive });
-        for (let v = 1; v <= (map.cliff?.top || 0); v++) layers.push({ mask: regionMask(map, v), up: v * LEVEL_H + dive });
-        elev3d ||= document.createElement('canvas'); if (elev3d.width !== gw || elev3d.height !== gh) { elev3d.width = gw; elev3d.height = gh; }
-        rotElev ||= document.createElement('canvas'); if (rotElev.width !== P.RW || rotElev.height !== P.RH) { rotElev.width = P.RW; rotElev.height = P.RH; }
-        // v0.74 층마다 오려 낸 땅 그림은 잠깐(0.6초) 모아 두고 다시 써요. 층이 많아도 매 장면마다 다시 오리지 않아요.
-        const tag = `${map.id}|${gw}|${seasonColor(z().color)}|${Math.floor(now / 600)}|${map.diving ? 1 : 0}`; if (elevCache.tag !== tag) { elevCache.tag = tag; elevCache.list = []; }
-        layers.forEach((L, i) => {
-          let c = elevCache.list[i]; if (!c || c.mask !== L.mask) { c = elevCache.list[i] = { mask: L.mask, cv: elevCache.list[i]?.cv || document.createElement('canvas') }; c.cv.width = gw; c.cv.height = gh; const e = c.cv.getContext('2d'); e.drawImage(ground3d, 0, 0); e.globalCompositeOperation = 'destination-in'; e.drawImage(L.mask, 0, 0); e.globalCompositeOperation = 'source-over'; }
-          L.cv = c.cv;
-        });
-        for (const { cv, up: UP } of layers) {
-          const re = rotElev.getContext('2d'); re.setTransform(1, 0, 0, 1, 0, 0); re.clearRect(0, 0, P.RW, P.RH); re.imageSmoothingEnabled = false;
-          re.setTransform(cs, -sn, sn, cs, P.RW / 2 - (cs * ux + sn * uy), P.RH - (-sn * ux + cs * uy)); re.drawImage(cv, 0, 0);
-          for (let y = Math.max(0, Math.floor(hz) + 1); y < sceneHeight; y++) {
-            const d0 = P.rowDepth(cam, y, UP), d1 = P.rowDepth(cam, y + 1, UP); if (d0 > P.RH || d1 < 2 || d0 < 0) continue;
-            const k = P.f / ((d0 + d1) / 2), hw = sceneWidth / 2 / k, sx = Math.max(0, P.RW / 2 - hw), sw = Math.min(P.RW, P.RW / 2 + hw) - sx;
-            actorCtx.drawImage(rotElev, sx, P.RH - d0, sw, Math.max(.5, d0 - d1), sceneWidth / 2 + (sx - P.RW / 2) * k, y, sw * k, 1.03);
-            if (diveT > .01) { actorCtx.fillStyle = `rgba(${FOG_RGB},${fogA((d0 + d1) / 2).toFixed(3)})`; actorCtx.fillRect(0, y, sceneWidth, 1.03); }
-          }
-        }
-      }
-      const haze = actorCtx.createLinearGradient(0, hz, 0, hz + sceneHeight * .06); haze.addColorStop(0, '#e4f4f6'); haze.addColorStop(1, '#e4f4f600'); actorCtx.fillStyle = haze; actorCtx.fillRect(0, hz, sceneWidth, sceneHeight * .06);
-      const project = (wx, wy) => { const p = P.project(cam, wx, wy), h = liftAt(wx, wy); if (p && h) p.y -= h * p.k; return p; }; // v0.70 언덕 위는 한 층 높이 · v0.71 바닷속에선 땅이 한 단 위
-      if (diveT > .01) project.fog = fogA;
-      { // 3D 벽: 언덕 둘레 바위벽(+ 바닷속에선 물가 흙벽). 카메라 쪽을 보는 것만, 가까운 것부터 정렬돼요
-        const img = assetImage(V2_TERRAIN.key), ctex = map.cliff && img ? cliffTextures(img) : null, stex = shoreTextures(), up = DIVE_LAND * diveT, list = [];
-        if (ctex) for (const w of cliffWalls(map)) list.push({ ...w, h: LEVEL_H, lift: up + (w.lift0 || 0), tex: w.ladder ? ctex.ladder : w.top === false ? ctex.rock : ctex.plain, th: 32 });
-        if (diveT > .01) for (const w of shoreWalls(map)) list.push({ ...w, h: up, lift: 0, tex: w.sand ? stex.sand : stex.soil, th: 64 });
-        project.walls = list.map(w => { const mx = (w.x0 + w.x1) / 2, my = (w.y0 + w.y1) / 2; return { ...w, z: (mx - cam.x) * cam.fx + (my - cam.y) * cam.fy, facing: (cam.x - mx) * w.n[0] + (cam.y - my) * w.n[1] }; }).filter(w => w.facing > 0 && w.z > -40 && w.z < P.RH * 1.6);
-        project.drawWall = (g, w) => drawFace(g, P, cam, { tex: w.tex, lift: w.lift, v: [[w.x0, w.y0, 0, 0, w.th], [w.x1, w.y1, 0, 32, w.th], [w.x1, w.y1, w.h, 32, 0], [w.x0, w.y0, w.h, 0, 0]] });
-      }
-      project.slab = { has: k => k in SLAB, draw: (g, n, kind, fx, fy, render) => drawSlab(g, P, cam, `${kind}|${n.art || ''}|${n.w || ''}|${n.used ? 1 : 0}|${n.species || ''}`, fx, fy, kind === 'fence' ? 4 : SLAB[kind], render, liftAt(fx, fy), kind === 'railv') };
-      project.fadeZ = BACK - 6; project.cam = cam; // v0.73 그리는 순서(가림) 판단용 project.seen = d => seenDir(yaw, d); project.box = boxPainter(P, cam, b => buildingArt(map, b), () => DIVE_LAND * diveT); // v0.68: 건물은 앞·뒤·옆이 있는 상자로
-      drawActors(actorCtx, state, view, now, motion, people, map, project);
-      { const lp = P.project(cam, view.x * TILE + 16, view.y * TILE + 28); lamp = lp ? { x: lp.x, y: lp.y - 22 * lp.k, r: 120 * lp.k } : null; }
-      paintMiniMap(now, people); if (!scene.classList.contains('look-on')) scene.classList.add('look-on');
-    } else {
-      if (scene.classList.contains('look-on')) scene.classList.remove('look-on');
+      // 땅 그림은 바뀔 때만 다시 그려요(지도·계절·누른 곳 표시·잠수) — 물결·풀 흔들림은 WebGL이 그려요. 늦어도 4초마다 한 번
+      const gkey = `${map.id}|${assetTintTag()}|${target ? target.x + ',' + target.y : ''}|${map.diving ? 1 : 0}|${gw}x${gh}|${Object.keys(state.flags || {}).length}`;
+      if (gkey !== groundCache.key || now - groundCache.at > 4000) { groundCache.camera = drawWorld(g, map, state, view, now, target, motion, { width: gw, height: gh, labels: false, actors: false, seabed: map.diving }, people); groundCache.key = gkey; groundCache.at = now; groundCache.ver++; }
+      camera = groundCache.camera;
+      const sc = map.diving ? ['#7fd6ec', '#2c8db5', FOG] : map.kind === 'room' ? ['#3b3448', '#3b3448', '#3b3448'] : skyColors(); ctx.fillStyle = sc[2]; ctx.fillRect(0, 0, sceneWidth, sceneHeight);
+      const px = view.x * TILE + 16, py = view.y * TILE + 28; hdView = hdCamera(px, py, glView.groundAt(map, px, py), 0, sceneWidth, sceneHeight);
+      const L = daylight(), room = map.kind === 'room', lt = room ? { sun: [.42, .82, .39], tint: [1, 1, 1] } : lightFor(L);
+      glView.render({ map, ground: ground3d, groundVer: groundCache.ver, view: hdView, now, people, viewPos: view, state, motion, wanted: map.kind === 'town' ? wantedRole(state.progress[state.zone] || {}) : null, seen: d => seenDir(0, d), fogColor: sc[2], seaColor: map.diving ? '#1d6f96' : '#3d8fc4', sun: lt.sun, tint: map.diving ? [.72, .9, 1.05] : lt.tint, night: room ? 0 : L.night, light: room ? .5 : Math.max(0, 1 - (L.night || 0)), post: true, season: currentSeason(), quality: gfxQ });
+      nightLamps = !room && L.night > .05 ? (glView.info.lamps || []).map(([x, h, z]) => hdView.project(x, z, h)).filter(Boolean).map(p => ({ x: p.x, y: p.y, r: 64 * p.k })) : [];
+      { const lp = toScreen(px, py); lamp = lp && lp.k ? { x: lp.x, y: lp.y - 22 * lp.k, r: 120 * lp.k } : null; }
+      if (!room) paintMiniMap(now, people); else if (miniMap) miniMap.hidden = true;
+    } else { // WebGL이 안 되는 기기: 2D로 그려요
+      glCanvas.hidden = true; setPixelSnap(true); nightLamps = [];
       camera = drawWorld(ctx, map, state, view, now, target, motion, { width: sceneWidth, height: sceneHeight, labels: false, actors: false, seabed: map.diving }, people);
       actorCtx.scale(K, K); actorCtx.translate(-camera.x, -camera.y);
       drawActors(actorCtx, state, view, now, motion, people, map);
@@ -903,7 +823,7 @@ function frame(now) {
     }
     actorCtx.restore();
     if (map.diving) paintUnderwater(actorCtx, K, now); // v0.71 바닷속
-    else if (map.kind !== 'room') paintWind(actorCtx, now, K, in3d() ? -(yaw || 0) * projection().f * .8 : -camera.x, in3d() ? pitch * sceneHeight * .5 : -camera.y);
+    else if (map.kind !== 'room') paintWind(actorCtx, now, K, hdOn() ? -view.x * TILE : -camera.x, hdOn() ? -view.y * TILE * .6 : -camera.y);
     if (map.kind !== 'room') paintDaylight(actorCtx, K); // v0.69 낮·밤
     paintWorldLabels(people);
   }
@@ -911,7 +831,7 @@ function frame(now) {
   if (state.started && !document.hidden && now - (frame.legendAt || 0) > 700) { frame.legendAt = now; checkLegends(); }
   if (avatarChoice) $$('canvas[data-explorer-sprite]').forEach(c => paintExplorerCard(c, c.dataset.explorerSprite, now, avatarChoice.selected === c.dataset.explorerSprite));
   const door = !busy() && !facingNPC() && doorAhead(), n = !door && !busy() && nearestNPC(); $('#interactionPrompt').classList.toggle('hidden', !n && !door);
-  if (door) $('#interactionPrompt').textContent = `${matchMedia('(pointer:coarse)').matches ? '대화' : 'E'} · ${door.name} 들어가기`;
+  if (door) $('#interactionPrompt').textContent = `${matchMedia('(pointer:coarse)').matches ? '대화' : 'E'} · ${door.name} 들어가기${map.def.island !== '울릉도' && ['gym', 'lab', 'shop', 'home'].includes(door.kind) ? ' · 이야기 시설' : ''}`; // v0.82 독도의 수호관·연구소·상점·집은 창작 시설
   else if (n) $('#interactionPrompt').textContent = `${matchMedia('(pointer:coarse)').matches ? '대화' : 'E'} · ${n.name}`;
   requestAnimationFrame(frame);
 }
@@ -1028,7 +948,7 @@ function startBattle(kind, id, opts = {}) {
   else if (kind === 'tutorial') {
     // a gentle practice foe: two right answers calm it, and it only taps lightly
     const foe = createMonster(id, 3), mine = state.party[state.active] || state.party[0];
-    foe.maxHp = foe.hp = damage(mine, foe, QUESTION_POWER, () => .5).amount * 2 - 1; foe.attack = 3; enemies = [foe];
+    foe.maxHp = foe.hp = Math.max(3, toHalves(damage(mine, foe, QUESTION_POWER, () => .5).amount, foe) * 2 - 2); foe.attack = 3; enemies = [foe]; // 하트 반 칸 단위
   }
   else if (kind === 'enemy') { const pool = z().wild; enemies = (state.zone === 7 ? bossTeam() : [pool[2] || pool[0] || 21]).map(i => createMonster(i, base)); }
   else if (kind === 'trainer') enemies = (opts.npc.team?.length ? opts.npc.team : [z().wild[3]]).map(i => createMonster(i, base));
@@ -1117,7 +1037,7 @@ async function attackWithQuiz(b, q = null) {
     if (tr === 'comeback' && ts.lastWrong) k *= 1.4;
     if (k !== 1) { d.amount = Math.max(1, Math.round(d.amount * k)); note = ` [${traitName(a)}]`; }
     ts.lastWrong = false;
-    if (tr === 'mend' && a.hp < a.maxHp) { healBy(a, .06); note = ` [${traitName(a)}: 체력 회복]`; }
+    if (tr === 'mend' && a.hp < a.maxHp) { healBy(a, .06); note = ` [${traitName(a)}: 하트 회복]`; }
   } else {
     ts.streak = 0; ts.lastWrong = true;
     if (tr === 'grit' && d.amount === 0) { d.amount = Math.max(1, Math.round(attackHit(a, e, true).amount * .3)); note = ` [${traitName(a)}]`; }
@@ -1125,8 +1045,8 @@ async function attackWithQuiz(b, q = null) {
   if (d.amount > 0) { e.hp = Math.max(0, e.hp - d.amount); sfx(d.mult > 1 ? 'hitStrong' : d.mult < 1 ? 'hitWeak' : 'hit'); battleUI.damage(d.amount, 'enemy'); refreshBattle(); }
   // 결과는 짧은 한 줄 + 배지(v0.65): 숫자는 문장에, 상성·특성은 배지에
   const tags = [...(d.amount > 0 && d.mult > 1 ? ['상성 좋음 ×1.5'] : d.amount > 0 && d.mult < 1 ? ['상성 나쁨 ×0.75'] : []), ...noteBadges(note)], gauge = dark ? '검은 기운' : '기운';
-  if (r.correct) await battleUI.explain(`정답! ${gauge} −${d.amount}`, explanationHTML(r.q), 'good', tags);
-  else if (d.amount > 0) await battleUI.explain(`아쉬워요! 그래도 ${gauge} −${d.amount}`, explanationHTML(r.q), 'bad', tags);
+  if (r.correct) await battleUI.explain(`정답! ${gauge} −${heartText(d.amount)}♥`, explanationHTML(r.q), 'good', tags);
+  else if (d.amount > 0) await battleUI.explain(`아쉬워요! 그래도 ${gauge} −${heartText(d.amount)}♥`, explanationHTML(r.q), 'bad', tags);
   else await battleUI.explain('아쉬워요! 이번에는 채우지 못했어요.', explanationHTML(r.q), 'bad', tags);
   // 연속 풀이: 결투마다 한 번, 맞히면 곧바로 한 문제 더
   if (battle === b && r.correct && tr === 'double' && !ts.doubled && e.hp > 0) { ts.doubled = true; await battleUI.say(`${name(a)}의 ${traitName(a)}! 한 문제 더 풀 수 있다!`, { tone: 'good' }); if (battle === b) await attackWithQuiz(b); }
@@ -1176,15 +1096,15 @@ async function playerTurn(b) {
   if (cmd === 'befriend') return befriend(b);
   if (cmd === 'item') {
     const pick = await battleUI.menu([
-      { label: `회복젤 ×${state.items.heal}`, value: 'heal', sub: `체력 ${tr === 'medic' ? 70 : 45}% 회복`, disabled: state.items.heal <= 0 || a.hp === a.maxHp }
+      { label: `회복젤 ×${state.items.heal}`, value: 'heal', sub: `하트 ${tr === 'medic' ? 70 : 45}% 회복`, disabled: state.items.heal <= 0 || a.hp === a.maxHp }
     ], { title: '도구', prompt: '어떤 도구를 쓸까?', cancel: true });
     if (pick === null) return 'free';
     state.items.heal--; jingle('heal'); const before = a.hp; a.hp = Math.min(a.maxHp, a.hp + Math.ceil(a.maxHp * (tr === 'medic' ? .7 : .45))); refreshBattle(); updateUI(); save();
-    await battleUI.say(`회복젤을 썼다! ${name(a)}의 체력이 ${a.hp - before} 회복됐다!`); return 'turn';
+    await battleUI.say(`회복젤을 썼다! ${name(a)}의 하트가 ${heartText(a.hp - before)}개 채워졌다!`); return 'turn';
   }
   if (cmd === 'party') {
     const e = enemy();
-    const pick = await battleUI.menu(state.party.map((m, i) => { const mu = matchup(m, e); return { label: name(m), value: String(i), sub: `Lv ${m.level} · HP ${m.hp}/${m.maxHp}${mu > 1 ? ' · 유리' : mu < 1 ? ' · 불리' : ''}`, disabled: m.hp <= 0 || i === state.active }; }), { title: '동료', prompt: '누구와 교체할까?', cancel: true });
+    const pick = await battleUI.menu(state.party.map((m, i) => { const mu = matchup(m, e); return { label: name(m), value: String(i), sub: `Lv ${m.level} · 하트 ${heartText(m.hp)}/${heartText(m.maxHp)}${mu > 1 ? ' · 유리' : mu < 1 ? ' · 불리' : ''}`, disabled: m.hp <= 0 || i === state.active }; }), { title: '동료', prompt: '누구와 교체할까?', cancel: true });
     if (pick === null) return 'free';
     state.active = Number(pick); if (traitId(b, active()) === 'cheer') healBy(active(), .15); refreshBattle(); battleUI.allyAct?.('enter'); updateUI(); save();
     await battleUI.say(`${name(active())}, 부탁해!`); return 'turn';
@@ -1205,15 +1125,16 @@ async function enemyTurn(b) {
   if (tr === 'sturdy') { d *= .85; note = ` [${traitName(a)}]`; }
   if (tr === 'shield' && r.correct && !pierce) { d *= 2 / 3; note = ` [${traitName(a)}]`; }
   if (tr === 'firstguard' && !ts.hit) { d *= .5; note = ` [${traitName(a)}]`; }
-  ts.hit = true; d = Math.max(1, Math.round(d));
-  if (tr === 'endure' && !ts.endured && a.hp > 1 && a.hp - d <= 0) { d = a.hp - 1; ts.endured = true; note = ` [${traitName(a)}: 체력 1로 버텼다!]`; }
+  ts.hit = true; d = d > 0 ? Math.max(1, Math.round(d)) : 0; // v0.83 반 개짜리 충격을 맞혀서 막으면 0(완전 방어)
+  if (tr === 'endure' && !ts.endured && a.hp > 1 && a.hp - d <= 0) { d = a.hp - 1; ts.endured = true; note = ` [${traitName(a)}: 하트 반 개로 버텼다!]`; }
   a.hp = Math.max(tut(b) ? 1 : 0, a.hp - d);
   if (tr === 'counter' && r.correct) { e.hp = Math.max(1, e.hp - Math.max(1, Math.round(e.maxHp * .05))); note = ` [${traitName(a)}: 두루마리가 조금 채워졌다]`; }
-  if (tr === 'thorns' && e.hp > 1) { e.hp = Math.max(1, e.hp - Math.max(1, Math.round(d * .2))); note = ` [${traitName(a)}]`; }
-  tip(b, '내 체력(HP)은 왼쪽 위에서 볼 수 있어요. 줄어들면 쉼터나 회복젤로 채워요.'); if (d > 0) sfx('hurt'); battleUI.damage(d, 'player'); refreshBattle(); updateUI();
-  if (pierce) await battleUI.explain(`정답! 하지만 뚫고 들어왔다. 체력 −${d}`, explanationHTML(r.q), 'bad', ['관통', ...noteBadges(note)]);
-  else if (r.correct) await battleUI.explain(`정답! 잘 막았다. 체력 −${d}`, explanationHTML(r.q), 'good', ['충격 40% 줄임', ...noteBadges(note)]);
-  else await battleUI.explain(`막지 못했다! 체력 −${d}`, explanationHTML(r.q), 'bad', noteBadges(note));
+  if (tr === 'thorns' && d > 0 && e.hp > 1) { e.hp = Math.max(1, e.hp - Math.max(1, Math.round(d * .2))); note = ` [${traitName(a)}]`; }
+  tip(b, '내 하트는 왼쪽 위에서 볼 수 있어요. 줄어들면 쉼터나 회복젤로 채워요.'); if (d > 0) { sfx('hurt'); battleUI.damage(d, 'player'); } refreshBattle(); updateUI();
+  if (pierce) await battleUI.explain(`정답! 하지만 뚫고 들어왔다. 하트 −${heartText(d)}`, explanationHTML(r.q), 'bad', ['관통', ...noteBadges(note)]);
+  else if (r.correct && d === 0) await battleUI.explain('정답! 완전히 막아 냈다. 하트 그대로!', explanationHTML(r.q), 'good', ['완전 방어', ...noteBadges(note)]);
+  else if (r.correct) await battleUI.explain(`정답! 잘 막았다. 하트 −${heartText(d)}`, explanationHTML(r.q), 'good', ['충격 40% 줄임', ...noteBadges(note)]);
+  else await battleUI.explain(`막지 못했다! 하트 −${heartText(d)}`, explanationHTML(r.q), 'bad', noteBadges(note));
 }
 async function allyFainted(b) {
   battleUI.allyAct?.('tired'); sfx('faint');
@@ -1388,7 +1309,7 @@ function paintLegendList() {
 // ── shop, party, dex, world map, notebook, menu ────────────────────────────────
 function showShop() {
   openModal(head('쉼터', '회복 · 준비') + `<p>잠깐 쉬어 가요. 동료 회복은 언제나 무료예요.</p><div class="fact-box">조사 코인 <strong>${state.coins}</strong> · 회복젤 ${state.items.heal}</div><div class="modal-actions"><button id="healAll" class="primary">모두 회복하기</button><button id="buyHeal" class="neutral" ${state.coins < 20 ? 'disabled' : ''}>회복젤 +3 · 20코인</button></div>`, () => {
-    $('#healAll').onclick = () => { healAll(state); save(); updateUI(); closeModal(); toast('모든 동료의 체력을 회복했어요.'); jingle('heal'); };
+    $('#healAll').onclick = () => { healAll(state); save(); updateUI(); closeModal(); toast('모든 동료의 하트를 가득 채웠어요.'); jingle('heal'); };
     $('#buyHeal').onclick = () => { state.coins -= 20; state.items.heal += 3; save(); showShop(); };
   });
 }
@@ -1420,7 +1341,7 @@ function showStorage(pick = null) {
 }
 function partyDetail(index) {
   if (battle) return; const m = state.party[index]; if (!m) return; const sp = getSpecies(m.id);
-  openModal(head(sp.name, `함께하는 동료 · Lv.${m.level}`) + `<div class="monster-detail"><canvas data-portrait="${m.id}" width="160" height="160"></canvas><div><span class="type-chip">${TYPES[sp.type].name}</span><p>${sp.motif} 모티브</p><p class="trait-line">${traitChip(m)} ${esc(traitOf(m.id).text)}</p><div class="stat-list"><span>체력 ${m.hp}/${m.maxHp}</span><span>공격 ${m.attack}</span><span>방어 ${m.defense}</span><span>스피드 ${m.speed}</span></div></div></div><div class="fact-box">결투에서는 ‘기록 찾기’로 문제를 풀어 검은 기운이 지운 기록을 되찾아요. 상성이 좋은 상대에게는 1.5배! 특성은 결투에서 저절로 쓰여요.</div><div class="modal-actions"><button id="leadMon" class="primary" ${m.hp <= 0 ? 'disabled' : ''}>첫 번째로 내보내기</button><button id="fieldHeal" class="neutral" ${state.items.heal <= 0 ? 'disabled' : ''}>회복젤 사용 (${state.items.heal})</button><button id="toStorage" class="neutral" ${state.party.length <= 1 ? 'disabled' : ''}>보관함에 맡기기</button><button id="backStorage" class="neutral">← 동료 보관함</button></div>`, () => {
+  openModal(head(sp.name, `함께하는 동료 · Lv.${m.level}`) + `<div class="monster-detail"><canvas data-portrait="${m.id}" width="160" height="160"></canvas><div><span class="type-chip">${TYPES[sp.type].name}</span><p>${sp.motif} 모티브</p><p class="trait-line">${traitChip(m)} ${esc(traitOf(m.id).text)}</p><div class="stat-list"><span>하트 ${heartText(m.hp)}/${heartText(m.maxHp)}</span><span>공격 ${m.attack}</span><span>방어 ${m.defense}</span><span>스피드 ${m.speed}</span></div></div></div><div class="fact-box">결투에서는 ‘기록 찾기’로 문제를 풀어 검은 기운이 지운 기록을 되찾아요. 상성이 좋은 상대에게는 1.5배! 특성은 결투에서 저절로 쓰여요.</div><div class="modal-actions"><button id="leadMon" class="primary" ${m.hp <= 0 ? 'disabled' : ''}>첫 번째로 내보내기</button><button id="fieldHeal" class="neutral" ${state.items.heal <= 0 ? 'disabled' : ''}>회복젤 사용 (${state.items.heal})</button><button id="toStorage" class="neutral" ${state.party.length <= 1 ? 'disabled' : ''}>보관함에 맡기기</button><button id="backStorage" class="neutral">← 동료 보관함</button></div>`, () => {
     $('#leadMon').onclick = () => { state.active = index; save(); updateUI(); showStorage(); };
     $('#toStorage').onclick = () => { if (state.party.length <= 1) return; const out = state.party.splice(index, 1)[0]; state.storage.push(out); state.active = Math.min(state.active > index ? state.active - 1 : state.active === index ? 0 : state.active, state.party.length - 1); save(); updateUI(); toast(`${josa(name(out), '은/는')} 보관함에서 쉬어요.`); showStorage(); };
     $('#backStorage').onclick = () => showStorage();
@@ -1590,12 +1511,13 @@ function exportLearning() {
 function download(fileName, content, type = 'application/json') { const blob = new Blob([content], { type }), url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = fileName; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 function showMenu() {
   if (battle) { toast('결투를 마친 뒤 메뉴를 열어 주세요.'); return; }
-  openModal(head('모험 메뉴', `DOKDO EXPLORERS · BUILD ${VERSION}`) + `<div class="sound-settings" aria-label="소리 설정"><strong>소리</strong><label><span>배경음악</span><input id="musicVol" type="range" min="0" max="100" step="5" value="${Math.round(audioPrefs().music * 100)}"></label><label><span>효과음</span><input id="sfxVol" type="range" min="0" max="100" step="5" value="${Math.round(audioPrefs().sfx * 100)}"></label><button id="soundToggle" class="neutral">${isOn() ? '소리 끄기' : '소리 켜기'}</button><label class="music-pick"><span>배경음악 듣기</span><select id="musicPick"><option value="">지금 있는 곳의 음악</option>${Object.entries(TRACKS).map(([id, t]) => `<option value="${id}">${t.name}</option>`).join('')}</select></label></div><div class="sound-settings hand-settings" aria-label="조작 설정"><strong>조작 손</strong><button id="handToggle" class="neutral">${handLabel()}</button></div><div class="sound-settings hand-settings" aria-label="계절 설정"><strong>계절</strong><select id="seasonPick" aria-label="계절 고르기"><option value="flow">시간 따라 바뀌기 · 한 계절 5분</option><option value="auto">달력 따라 (지금 ${SEASON_NAME[seasonOfMonth(new Date().getMonth())]})</option>${['spring', 'summer', 'autumn', 'winter'].map(s => `<option value="${s}">${SEASON_ICON[s]} ${SEASON_NAME[s]}</option>`).join('')}</select></div><div class="sound-settings hand-settings" aria-label="낮과 밤 설정"><strong>낮·밤</strong><select id="dayPick" aria-label="낮과 밤"><option value="flow">흐르기 · 하루 2분 30초</option><option value="day">항상 낮</option></select></div><div class="sound-settings hand-settings" aria-label="날씨 설정"><strong>날씨</strong><select id="weatherPick" aria-label="날씨"><option value="flow">바뀌기 · 비와 눈이 와요</option><option value="clear">늘 맑음</option></select></div><div class="settings-grid"><button id="menuSave" class="neutral" ${!state.started ? 'disabled' : ''}>▣ 지금 저장하기</button><button id="exportSave" class="neutral" ${!state.started ? 'disabled' : ''}>↓ 저장 파일 내려받기</button><label class="neutral">↑ 저장 파일 불러오기 <input id="importSave" type="file" accept="application/json,.json"></label><button id="menuLearn" class="neutral">✎ 공부 수첩 · 배움의 기록 내보내기</button><button id="menuSources" class="neutral">학습 자료와 출처</button><button id="menuHelp" class="neutral">조작 방법</button><button id="menuOpening" class="neutral" ${!state.started ? 'disabled' : ''}>오프닝 다시 보기</button><button id="menuTutorial" class="neutral" ${!state.started ? 'disabled' : ''}>튜토리얼 다시 하기</button><button id="menuAvatar" class="neutral" ${!state.started ? 'disabled' : ''}>탐험대원 바꾸기</button><button id="restartBtn" class="neutral danger">새로운 모험</button></div><p class="footer-note">진행은 현재 브라우저에 저장돼요. 다른 기기에서는 저장 파일을 불러와 이어갈 수 있어요. 서버에 학생 이름이나 기록을 전송하지 않아요.</p>`, () => {
+  openModal(head('모험 메뉴', `DOKDO EXPLORERS · BUILD ${VERSION}`) + `<div class="sound-settings" aria-label="소리 설정"><strong>소리</strong><label><span>배경음악</span><input id="musicVol" type="range" min="0" max="100" step="5" value="${Math.round(audioPrefs().music * 100)}"></label><label><span>효과음</span><input id="sfxVol" type="range" min="0" max="100" step="5" value="${Math.round(audioPrefs().sfx * 100)}"></label><button id="soundToggle" class="neutral">${isOn() ? '소리 끄기' : '소리 켜기'}</button><label class="music-pick"><span>배경음악 듣기</span><select id="musicPick"><option value="">지금 있는 곳의 음악</option>${Object.entries(TRACKS).map(([id, t]) => `<option value="${id}">${t.name}</option>`).join('')}</select></label></div><div class="sound-settings hand-settings" aria-label="조작 설정"><strong>조작 손</strong><button id="handToggle" class="neutral">${handLabel()}</button></div><div class="sound-settings hand-settings" aria-label="계절 설정"><strong>계절</strong><select id="seasonPick" aria-label="계절 고르기"><option value="flow">시간 따라 바뀌기 · 한 계절 5분</option><option value="auto">달력 따라 (지금 ${SEASON_NAME[seasonOfMonth(new Date().getMonth())]})</option>${['spring', 'summer', 'autumn', 'winter'].map(s => `<option value="${s}">${SEASON_ICON[s]} ${SEASON_NAME[s]}</option>`).join('')}</select></div><div class="sound-settings hand-settings" aria-label="낮과 밤 설정"><strong>낮·밤</strong><select id="dayPick" aria-label="낮과 밤"><option value="flow">흐르기 · 하루 2분 30초</option><option value="day">항상 낮</option></select></div><div class="sound-settings hand-settings" aria-label="날씨 설정"><strong>날씨</strong><select id="weatherPick" aria-label="날씨"><option value="flow">바뀌기 · 비와 눈이 와요</option><option value="clear">늘 맑음</option></select></div><div class="sound-settings hand-settings" aria-label="그래픽 품질"><strong>그래픽</strong><select id="gfxPick" aria-label="그래픽 품질"><option value="0">낮음 · 가볍게(오래된 기기)</option><option value="1">보통</option><option value="2">높음 · 빛 먼지·물 반짝임</option></select></div><div class="settings-grid"><button id="menuSave" class="neutral" ${!state.started ? 'disabled' : ''}>▣ 지금 저장하기</button><button id="exportSave" class="neutral" ${!state.started ? 'disabled' : ''}>↓ 저장 파일 내려받기</button><label class="neutral">↑ 저장 파일 불러오기 <input id="importSave" type="file" accept="application/json,.json"></label><button id="menuLearn" class="neutral">✎ 공부 수첩 · 배움의 기록 내보내기</button><button id="menuSources" class="neutral">학습 자료와 출처</button><button id="menuHelp" class="neutral">조작 방법</button><button id="menuOpening" class="neutral" ${!state.started ? 'disabled' : ''}>오프닝 다시 보기</button><button id="menuTutorial" class="neutral" ${!state.started ? 'disabled' : ''}>튜토리얼 다시 하기</button><button id="menuAvatar" class="neutral" ${!state.started ? 'disabled' : ''}>탐험대원 바꾸기</button><button id="restartBtn" class="neutral danger">새로운 모험</button></div><p class="footer-note">진행은 현재 브라우저에 저장돼요. 다른 기기에서는 저장 파일을 불러와 이어갈 수 있어요. 서버에 학생 이름이나 기록을 전송하지 않아요.</p>`, () => {
     $('#musicVol').oninput = e => setVolume('music', e.target.value / 100);
     $('#musicPick').onchange = e => { musicPreview = e.target.value || null; if (musicPreview && !isOn()) { setOn(true); $('#soundToggle').textContent = '소리 끄기'; updateUI(); } };
     $('#sfxVol').oninput = e => setVolume('sfx', e.target.value / 100); $('#sfxVol').onchange = () => sfx('correct');
     $('#handToggle').onclick = e => { setHand(!leftHanded); e.target.textContent = handLabel(); };
     $('#weatherPick').value = weatherChoice(); $('#weatherPick').onchange = e => { setWeather(e.target.value); $('#weather').textContent = weatherText(); };
+    $('#gfxPick').value = String(gfxQ); $('#gfxPick').onchange = e => { setQuality(e.target.value); toast(['그래픽 낮음: 가볍게 그려요(그림자·화면 효과 끔).', '그래픽 보통으로 그려요.', '그래픽 높음: 선명하게, 빛 먼지와 물 반짝임까지 그려요.'][gfxQ]); };
     $('#dayPick').value = dayNightChoice(); $('#dayPick').onchange = e => { setDayNight(e.target.value); $('#weather').textContent = weatherText(); };
     $('#seasonPick').value = seasonChoice(); $('#seasonPick').onchange = e => { const s = setSeason(e.target.value); $('#weather').textContent = weatherText(); toast(`${SEASON_ICON[s]} ${SEASON_NAME[s]}이 왔어요.`); };
     $('#soundToggle').onclick = e => { setOn(!isOn()); e.target.textContent = isOn() ? '소리 끄기' : '소리 켜기'; updateUI(); };
@@ -1605,7 +1527,7 @@ function showMenu() {
     $('#menuTutorial').onclick = () => { closeModal(); state.tutorial = { battle: false, walk: 0 }; save(); renderCoachPanel(); startTutorial(); };
     $('#menuAvatar').onclick = () => chooseAvatar(id => { state.avatar = id; save(); updateUI(); toast('탐험대원을 바꿨어요.'); });
     $('#restartBtn').onclick = () => { saved = state.started ? state : saved; startNew(); };
-    $('#menuHelp').onclick = () => openModal(head('천천히, 함께 탐험해요') + '<div class="fact-box">이동: 방향키 / WASD / 조이스틱(터치 화면) / 지도 화면 누르기<br>3D 보기(◈): 내 캐릭터를 뒤에서 따라가며 봐요. W A S D로 보는 방향으로 칸에 얽매이지 않고 자유롭게 걷고, 마우스(화면을 한 번 눌러요 · Esc로 풀기)·방향키·둘러보기 조이스틱으로 하늘과 땅까지 둘러봐요. 왼손잡이는 메뉴의 ‘조작 손’에서 조이스틱 자리를 바꿔요<br>건물: 문 바로 아래에서 위로 걸으면(또는 건물을 누르면) 들어가요. 계단을 밟으면 위아래 층으로, 문 깔개를 밟으면 밖으로 나가요<br>대화·조사: 가까이에서 E·스페이스 / 대화 버튼<br>자동 안내: 수첩의 목적지 안내<br>다음 지역: 독도 지킴이 인증 후 마을 오른쪽 다리 → 길을 따라 걷기<br>세계 지도: 가 본 마을로 바로 이동<br>결투 명령: 기록 찾기 · 동료 만들기 · 도구 · 동료 · 물러나기 (전설의 우산몬은 형태변환도)<br>기록 찾기: 누르면 독도 문제가 나와요. 맞히면 위쪽 두루마리(검은 기운이 지운 기록)의 빈칸이 채워져요. 문제에 따라 나침반·순서 놓기·근거 카드로 풀고, 검은 기운이 밀려올 때는 ○ ×로 빠르게 판단해요<br>상성(화살표 앞이 뒤에 강해요): 잎→빛→메아리→잎, 파도→바위→바람→파도. 상성이 좋으면 맞혔을 때 1.5배, 틀려도 절반은 닿아요. 상성이 나쁘면 0.75배<br>사나워진 우산몬: 문제를 맞히면 검은 기운을 걷어 내요. 모두 걷히면 평온을 되찾아요<br>상대의 문제: 맞히면 충격이 40% 줄고, 틀리면 그대로 받아요. 독도 지킴이·백무 사장은 가끔 정답도 뚫고 들어와요(관통)<br>동료 만들기: 버튼을 누르면 확률로 동료가 돼요(그 차례엔 공격 못 해요). 검은 기운이 적을수록 잘 되고, 전설의 우산몬은 10%<br>동료 보관함: 함께 다니는 동료는 4마리예요. 화면 아래 ‘동료’ 단추를 누르면 보관함이 열리고, 쉬는 동료와 언제든 바로 바꿔요<br>특성: 우산몬마다 결투에서 저절로 쓰이는 특별한 능력이 하나씩 있어요(30가지). 동료 보관함과 도감에서 볼 수 있어요<br>독도 지킴이와는 인증 결투로 겨뤄요<br>힌트: 문제 아래 기록 힌트 · 학습 기록에 도움 표시<br>대화와 컷신: 클릭·엔터·스페이스로 넘기기</div>' + typeRingHTML() + '<p>길에서는 표지판, 관찰 지점, 기억 비석, 조사 상자, 길에서 만난 사람과 몽땅랜드 직원을 찾아봐요. 사나워진 야생 우산몬은 마을과 마을 사이의 길 위를 걸어 다녀요.</p>');
+    $('#menuHelp').onclick = () => openModal(head('천천히, 함께 탐험해요') + '<div class="fact-box">이동: 방향키 / WASD / 조이스틱(터치 화면) / 지도 화면 누르기<br>화면: 비스듬히 내려다보는 HD-2D예요. 위쪽이 북쪽이고, 칸에 얽매이지 않고 자유롭게 걸어요. 건물이 내 캐릭터를 가리면 그 둘레가 비쳐 보여요. 메뉴의 ‘그래픽’에서 낮음·보통·높음을 골라요. 왼손잡이는 ‘조작 손’에서 조이스틱 자리를 바꿔요<br>건물: 문 바로 아래에서 위로 걸으면(또는 건물을 누르면) 들어가요. 계단을 밟으면 위아래 층으로, 문 깔개를 밟으면 밖으로 나가요<br>대화·조사: 가까이에서 E·스페이스 / 대화 버튼<br>자동 안내: 수첩의 목적지 안내<br>다음 지역: 독도 지킴이 인증 후 마을 오른쪽 다리 → 길을 따라 걷기<br>세계 지도: 가 본 마을로 바로 이동<br>결투 명령: 기록 찾기 · 동료 만들기 · 도구 · 동료 · 물러나기 (전설의 우산몬은 형태변환도)<br>기록 찾기: 누르면 독도 문제가 나와요. 맞히면 위쪽 두루마리(검은 기운이 지운 기록)의 빈칸이 채워져요. 문제에 따라 나침반·순서 놓기·근거 카드로 풀고, 검은 기운이 밀려올 때는 ○ ×로 빠르게 판단해요<br>상성(화살표 앞이 뒤에 강해요): 잎→빛→메아리→잎, 파도→바위→바람→파도. 상성이 좋으면 맞혔을 때 1.5배, 틀려도 절반은 닿아요. 상성이 나쁘면 0.75배<br>사나워진 우산몬: 문제를 맞히면 검은 기운을 걷어 내요. 모두 걷히면 평온을 되찾아요<br>상대의 문제: 맞히면 충격이 40% 줄고, 틀리면 그대로 받아요. 독도 지킴이·백무 사장은 가끔 정답도 뚫고 들어와요(관통)<br>동료 만들기: 버튼을 누르면 확률로 동료가 돼요(그 차례엔 공격 못 해요). 검은 기운이 적을수록 잘 되고, 전설의 우산몬은 10%<br>동료 보관함: 함께 다니는 동료는 4마리예요. 화면 아래 ‘동료’ 단추를 누르면 보관함이 열리고, 쉬는 동료와 언제든 바로 바꿔요<br>특성: 우산몬마다 결투에서 저절로 쓰이는 특별한 능력이 하나씩 있어요(30가지). 동료 보관함과 도감에서 볼 수 있어요<br>독도 지킴이와는 인증 결투로 겨뤄요<br>힌트: 문제 아래 기록 힌트 · 학습 기록에 도움 표시<br>대화와 컷신: 클릭·엔터·스페이스로 넘기기</div>' + typeRingHTML() + '<p>길에서는 표지판, 관찰 지점, 기억 비석, 조사 상자, 길에서 만난 사람과 몽땅랜드 직원을 찾아봐요. 사나워진 야생 우산몬은 마을과 마을 사이의 길 위를 걸어 다녀요.</p>');
     $('#importSave').onchange = async e => { const file = e.target.files[0]; if (!file) return; try { if (file.size > 3e6) throw new Error('파일이 너무 커요.'); const parsed = validateSave(JSON.parse(await file.text())); saved = parsed; closeModal(); continueGame(); toast('저장한 모험을 불러왔어요.'); } catch (err) { toast(err.message || '저장 파일을 확인해 주세요.'); } };
   });
 }
@@ -1642,14 +1564,10 @@ function paintMiniMap(now, people) {
 // 조작 손(v0.62): 오른손잡이는 이동 조이스틱이 왼쪽·둘러보기가 오른쪽, 왼손잡이는 반대예요. 이 기기에 기억해요.
 let leftHanded = false; try { leftHanded = localStorage.getItem('dokdo-hand') === 'left'; } catch { /* 기본 오른손 */ }
 function setHand(left) { leftHanded = !!left; scene.classList.toggle('left-handed', leftHanded); try { localStorage.setItem('dokdo-hand', leftHanded ? 'left' : 'right'); } catch { /* 괜찮아요 */ } }
-const handLabel = () => leftHanded ? '왼손잡이 · 이동 오른쪽, 둘러보기 왼쪽' : '오른손잡이 · 이동 왼쪽, 둘러보기 오른쪽';
-function setView3d(on) {
-  view3d = !!on; setPixelSnap(!view3d); try { localStorage.setItem('dokdo-view3d', view3d ? '1' : '0'); } catch { /* 기억하지 못해도 괜찮아요 */ }
-  const b = $('#viewBtn'); b.setAttribute('aria-pressed', String(view3d)); b.title = view3d ? '2D로 보기' : '3D로 보기'; b.setAttribute('aria-label', b.title); b.innerHTML = `◈ <span>${view3d ? '2D 보기' : '3D 보기'}</span>`;
-  scene.classList.toggle('view3d', view3d); labelKey = ''; yaw = null; freePos = null; if (!moving && state.started) view = { x: state.x, y: state.y };
-}
-$('#viewBtn').onclick = () => { setView3d(!view3d); sfx('toggle'); if (!view3d && document.pointerLockElement === canvas) document.exitPointerLock?.(); if (view3d) toast(map.kind === 'room' ? '건물 밖으로 나가면 3D로 보여요.' : matchMedia('(pointer:coarse)').matches ? '3D 보기: 이동 조이스틱으로 걷고, 둘러보기 조이스틱이나 화면 끌기로 둘러봐요.' : '3D 보기: W A S D로 보는 쪽으로 걷고, 화면을 누르면 마우스로 둘러봐요(Esc로 풀기).'); };
-setView3d(view3d); setHand(leftHanded);
+const handLabel = () => leftHanded ? '왼손잡이 · 조이스틱 오른쪽' : '오른손잡이 · 조이스틱 왼쪽';
+function setView3d(on) { setGL(on); } // 시험용 고리(예전 이름): false면 2D 대체 그리기
+scene.classList.add('view3d');
+setHand(leftHanded);
 $('#soundBtn').onclick = () => { setOn(!isOn()); if (isOn()) sfx('toggle'); updateUI(); };
 window.addEventListener('beforeunload', () => save());
 // 단추를 누를 때 작은 소리(결투 창은 battle-ui가 따로 내요)
@@ -1667,12 +1585,12 @@ if (typeof location !== 'undefined' && new URLSearchParams(location.search).has(
     get state() { return state; }, get battle() { return battle; }, get busy() { return busy(); }, get transition() { return transition; }, get talk() { return dialogueState; }, get map() { return map; },
     audio: () => ({ wanted: wantedMusic(), playing: currentMusic(), on: isOn() }),
     cutscene: () => cutscenes.current, people: liveNPCs, guide, interact, nextTalk, startBattle, closeModal, stampCeremony, showStudy, travel, changeMap, save, continueGame,
-    motion: () => ({ view: { ...view }, walkDistance, moving }), npcs: () => npcs(map, progress(), state.flags),
+    motion: () => ({ view: { ...view }, walkDistance, moving, swimming: deepWater() }), walking: () => path.length > 0 || !!pathAction || !!moving, npcs: () => npcs(map, progress(), state.flags),
     playStory, stories: { OPENING, GUIDE, BOSS_REVEAL, BOSS_FALL, TREE_JOINS },
     get longestQuestion() { return QUESTIONS.reduce((m, q) => (q.prompt.length + q.options.join('').length + q.explanation.length > m.prompt.length + m.options.join('').length + m.explanation.length ? q : m)); },
     set forceQuestion(q) { testQuestion = q; }, questionById: id => QUESTIONS.find(q => q.id === id), closeBattleForTest: () => { if (battle) closeBattle(); },
     screenOf(x, y) { const r = canvas.getBoundingClientRect(), p = toScreen(x * TILE + 16, y * TILE + 16); return { x: r.left + p.x * sceneScale, y: r.top + p.y * sceneScale }; },
-    get view3d() { return view3d; }, setView3d, get look() { return { yaw, pitch }; }, setLook(y, p = 0) { yaw = y; pitch = clampPitch(p); }, setHand, setClock: ms => setClock(ms), get diving() { return !!map.diving; }, toggleDive, get inWater() { return inWater(); }, get clock() { return { ms: gameClock(), hour: daylight().hour, night: isNight(), day: DAY_MS, weather: weatherNow() }; }, get music() { return musicFor(); }, setSeason: v => { const r = setSeason(v); updateUI(); return r; }, get season() { return currentSeason(); },
+    get view3d() { return hdOn(); }, setView3d, get look() { return { yaw, pitch }; }, setGL, get gl() { return { wanted: !force2D, mode: hdOn() ? 'hd' : '2d', ...(glView?.info || {}) }; }, setQuality, get quality() { return gfxQ; }, setWeather: v => setWeather(v), get pos() { return { x: view.x, y: view.y }; }, setLook(y, p = 0) { yaw = y; pitch = clampPitch(p); }, setHand, setClock: ms => setClock(ms), get diving() { return !!map.diving; }, toggleDive, get inWater() { return inWater(); }, get clock() { return { ms: gameClock(), hour: daylight().hour, night: isNight(), day: DAY_MS, weather: weatherNow() }; }, get music() { return musicFor(); }, setSeason: v => { const r = setSeason(v); updateUI(); return r; }, get season() { return currentSeason(); },
     standAtDoor(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b); settleMovement(); freePos = null; state.x = f.x; state.y = f.y; view = { x: f.x, y: f.y }; state.dir = 'up'; return f; },
     goInside(kind) { const b = map.buildings.find(b => b.kind === kind), f = doorFront(b), p = pathfind(map, state.x, state.y, f.x, f.y, liveNPCs()); if (state.x === f.x && state.y === f.y) enterBuilding(b); else { path = p; pathAction = () => enterBuilding(b); } return p.length; },
     legendRadio: false, dexDetail, showDex, showQuest, checkLegends, place(x, y, dir = 'right') { settleMovement(); freePos = null; path = []; state.x = x; state.y = y; view = { x, y }; state.dir = dir; },

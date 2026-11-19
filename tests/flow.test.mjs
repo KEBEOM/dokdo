@@ -79,7 +79,9 @@ async function walkTo(target) {
   }
   await until(t => window.__dokdo.map.id === t, 5000, target).catch(() => { });
   await until(() => !window.__dokdo.transition, 5000);
-  assert.equal(await G(() => window.__dokdo.map.id), target, `walked from ${from} to ${target}`);
+  const at = await G(() => ({ id: window.__dokdo.map.id, pos: window.__dokdo.pos, battle: !!window.__dokdo.battle, cs: window.__dokdo.cutscene(), talk: !document.querySelector('#dialogue')?.classList.contains('hidden'), modal: !document.querySelector('#modal')?.classList.contains('hidden'), fps: window.__dokdo.gl?.frames, busy: window.__dokdo.busy, transition: window.__dokdo.transition, toast: document.querySelector('#toast')?.textContent, walking: window.__dokdo.walking?.(), quest: window.__dokdo.state.progress?.[window.__dokdo.state.zone] }));
+  if (at.id !== target) await page.screenshot({ path: 'walk-stuck.png' }).catch(() => {});
+  assert.equal(at.id, target, `walked from ${from} to ${target} ${JSON.stringify(at)}`);
 }
 
 await page.addInitScript(() => { window.__dokdoStarterField = () => { const ids = [1, 67, 66]; for (let i = 2; ids.length < 30; i++) if (![66, 67, 18, 68, 70, 71, 72, 75, 76, 100].includes(i)) ids.push(i); return ids; }; }); // a fixed field so the test can pick 해국
@@ -158,6 +160,7 @@ assert.equal(await G(() => window.__dokdo.state.tutorial.walk), 2, 'talked to so
 await page.click('#questBtn'); assert.equal(await G(() => window.__dokdo.state.tutorial.walk), 3, 'opened the notebook');
 await page.click('#guideBtn'); assert.equal(await G(() => window.__dokdo.state.tutorial.walk), 4, 'used the destination guide'); assert.equal(await page.$('#coachPanel'), null, 'tutorial finished');
 // 공부 수첩: [독도 공부] 쪽을 읽으면 표시가 남고, 확인 문제로 이어져요 · [배움의 기록] 탭
+await until(() => !window.__dokdo.walking(), 40000).catch(() => {}); await page.waitForTimeout(400); // 안내 걷기가 끝날 때까지(그리기가 느린 기기에서도)
 await closeAll(); await page.click('#notebookBtn'); await page.waitForSelector('[data-page]'); assert.equal(await page.locator('[data-page]').count(), 8, '8 독도 공부 pages');
 await page.click('[data-page="history"]'); await page.waitForSelector('.study-timeline'); assert.match(await page.textContent('.study-timeline'), /1900년[\s\S]*칙령 제41호/);
 assert.ok(await G(() => window.__dokdo.state.flags['study:history']), 'reading a page marks it'); assert.equal(await page.textContent('#learningProgress'), '1 / 8');
@@ -177,7 +180,7 @@ await purifyAttack(); assert.equal(await G(() => window.__dokdo.battle.quiz.phas
 const right = await G(() => window.__dokdo.battle.quiz.q.answer);
 await page.click(`[data-battle-answer="${right}"]`); await page.click(`[data-battle-answer="${right}"]`, { force: true }).catch(() => { });
 let h2 = await hp(); assert.ok(h2.foe < h.foe, 'correct attack answer hurts the foe'); assert.equal(h2.me, h.me); assert.equal(h2.log, h.log + 1, 'answered once');
-await toMenu(); assert.equal(await G(() => window.__dokdo.battle.quiz.phase), 'defense', 'the foe asks next'); await answer(true); const softHit = h.me - (await hp()).me; assert.ok(softHit >= 1, 'a correct defence still takes a light hit');
+await toMenu(); assert.equal(await G(() => window.__dokdo.battle.quiz.phase), 'defense', 'the foe asks next'); await answer(true); const softHit = h.me - (await hp()).me; assert.ok(softHit >= 0, 'a correct defence takes a light hit, or none for a half-heart blow (v0.83)');
 await toMenu(); await purifyAttack(); h = await hp(); await answer(false); h2 = await hp(); assert.equal(h2.me, h.me, 'a wrong attack answer just misses'); assert.equal(h2.foe, h.foe);
 await toMenu(); h = await hp(); await answer(false); assert.ok(h.me - (await hp()).me > softHit, 'a wrong defence hurts more than a correct one');
 // hint is logged as assisted
@@ -391,32 +394,61 @@ await toMenu(); await page.waitForTimeout(700);
 assert.deepEqual(await G(() => ['.dq-me', '.dq-vs', '.dq-portrait'].map(q => getComputedStyle(document.querySelector(q)).opacity)), ['0', '0', '0'], 'they leave together, and I am not shown afterwards');
 assert.ok(await page.isVisible('#allySprite'), 'my 우산몬 comes out after the VS');
 await G(() => window.__dokdo.closeBattleForTest());
-// ── v0.62: 3D 보기 — 뒤에서 따라가는 시점, 보는 방향 기준 W A S D, 끌어서 둘러보기, 작은 지도 ──
+// ── v0.79 HD-2D 하나로: 2D·3D 보기 단추가 없고, 카메라는 북쪽을 보며 비스듬히 내려다봐요(걷기는 2D처럼 위 = 북쪽) ──
 await G(() => window.__dokdo.closeModal()); for (let i = 0; i < 8 && await page.$('#dialogue:not(.hidden) #nextTalk'); i++) await page.click('#nextTalk');
-if (await G(() => window.__dokdo.map.kind !== 'room' && !window.__dokdo.busy)) {
-  await G(() => { window.__dokdo.setView3d(true); window.__dokdo.state.dir = 'up'; window.__dokdo.setLook(0, 0); });
-  await page.waitForTimeout(300); assert.ok(await page.isVisible('.mini-map'), 'the mini map shows in the 3D view');
-  await page.keyboard.press('a'); await page.waitForTimeout(400); assert.equal(await G(() => window.__dokdo.state.dir), 'left', 'looking north, A goes west');
-  if (await G(() => !window.__dokdo.battle && !window.__dokdo.busy)) {
-    await G(() => window.__dokdo.setLook(Math.PI / 2, 0)); await page.keyboard.press('w'); await page.waitForTimeout(400);
-    assert.equal(await G(() => window.__dokdo.battle ? 'right' : window.__dokdo.state.dir), 'right', 'looking east, W goes east');
-  }
-  if (await G(() => !window.__dokdo.battle && !window.__dokdo.busy)) {
-    await G(() => window.__dokdo.setLook(0, 0)); await page.keyboard.down('ArrowRight'); await page.waitForTimeout(250); await page.keyboard.up('ArrowRight'); await page.keyboard.down('ArrowUp'); await page.waitForTimeout(250); await page.keyboard.up('ArrowUp');
-    const lk = await G(() => window.__dokdo.look); assert.ok(lk.yaw > .1 && lk.pitch > .05, 'arrow keys look around (right and up)');
-  }
-  // v0.63 자유 걷기: 칸 사이에도 설 수 있고, 2D로 돌아오면 칸 가운데로 돌아와요
+assert.equal(await page.$('#viewBtn'), null, 'no 2D/3D view button any more');
+{
   if (await G(() => !!window.__dokdo.battle)) await G(() => window.__dokdo.closeBattleForTest());
+  await G(() => window.__dokdo.changeMap('town0', 'a', { instant: true })); await page.waitForTimeout(900);
+  for (let i = 0; i < 8 && await page.$('#dialogue:not(.hidden) #nextTalk'); i++) await page.click('#nextTalk');
+  const h = await G(() => window.__dokdo.gl);
+  assert.ok(h.ok, `WebGL works in the test browser — HD-2D must not silently fall back to 2D ${JSON.stringify({ ok: h.ok, mode: h.mode })}`);
+  if (h.ok) {
+    assert.equal(h.mode, 'hd'); assert.ok(await G(() => !document.querySelector('#gl3d').hidden), 'the WebGL layer shows');
+    await page.waitForTimeout(400); const h2 = await G(() => window.__dokdo.gl);
+    assert.ok(h2.frames > h.frames && h2.meshes > 2 && h2.dynamic >= 1, `HD-2D draws frames ${JSON.stringify({ ...h2, lamps: h2.lamps?.length, cardKeys: undefined })}`);
+    if (h2.software) assert.equal(h2.quality, 0, 'software WebGL starts on low quality');
+    assert.ok(h2.hd2d && h2.cards >= 30 && h2.cardKeys.includes('ul_terminal') && h2.cardKeys.includes('ul_ferry'), '도동항: buildings, the terminal and the ferry are asset-pack cards');
+    assert.ok(h2.water && h2.lamps.length >= 4, 'animated sea and harbour lamps');
+    assert.ok(await page.isVisible('.mini-map'), 'the mini map shows');
+    // 품질: 낮음은 그림자·화면 효과를 끄고 작게 그려요
+    const q0 = h2.quality; await G(() => window.__dokdo.setQuality(1)); await page.waitForTimeout(900);
+    const mid = await G(() => ({ gl: window.__dokdo.gl, w: document.querySelector('#gl3d').width })), w1 = mid.w; assert.ok(mid.gl.post && mid.gl.shadows > 0, 'normal quality: screen effects and shadows');
+    await G(() => window.__dokdo.setQuality(0)); await page.waitForTimeout(900);
+    const lo = await G(() => ({ gl: window.__dokdo.gl, w: document.querySelector('#gl3d').width }));
+    assert.ok(!lo.gl.post && lo.gl.shadows === 0 && lo.gl.quality === 0 && lo.w < w1, `low quality is lighter ${JSON.stringify({ post: lo.gl.post, sh: lo.gl.shadows, w: lo.w, w1 })}`);
+    await G(q => window.__dokdo.setQuality(q), q0); await page.waitForTimeout(300);
+  }
+  // 걷기: 방향키·WASD 모두 화면 방향 그대로(위 = 북쪽), 칸 사이에도 설 수 있어요
   await G(() => window.__dokdo.changeMap('route0', 'a', { instant: true })); await page.waitForTimeout(900);
   for (let i = 0; i < 8 && await page.$('#dialogue:not(.hidden) #nextTalk'); i++) await page.click('#nextTalk');
-  const f0 = await G(() => { window.__dokdo.setLook(Math.PI / 2, 0); return window.__dokdo.state.x; });
-  await page.keyboard.down('w'); await page.waitForTimeout(330); await page.keyboard.up('w'); await page.waitForTimeout(120);
+  if (h.ok) { await page.waitForTimeout(500); const g0 = await G(() => window.__dokdo.gl); assert.ok(g0.pier, 'v0.82 동도 선착장 GLB'); assert.ok(g0.playerDrawn, 'my explorer is always drawn'); assert.ok(g0.models > 100 && g0.glbLandmarks.includes('숫돌바위'), `GLB: 숫돌바위 and stairs are real 3D models ${JSON.stringify({ models: g0.models, lm: g0.glbLandmarks })}`); }
+  const f0 = await G(() => window.__dokdo.motion().view.x);
+  await page.keyboard.down('ArrowRight'); await page.waitForTimeout(330); await page.keyboard.up('ArrowRight'); await page.waitForTimeout(120);
   const f1 = await G(() => ({ x: window.__dokdo.state.x, vx: window.__dokdo.motion().view.x, battle: !!window.__dokdo.battle, dir: window.__dokdo.state.dir }));
-  if (!f1.battle) { assert.equal(f1.dir, 'right'); assert.ok(f1.vx > f0 + .5, `W walks the way the camera looks (${f0} → ${f1.vx})`); assert.ok(Math.abs(f1.vx - Math.round(f1.vx)) > .001, 'free walking can stop between tiles'); assert.equal(f1.x, Math.round(f1.vx), 'my tile is the nearest one'); }
+  if (!f1.battle) { assert.equal(f1.dir, 'right'); assert.ok(f1.vx > f0 + .5, `→ walks east (${f0} → ${f1.vx})`); assert.ok(Math.abs(f1.vx - Math.round(f1.vx)) > .001, 'free walking can stop between tiles'); assert.equal(f1.x, Math.round(f1.vx), 'my tile is the nearest one'); }
   if (await G(() => !!window.__dokdo.battle)) await G(() => window.__dokdo.closeBattleForTest());
-  await G(() => { document.exitPointerLock?.(); window.__dokdo.setView3d(false); }); await page.waitForTimeout(200); assert.ok(await page.isVisible('.mini-map'), 'v0.68: the mini map shows in 2D too');
-  // v0.71 위쪽 단추를 마우스로 누른 뒤에는 포커스가 남지 않아요(스페이스가 3D 단추를 또 누르지 않게)
-  { const v0 = await G(() => window.__dokdo.view3d); await page.click('#viewBtn'); await page.waitForTimeout(150); assert.ok(!(await G(() => document.activeElement?.id === 'viewBtn')), 'the 3D button lets go of focus'); await page.keyboard.press('Space'); await page.waitForTimeout(150); assert.equal(await G(() => window.__dokdo.view3d), !v0, 'Space does not press it again'); await closeAll(); if (await G(() => !!window.__dokdo.battle)) await G(() => window.__dokdo.closeBattleForTest()); if (await G(() => window.__dokdo.view3d)) await G(() => window.__dokdo.setView3d(false)); }
+  await G(() => window.__dokdo.setLook(Math.PI / 2, 0)); // 예전 카메라 돌리기는 걷는 방향을 바꾸지 않아요
+  const y0 = await G(() => window.__dokdo.motion().view.y); await page.keyboard.down('w'); await page.waitForTimeout(300); await page.keyboard.up('w'); await page.waitForTimeout(150);
+  const st = await G(() => ({ y: window.__dokdo.motion().view.y, b: !!window.__dokdo.battle, dir: window.__dokdo.state.dir }));
+  if (!st.b) { assert.equal(st.dir, 'up', 'W faces north'); assert.ok(st.y < y0 - .3 || st.y === y0, `W walks north or is blocked (${y0} → ${st.y})`); }
+  if (st.b) await G(() => window.__dokdo.closeBattleForTest());
+  if (h.ok) { // v0.82 고침: 사람·우산몬이 아주 많아도 내 캐릭터는 늘 그려요(그림 칸이 모자라면 늘려요)
+    await G(() => window.__dokdo.changeMap('meadow0', 'a', { instant: true })); await page.waitForTimeout(900);
+    for (let i = 0; i < 8 && await page.$('#dialogue:not(.hidden) #nextTalk'); i++) await page.click('#nextTalk');
+    const many = await G(() => window.__dokdo.gl); assert.ok(many.playerDrawn, `explorer drawn among ${many.dynamic} sprites`);
+  }
+  // 건물 안도 HD-2D
+  await G(() => window.__dokdo.changeMap('town0/home/1', 'a', { instant: true })); await page.waitForTimeout(900);
+  for (let i = 0; i < 8 && await page.$('#dialogue:not(.hidden) #nextTalk'); i++) await page.click('#nextTalk');
+  if (h.ok) { const r = await G(() => ({ kind: window.__dokdo.map.kind, gl: window.__dokdo.gl })); assert.equal(r.kind, 'room'); await page.waitForTimeout(300); const r2 = await G(() => window.__dokdo.gl); assert.ok(r2.mode === 'hd' && r2.frames > r.gl.frames, 'rooms are drawn in HD-2D too'); assert.ok(r2.statics >= 6, `furniture stands in the room (${r2.statics})`); assert.ok(r2.interior || await until(() => window.__dokdo.gl.interior, 10000).then(() => true, () => false), 'v0.82 room walls and floor use the interior art'); }
+  // WebGL이 안 되는 기기: 2D로 그려요
+  await G(() => window.__dokdo.setGL(false)); await page.waitForTimeout(250);
+  assert.ok(await G(() => document.querySelector('#gl3d').hidden && window.__dokdo.gl.mode === '2d'), '2D fallback without WebGL');
+  await G(() => window.__dokdo.setGL(true)); await G(() => window.__dokdo.changeMap('route0', 'a', { instant: true })); await page.waitForTimeout(700);
+  for (let i = 0; i < 8 && await page.$('#dialogue:not(.hidden) #nextTalk'); i++) await page.click('#nextTalk');
+  // v0.71 위쪽 단추를 마우스로 누른 뒤에는 포커스가 남지 않아요(스페이스가 그 단추를 또 누르지 않게)
+  { await page.click('#saveBtn'); await page.waitForTimeout(150); assert.ok(!(await G(() => document.activeElement?.id === 'saveBtn')), 'a HUD button lets go of focus'); await closeAll(); if (await G(() => !!window.__dokdo.battle)) await G(() => window.__dokdo.closeBattleForTest()); }
   // v0.68 사계절: 메뉴의 계절 고르기 → 위치 칸에 계절 이름, 다시 자동으로
   await page.click('#menuBtn'); await page.selectOption('#seasonPick', 'winter'); assert.match(await page.textContent('#weather'), /겨울/); assert.equal(await G(() => window.__dokdo.season), 'winter');
   await page.selectOption('#seasonPick', 'flow'); await G(() => window.__dokdo.closeModal()); await page.waitForTimeout(200);

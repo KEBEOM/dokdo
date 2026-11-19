@@ -9,7 +9,7 @@ export const TRAITS = [
   // ── 기록 찾기(공격) ──
   { id: 'double', kind: 'attack', name: '연속 풀이', text: '결투마다 한 번, 문제를 맞히면 곧바로 한 문제를 더 풀어요.' },
   { id: 'opener', kind: 'attack', name: '첫걸음', text: '결투에서 처음 맞힌 문제는 1.5배로 채워요.', mult: 1.5 },
-  { id: 'clutch', kind: 'attack', name: '뒷심', text: '체력이 절반 아래면 맞힌 문제가 1.3배로 채워져요.', mult: 1.3 },
+  { id: 'clutch', kind: 'attack', name: '뒷심', text: '하트가 절반 아래면 맞힌 문제가 1.3배로 채워져요.', mult: 1.3 },
   { id: 'streak', kind: 'attack', name: '연승', text: '연달아 맞힐수록 10%씩 더 채워요(30%까지).', step: .1, max: .3 },
   { id: 'grit', kind: 'attack', name: '끈기', text: '문제를 틀려도 30%는 채워져요.', rate: .3 },
   { id: 'sharp', kind: 'attack', name: '날카로움', text: '세 번째로 맞히는 문제마다 1.5배로 채워요.', every: 3, mult: 1.5 },
@@ -23,16 +23,16 @@ export const TRAITS = [
   // ── 막기 ──
   { id: 'sturdy', kind: 'guard', name: '단단함', text: '받는 충격이 15% 줄어요.', mult: .85 },
   { id: 'shield', kind: 'guard', name: '든든한 방패', text: '○×를 맞히면 충격이 40%가 아니라 60% 줄어요.', mult: 2 / 3 },
-  { id: 'endure', kind: 'guard', name: '버티기', text: '결투마다 한 번, 지칠 만한 충격에도 체력 1로 버텨요.' },
+  { id: 'endure', kind: 'guard', name: '버티기', text: '결투마다 한 번, 지칠 만한 충격에도 하트 반 개로 버텨요.' },
   { id: 'antipierce', kind: 'guard', name: '빈틈없음', text: '독도 지킴이의 ‘관통’을 막아요.' },
   { id: 'firstguard', kind: 'guard', name: '첫 방어', text: '결투에서 처음 받는 충격이 절반이 돼요.', mult: .5 },
   { id: 'counter', kind: 'guard', name: '되받기', text: '○×를 맞히면 상대의 두루마리가 5% 채워져요.', rate: .05 },
   { id: 'thorns', kind: 'guard', name: '가시', text: '충격을 받으면 그 20%만큼 상대의 기운도 줄어요.', rate: .2 },
   // ── 회복 ──
-  { id: 'mend', kind: 'heal', name: '새살', text: '문제를 맞힐 때마다 체력이 6% 돌아와요.', rate: .06 },
-  { id: 'rest', kind: 'heal', name: '숨 고르기', text: '차례가 끝날 때마다 체력이 4% 돌아와요.', rate: .04 },
-  { id: 'cheer', kind: 'heal', name: '응원', text: '교체되어 나올 때 체력이 15% 돌아와요.', rate: .15 },
-  { id: 'afterglow', kind: 'heal', name: '정화의 숨결', text: '상대의 기록을 모두 되찾으면 체력이 25% 돌아와요.', rate: .25 },
+  { id: 'mend', kind: 'heal', name: '새살', text: '문제를 맞힐 때마다 하트가 조금(6%, 최소 반 개) 돌아와요.', rate: .06 },
+  { id: 'rest', kind: 'heal', name: '숨 고르기', text: '차례가 끝날 때마다 하트가 조금(4%, 최소 반 개) 돌아와요.', rate: .04 },
+  { id: 'cheer', kind: 'heal', name: '응원', text: '교체되어 나올 때 하트가 15% 돌아와요.', rate: .15 },
+  { id: 'afterglow', kind: 'heal', name: '정화의 숨결', text: '상대의 기록을 모두 되찾으면 하트가 25% 돌아와요.', rate: .25 },
   { id: 'medic', kind: 'heal', name: '응급 처치', text: '회복젤이 45%가 아니라 70%를 채워 줘요.', rate: .7 },
   // ── 탐험 도우미 ──
   { id: 'charm', kind: 'help', name: '친화력', text: '동료 만들기 성공률이 15%p 올라요.', add: .15 },

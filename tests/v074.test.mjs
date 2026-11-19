@@ -7,7 +7,11 @@ const town0 = createMap('town0');
 assert.ok(town0[0].length > MAP_W && town0.length > MAP_H, `도동항 ${town0[0].length}×${town0.length}`);
 // 촘촘한 시가지: 들어가는 건물 4채 + 들어갈 수 없는 집·상가가 많아요, 여객선터미널 하나
 const kinds = town0.structures.reduce((o, s) => (o[s.kind] = (o[s.kind] || 0) + 1, o), {});
-assert.equal(town0.buildings.length, 4); assert.equal(kinds.terminal, 1); assert.ok(kinds.house + kinds.block >= 40, JSON.stringify(kinds));
+assert.equal(town0.buildings.length, 4); assert.equal(kinds.terminal, 1); assert.ok(kinds.house + kinds.block >= 35, JSON.stringify(kinds));
+// v0.75 이웃 건물 사이에는 골목이 있어요(옆면이 보여요): 같은 줄에서 맞붙은 구조물이 없어요
+for (const a of town0.structures) for (const b of town0.structures) if (a !== b && a.y + a.h === b.y + b.h) assert.ok(a.x + a.w < b.x || b.x + b.w < a.x, `${a.kind}@${a.x},${a.y} · ${b.kind}@${b.x},${b.y} 골목`);
+// v0.75 그리는 코드가 줄 가운데 주석에 묻히지 않았어요(v0.79: 예전 3D 대신 HD-2D 그리기 줄을 봐요)
+{ const src = (await import('node:fs')).readFileSync(new URL('../dist/game.js', import.meta.url), 'utf8'); for (const key of ['hdView = hdCamera(', 'glView.render(', 'glCanvas.style.width =']) { const line = src.split('\n').find(l => l.includes(key)); assert.ok(line && !line.slice(0, line.indexOf(key)).includes('//'), `${key} 살아 있어요`); } }
 for (const s of town0.structures) for (let y = s.y; y < s.y + s.h; y++) for (let x = s.x; x < s.x + s.w; x++) assert.ok(blocked(town0, x, y, [], true), `${s.kind} ${x},${y}: 들어갈 수 없어요`);
 assert.equal(buildingArt(town0, town0.structures.find(s => s.kind === 'terminal')), 'ulleung-terminal');
 // 소파블록은 물 위에 있어도 못 지나가요 · 여객선은 물 위

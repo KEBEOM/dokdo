@@ -4,7 +4,14 @@ const START=parseMap('town0').spawns.a;
 // v0.42 우산몬마다 다른 기본 능력치(data.js의 base: 체력·공격·방어·스피드, 보통 75). 레벨이 오르면 같이 커져요.
 //   기본값 차이의 절반만 반영해요(차이는 살리되 너무 벌어지지 않게): 배율 = (기본값+75)/150
 const DEFAULT_BASE={hp:75,attack:75,defense:75,speed:75};
-export function stats(id,level){const b=getSpecies(id).base||DEFAULT_BASE,k=v=>(v+75)/150;return {maxHp:Math.round((29+level*5)*k(b.hp)),attack:Math.max(1,Math.round((11+level*2)*k(b.attack))),defense:Math.max(1,Math.round((8+level)*k(b.defense))),speed:Math.max(1,Math.round((8+level)*k(b.speed)))};}
+// v0.83 하트: 체력(hp·maxHp)은 하트 반 칸 단위예요(2 = 하트 1개). 우산몬마다 기본 3~5개(바탕 체력이 클수록 많아요),
+//   6레벨마다 반 개씩 늘고, 아무리 커도 HEART_MAX개(반 칸 HEART_MAX*2)까지예요.
+//   vit는 예전 체력 크기(공격·방어로 정해지는 충격의 기준). 충격 = 예전 계산의 충격 ÷ vit × 하트 칸 수 → 반 칸 단위로 반올림(최소 반 칸).
+export const HEART_MAX=8;
+export function heartsMax(id,level){const b=getSpecies(id).base||DEFAULT_BASE,base=Math.max(6,Math.min(10,Math.round(6+(b.hp-45)/85*4)));return Math.min(HEART_MAX*2,base+Math.floor((Math.max(1,level)-1)/6));}
+export function toHalves(amount,defender){if(!(amount>0))return 0;const full=heartsMax(defender.id,defender.level),vit=defender.vit||stats(defender.id,defender.level).vit;return Math.max(1,Math.round(amount/vit*full));}
+export const heartText=n=>{const v=Math.max(0,n)/2;return Number.isInteger(v)?String(v):v.toFixed(1);}; // 반 칸 수 → ‘3.5’
+export function stats(id,level){const b=getSpecies(id).base||DEFAULT_BASE,k=v=>(v+75)/150;return {maxHp:heartsMax(id,level),vit:Math.round((29+level*5)*k(b.hp)),attack:Math.max(1,Math.round((11+level*2)*k(b.attack))),defense:Math.max(1,Math.round((8+level)*k(b.defense))),speed:Math.max(1,Math.round((8+level)*k(b.speed)))};}
 // 물러나기: 내 우산몬이 빠를수록 잘 돼요(30%~95%).
 export const runChance=(me,foe)=>Math.min(.95,Math.max(.3,.6+(me.speed-foe.speed)/(me.speed+foe.speed)));
 export function createMonster(id,level=4){const s=stats(id,level);return {uid:`m${Date.now().toString(36)}${Math.random().toString(36).slice(2,7)}`,id,level,xp:0,hp:s.maxHp,...s,pp:PP_MAX.slice()};}
@@ -25,9 +32,10 @@ export const BOSS_KINDS=['boss','rematch']; // + 마지막 백무 사장 결투(
 // ENEMY_POWER: 상대가 문제로 공격할 때의 위력(난이도 손잡이). 낮출수록 쉬워요.
 export let ENEMY_POWER=.6;
 export function setEnemyPower(v){ENEMY_POWER=v;}
-export function enemyHit(attacker,defender,{correct=false,guard=false,pierce=false}={},rng=Math.random){let d=damage(attacker,defender,ENEMY_POWER,rng).amount;if(correct&&!pierce)d=Math.max(1,Math.round(d*SOFTEN_RATE));if(guard)d=Math.max(1,Math.ceil(d/2));return d;}
-// 내 공격: {amount, mult}. 틀렸을 때 상성이 좋으면 보통 위력(상성 1배)의 절반, 아니면 0.
-export function attackHit(attacker,defender,correct,power=QUESTION_POWER,rng=Math.random){const d=damage(attacker,defender,power,rng);if(correct)return d;if(d.mult>1)return {amount:Math.max(1,Math.round(d.amount/d.mult*WRONG_ADVANTAGE_RATE)),mult:d.mult};return {amount:0,mult:d.mult};}
+// v0.83 하트 규칙(반 칸 = 0.5개): 못 막으면 적어도 반 개 · 정답으로 막으면 그보다 적게(반 개짜리는 완전히 막아요) · 보호는 반으로 · 관통은 그대로
+export function enemyHit(attacker,defender,{correct=false,guard=false,pierce=false}={},rng=Math.random){const full=Math.max(1,toHalves(damage(attacker,defender,ENEMY_POWER,rng).amount,defender));let d=full;if(correct&&!pierce)d=full<=1?0:Math.max(1,Math.min(full-1,Math.round(full*SOFTEN_RATE)));if(guard&&d>0)d=Math.max(1,Math.ceil(d/2));return d;}
+// 내 공격: {amount(하트 반 칸 수), mult}. 맞히면 적어도 하트 1개. 틀렸을 때 상성이 좋으면 보통 위력(상성 1배)의 절반, 아니면 0.
+export function attackHit(attacker,defender,correct,power=QUESTION_POWER,rng=Math.random){const d=damage(attacker,defender,power,rng);if(correct)return {amount:Math.max(2,toHalves(d.amount,defender)),mult:d.mult};if(d.mult>1)return {amount:Math.max(1,toHalves(d.amount/d.mult*WRONG_ADVANTAGE_RATE,defender)),mult:d.mult};return {amount:0,mult:d.mult};} // 하트 반 칸 수
 // 기술: 처음(Lv1)에는 손길(정화)과 보호 두 가지, Lv8에 숨 고르기(회복), Lv12에 파동(강한 정화)을 배웁니다.
 // 배열 순서(0 손길, 1 파동, 2 숨 고르기, 3 보호)는 저장 파일의 기술 횟수(pp) 순서와 같습니다.
 export const PP_MAX=[25,8,8,10];
@@ -54,7 +62,7 @@ export function captureChance(enemy,tries=0){if(getSpecies(enemy.id).legendary)r
 export const PARTY_MAX=4;
 export function addMonster(state,mon){if(state.party.length<PARTY_MAX)state.party.push(mon);else state.storage.push(mon);if(!state.caught.includes(mon.id))state.caught.push(mon.id);if(!state.seen.includes(mon.id))state.seen.push(mon.id);}
 export function recordAnswer(state,q,correct,assisted=false,context={}){const r=state.learning[q.concept]||{attempts:0,correct:0,independent:0,seen:[],sessions:[],last:0};r.attempts++;if(correct){r.correct++;if(!assisted)r.independent++;}if(!r.seen.includes(q.id))r.seen.push(q.id);if(!r.sessions.includes(state.sessionId))r.sessions.push(state.sessionId);r.last=Date.now();state.learning[q.concept]=r;state.answerLog.push({q:q.id,concept:q.concept,correct,assisted,time:Date.now(),session:state.sessionId,mode:context.mode||'study',phase:context.phase||'',opponent:context.opponent||null,zone:state.zone});if(state.answerLog.length>2000)state.answerLog.shift();return r;}
-export function newState(){return {schema:1,rosterVersion:ROSTER_VERSION,started:false,zone:0,map:'town0',visited:[0],flags:{},x:START.x,y:START.y,dir:'up',avatar:null,party:[],storage:[],active:0,caught:[],seen:[],badges:[],progress:Array.from({length:8},()=>({met:false,studied:0,enemy:false,boss:false})),learning:{},answerLog:[],items:{heal:8,orb:15},coins:120,playMs:0,ended:false,legend:false,sound:false,tutorial:{battle:true,walk:4},sessionId:Date.now().toString(36),savedAt:0};}
+export function newState(){return {schema:1,hearts:1,rosterVersion:ROSTER_VERSION,started:false,zone:0,map:'town0',visited:[0],flags:{},x:START.x,y:START.y,dir:'up',avatar:null,party:[],storage:[],active:0,caught:[],seen:[],badges:[],progress:Array.from({length:8},()=>({met:false,studied:0,enemy:false,boss:false})),learning:{},answerLog:[],items:{heal:8,orb:15},coins:120,playMs:0,ended:false,legend:false,sound:false,tutorial:{battle:true,walk:4},sessionId:Date.now().toString(36),savedAt:0};}
 export function validateSave(value){
   const fail=()=>{throw new Error('저장 파일의 정보가 올바르지 않아요.');};
   if(!value||value.schema!==1||!Array.isArray(value.party)||value.party.length>6||!Array.isArray(value.progress)||value.progress.length!==8||!Number.isInteger(value.zone)||value.zone<0||value.zone>7)fail();
@@ -74,6 +82,7 @@ export function validateSave(value){
     if(!Number.isInteger(m.id)||m.id<1||m.id>100||!Number.isInteger(m.level)||m.level<1||m.level>100||!Number.isFinite(m.hp)||!Number.isFinite(m.xp)||m.xp<0||!Array.isArray(m.pp)||m.pp.length!==4||m.pp.some(p=>!Number.isInteger(p)||p<0))fail();
     if(legacy)m.id=LEGACY_SPECIES_MAP[m.id];
     delete m.form;delete m.formBase; // 형태변환은 결투 안에서만 (저장 파일에는 노멀폼)
+    if(!value.hearts){const old=stats(m.id,m.level).vit;m.hp=m.hp<=0?0:Math.max(1,Math.round(Math.min(m.hp,old)/old*heartsMax(m.id,m.level)));} // v0.83 예전 저장(숫자 체력) → 남은 비율대로 하트
     Object.assign(m,stats(m.id,m.level));m.hp=Math.max(0,Math.min(m.hp,m.maxHp));m.pp=m.pp.map((p,i)=>Math.min(p,PP_MAX[i]));
   }
   for(const p of v.progress)if(!p||typeof p!=='object'||!Number.isFinite(p.studied)||['met','enemy','boss'].some(k=>typeof p[k]!=='boolean'))fail();

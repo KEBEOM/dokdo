@@ -1,6 +1,6 @@
 // v0.68: 입체 건물(box3d) · 사계절(season) · 세워 그리는 들꽃 · 3D에서 눕히는 배
 import assert from 'node:assert/strict';
-const { buildingBox, boxDepth, EAVE } = await import('../dist/box3d.js');
+const { buildingBox, boxDepth, EAVE, BH } = await import('../dist/box3d.js');
 const { seasonOfMonth, seasonPixel, seasonColor, SEASONS } = await import('../dist/season.js');
 const { createMap, sceneDrawOrder, drawActors } = await import('../dist/world.js');
 const { ISLAND_ATLAS } = await import('../dist/island-atlas.js');
@@ -10,7 +10,7 @@ const { makeChase } = await import('../dist/view3d.js');
 for (const key of Object.keys(EAVE)) assert.ok(ISLAND_ATLAS.frames[key], `${key} 그림이 있어요`);
 const b = { x: 10, y: 5, w: 5, h: 4, kind: 'home' }, kit = { sw: 176, u0: 10, wallW: 156, wallH: 68, depth: 112, rise: 38 };
 const box = buildingBox(b, kit);
-assert.equal(box.yF, (b.y + b.h) * 32); assert.equal(box.x1 - box.x0, 156); assert.ok(box.yB >= b.y * 32, '뒷벽은 건물 칸 안쪽'); assert.equal(box.top, 68 + 38);
+assert.equal(box.yF, (b.y + b.h) * 32); assert.equal(box.x1 - box.x0, 156); assert.ok(box.yB >= b.y * 32, '뒷벽은 건물 칸 안쪽'); assert.equal(box.h, 68 * BH); assert.equal(box.top, 68 * BH + 38 * 1.4); assert.ok(68 * BH / 2 > 48, 'v0.75 3D에서 한 층이 사람 키(48)보다 높아요');
 assert.ok(Math.abs((box.x0 + box.x1) / 2 - (b.x + b.w / 2) * 32) <= 6, '가운데가 2D 그림과 같아요');
 const P = makeChase(800, 500), front = P.camera(12.5 * 32, 15 * 32, 0, 0), behind = P.camera(12.5 * 32, 2 * 32, Math.PI, 0);
 assert.ok(boxDepth(box, front) > 0 && boxDepth(box, behind) > 0, '앞에서도 뒤에서도 보여요');

@@ -1,6 +1,7 @@
 // turn-based battle screen: status window, framed backdrop, command window and a typed message window.
 // The game logic (game.js) drives it with await ui.say(...), await ui.menu(...), await ui.quiz(...).
 import { createTypewriter } from './typewriter.js';
+import { heartText } from './engine.js';
 import { portrait, battlePortrait, look } from './sprites.js';
 import { assetImage, drawAsset } from './assets.js';
 import { TERRAIN_ATLAS } from './terrain-atlas.js';
@@ -88,10 +89,15 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
   }
   function shade(hex, amt) { const n = parseInt(hex.slice(1), 16); const f = v => Math.max(0, Math.min(255, v + amt)); return '#' + [f(n >> 16), f((n >> 8) & 255), f(n & 255)].map(v => v.toString(16).padStart(2, '0')).join(''); }
 
+  // v0.83 하트: 체력은 하트 반 칸 단위(2 = 1개). 도트 하트를 꽉 찬 · 반 · 빈 하트로 그려요
+  const HEART = ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'];
+  const heartSVG = part => { let r = ''; HEART.forEach((row, y) => [...row].forEach((c, x) => { if (c !== '#') return; const on = part === 2 || (part === 1 && x < 4); r += `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${on ? '#e8394d' : '#5b3a44'}" ${on ? '' : 'opacity=".45"'}/>`; }));
+    return `<svg class="hrt" viewBox="0 0 7 6" aria-hidden="true">${r}</svg>`; };
+  function hearts(cur, max) { const n = Math.ceil(max / 2); let h = ''; for (let i = 0; i < n; i++) h += heartSVG(Math.max(0, Math.min(2, cur - i * 2))); return `<span class="hearts" role="img" aria-label="하트 ${heartText(cur)} / ${heartText(max)}">${h}</span>`; }
   function bar(cur, max, tag = 'HP') { const r = Math.max(0, cur / max); return `<div class="dq-barrow"><b class="dq-tag">${tag}</b><div class="dq-bar"><i style="width:${r * 100}%;background:${r < .3 ? '#e8503a' : r < .6 ? '#f2c230' : '#3fd16b'}"></i></div></div>`; }
   function setStatus(m, info, party) {
     els.status.innerHTML = `<div class="dq-status-row"><canvas class="dq-ally" width="48" height="48" aria-hidden="true"></canvas><div><strong>${esc(info.name)}</strong><span class="dq-lv">Lv ${m.level}</span>${info.trait ? `<span class="dq-trait" title="특성">${esc(info.trait)}</span>` : ''}
-      <div class="dq-hp">체력 <b>${m.hp}</b> / ${m.maxHp}</div>${bar(m.hp, m.maxHp, '체력')}</div></div>
+      <div class="dq-hp">${hearts(m.hp, m.maxHp)} <b>${heartText(m.hp)}</b> / ${heartText(m.maxHp)}</div></div></div>
       <div class="dq-party" aria-label="동료 상태">${party.map(p => `<i class="${p.hp <= 0 ? 'down' : p.active ? 'on' : ''}" title="${esc(p.name)}"></i>`).join('')}</div>`;
     portrait(els.status.querySelector('.dq-ally'), look(m));
     battlePortrait(els.ally, look(m), true); // my 우산몬 looks right, toward the foe
@@ -112,7 +118,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
     els.foe.classList.toggle('dark', !!info.dark);
     els.foe.innerHTML = `<div class="scroll-head"><strong>${info.dark && e.hp > 0 ? '<span class="dq-berserk">사나워짐</span> ' : ''}${esc(info.name)}</strong><span class="dq-lv">Lv ${e.level} · ${esc(info.type)}</span></div>
       <div class="scroll-paper" aria-label="${esc(info.title || '지워진 기록')}: ${total - left} / ${total} 글자"><span class="scroll-title">${esc(info.title || '지워진 기록')}</span><p class="scroll-record">${paper}</p></div>
-      <div class="dq-gauge-label">${esc(info.gauge || '기운')} <b>${Math.ceil(Math.max(0, e.hp))}</b> / ${e.maxHp}${extra ? ` · ${esc(extra)}` : ''}</div>`;
+      <div class="dq-gauge-label">검은 기운 ${hearts(Math.max(0, e.hp), e.maxHp)} <b>${heartText(e.hp)}</b> / ${heartText(e.maxHp)}${extra ? ` · ${esc(extra)}` : ''}</div>`;
     battlePortrait(els.enemy, look(e)); paintTrainer(); paintPortrait(); // the foe looks left
   }
   function paintPortrait() {
@@ -281,7 +287,7 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
 
   function flashEnemy() { els.enemyWrap.classList.remove('hit'); void els.enemyWrap.offsetWidth; els.enemyWrap.classList.add('hit'); }
   function damage(n, target = 'enemy') {
-    if (target === 'enemy') { els.dmg.textContent = n; els.dmg.classList.remove('show'); void els.dmg.offsetWidth; els.dmg.classList.add('show'); flashEnemy(); }
+    if (target === 'enemy') { els.dmg.textContent = `−${heartText(n)}♥`; els.dmg.classList.remove('show'); void els.dmg.offsetWidth; els.dmg.classList.add('show'); flashEnemy(); }
     else { root.classList.remove('shake'); void root.offsetWidth; root.classList.add('shake'); allyAct('hit'); }
   }
   // My 우산몬's small motions: 'lunge' (uses a skill), 'hit', 'enter' (sent out), 'tired'.

@@ -44,8 +44,8 @@ function edging(ctx,map,x,y){
    }
   }
  }
- if(k===6){
-  ctx.fillStyle='#5e3c22';
+ if(k===6){ // 콘크리트 부두 가장자리: 밝은 턱 + 물 쪽 그늘
+  ctx.fillStyle='#6f7378';
   if(at(map,x-1,y)!==6)ctx.fillRect(px,py,2,32);
   if(at(map,x+1,y)!==6)ctx.fillRect(px+30,py,2,32);
   if(at(map,x,y+1)!==6){ctx.fillRect(px,py+30,32,2);ctx.fillStyle='#00000030';ctx.fillRect(px,py+32,32,3);}
@@ -180,7 +180,7 @@ export function v2Tile(map,x,y,depth){
  if(k===2)return r<.14?pick(V2.dirtPebble,x,y,3):pick(V2.dirt,x,y);
  if(k===3)return r<.22?pick(V2.moss,x,y,3):pick(V2.basalt,x,y);
  if(k===4)return r<.12?pick(V2.sandPebble,x,y,3):pick(V2.sand,x,y);
- if(k===6)return pick(V2.wood,x,y);
+ if(k===6)return pick([V.pavement_0,V.pavement_1,V.pavement_2],x,y); // v0.74+ 부두·선착장·보행교는 콘크리트(D41·D42·U01)
  return r<.2?pick(V2.sprouts,x,y,3):pick(V2.grass,x,y); // 풀밭(v0.68: 꽃은 땅에 그리지 않고 flowerTiles 자리에 세워요)
 }
 // v0.68 세워 그리는 들꽃 자리: 예전에 꽃 무늬 땅을 깔던 풀밭 칸(약 6%) 중 건물·물건·출입구 둘레를 뺀 곳

@@ -15,7 +15,8 @@ for (const [kind, floors] of Object.entries(ROOM_TEMPLATES)) floors.forEach((f, 
   assert.equal(text.includes('N'), i > 0, `${kind} ${i + 1}층: stairs down above the ground floor`);
   assert.ok(f.art[0].split('').every(c => 'wy0123456789'.includes(c)) && f.art.at(-1).split('').every(c => 'wD'.includes(c)), `${kind} ${i + 1}층: walled in`);
 });
-assert.equal(ROOM_DEFS.length, 8 * (2 + 3 + 3 + 2), '8 towns × 10 floors');
+assert.equal(ROOM_DEFS.filter(d => ['lab', 'gym', 'shop', 'home'].includes(d.building)).length, 8 * (2 + 3 + 3 + 2), '8 towns × 10 floors');
+assert.deepEqual(parseRoomId('town0/house12/2'), { zone: 0, kind: 'house12', floor: 2 }); // v0.75 시가지 집·가게·터미널
 assert.deepEqual(parseRoomId('town3/lab/2'), { zone: 3, kind: 'lab', floor: 2 }); assert.equal(roomId(3, 'lab', 2), 'town3/lab/2');
 
 const walk = (map, x, y) => !blocked(map, x, y, npcs(map, {}, {})) && !(map[y][x] >= 13 && map[y][x] <= 15);
@@ -43,8 +44,13 @@ for (const def of MAPS.filter(m => m.kind === 'town')) {
     assert.ok(fronts.some(f => (f.x === s.x && f.y === s.y) || pathfind(town, s.x, s.y, f.x, f.y, people).length), `${def.id}: the ${b.kind} door can be reached`);
     assert.ok(MAP_BY_ID[roomId(def.zone, b.kind, 1)], `${def.id}: ${b.kind} has an inside`);
   }
+  for (const b of town.structures || []) { // v0.75 문이 있는 건물은 모두 들어가요
+    const f = { x: b.x + Math.floor(b.w / 2), y: b.y + b.h };
+    assert.ok(!blocked(town, f.x, f.y, people) && pathfind(town, s.x, s.y, f.x, f.y, people).length, `${def.id}: ${b.name}(${b.room}) door can be reached`);
+    const inside = MAP_BY_ID[roomId(def.zone, b.room, 1)]; assert.ok(inside && inside.building === b.room, `${def.id}: ${b.room} has an inside`);
+  }
 }
 // a save made inside a building loads inside it
 const st = newState(); addMonster(st, createMonster(1, 5)); st.started = true; st.map = 'town2/gym/3'; st.zone = 2; st.visited = [0, 1, 2]; st.x = createMap('town2/gym/3').spawns.a.x; st.y = createMap('town2/gym/3').spawns.a.y;
 const back = validateSave(JSON.parse(JSON.stringify(st))); assert.equal(back.map, 'town2/gym/3'); assert.equal(back.x, st.x);
-console.log(`interiors: ${ROOM_DEFS.length} floors in 32 buildings — doors, stairs and everything inside reachable`);
+console.log(`interiors: ${ROOM_DEFS.length} floors (32 town buildings + 도동항 시가지·터미널) — doors, stairs and everything inside reachable`);

@@ -98,7 +98,7 @@ export function seasonColor(hex, season = currentSeason()) {
   return out ? '#' + out.map(v => v.toString(16).padStart(2, '0')).join('') : hex;
 }
 // 나무·덤불·소품 그림은 불러올 때 바꿔요(사람·우산몬·컷신·타이틀은 그대로). 땅은 terrain.js가 다 그린 땅 그림을 한 번에 바꿔요.
-export const SEASON_KEYS = /^scenery\/(tileset-v2-objects|props-bw|island-art|village-pixels)/;
+export const SEASON_KEYS = /^scenery\/(tileset-v2-objects|props-bw|island-art|village-pixels|hd2d-trees|hd2d-ground)/; // v0.79 HD-2D 나무·땅 재질도
 export function tintCanvas(c, part = 'leaf', season = currentSeason()) {
   if (!c?.getContext) return c;
   const g = c.getContext('2d', { willReadFrequently: true }), d = g.getImageData(0, 0, c.width, c.height), a = d.data, memo = new Map(), W = c.width, pat = season !== 'summer' && season !== 'winter';
@@ -113,7 +113,7 @@ export function tintCanvas(c, part = 'leaf', season = currentSeason()) {
 function tint(key, image) {
   if (!SEASON_KEYS.test(key) || typeof document === 'undefined') return image;
   const c = document.createElement('canvas'); c.width = image.naturalWidth || image.width; c.height = image.naturalHeight || image.height;
-  c.getContext('2d', { willReadFrequently: true }).drawImage(image, 0, 0); return tintCanvas(c, 'leaf');
+  c.getContext('2d', { willReadFrequently: true }).drawImage(image, 0, 0); return tintCanvas(c, /hd2d-ground/.test(key) ? 'ground' : 'leaf');
 }
 function applyTint() { setAssetTint(tint, currentSeason()); }
 applyTint();

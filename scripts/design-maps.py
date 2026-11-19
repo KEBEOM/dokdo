@@ -1,5 +1,5 @@
 """지도 설계 도우미: 산(발자국) → 고리마다 한 층씩 높아지는 계단식 절벽 + 나무/바위, 그 위에 길·건물·물건을 찍어요.
-python3 scripts/design-maps.py dodong|dongdo_dock|dongdo_arch|seodo_town  → 지도 글자(art)·층(levels)을 maps.js 에 바로 써 넣어요(v0.74, art/실사-참고표.md 참고)."""
+python3 gen.py dodong  → 지도 글자(art)와 층(levels)을 maps.js 에 바로 써 넣어요."""
 import sys, re, json, os
 W, H = 42, 30
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'dist', 'maps.js')
@@ -36,65 +36,84 @@ class Grid:
     def rows(s): return [''.join(r) for r in s.a]
     def levels(s): return [''.join(str(v) if v else '.' for v in r) for r in s.lv]
 
-def dodong():
-    g = Grid('~', 64, 46)
-    g.rect(22, 0, 42, 7, '.'); g.rect(14, 8, 49, 20, '.'); g.rect(5, 21, 55, 28, '=')
+def dodong():  # v0.76: 골짜기를 따라 굽은 큰길, 양쪽 비탈 1층 단(집이 비탈에 올라앉은 U08 모습), 건물 줄 사이 길+마당, 이웃 사이 골목
+    g = Grid('~', 72, 58)
+    g.rect(26, 0, 45, 5, '.'); g.rect(20, 6, 51, 12, '.'); g.rect(14, 13, 57, 33, '.'); g.rect(6, 34, 63, 42, '=')
     def left(x, y):
-        if y <= 7: return x <= 21
-        if y <= 20: return x <= 13
-        if y <= 28: return x <= 4
-        if y <= 41: return x <= 22
-        if y <= 43: return x <= 9
-        return x <= 8
+        if y <= 5: return x <= 25
+        if y <= 12: return x <= 19
+        if y <= 33: return x <= 20          # 왼쪽 비탈 단(x 14~20)까지 산 발자국에 넣고 아래에서 1층으로 바꿔요
+        if y <= 42: return x <= 5
+        if y <= 53: return x <= 28
+        if y <= 55: return x <= 15
+        return x <= 14
     def right(x, y):
-        if y <= 7: return x >= 43
-        if y <= 20: return x >= 50
-        if y <= 28: return x >= 56
-        if y <= 33: return x >= 45
-        if y <= 36: return x >= 52
+        if y <= 5: return x >= 46
+        if y <= 12: return x >= 52
+        if y <= 33: return x >= 51          # 오른쪽 비탈 단(x 51~57)
+        if y <= 42: return x >= 64
+        if y <= 47: return x >= 51
+        if y <= 50: return x >= 58
         return False
-    g.mountain(left, 6, rock=lambda x, y, L: y >= 42)
+    g.mountain(left, 6, rock=lambda x, y, L: y >= 56)
     g.mountain(right, 6)
-    # 뒷산 공사장 터(1층) — 오른쪽 바위 턱 계단(골목에서)과 아래 절벽 계단(광장에서)으로 올라가요
-    for y in range(10, 21):
+    for x0, x1 in ((14, 20), (51, 57)):      # 비탈 단(1층)
+        for y in range(13, 34):
+            for x in range(x0, x1 + 1): g.lv[y][x] = 1; g.a[y][x] = '.'
+    # 뒷산 공사장 터(1층)
+    for y in range(15, 34):
         for x in range(4, 13): g.lv[y][x] = 1; g.a[y][x] = '.'
-    g.text(5, 11, 'nnnnnnn'); g.text(5, 12, '7.E'); g.text(8, 18, '"""'); g.text(8, 19, '"""'); g.put(6, 18, 'V')
-    g.put(4, 15, 'T'); g.put(11, 17, 'T'); g.put(5, 20, 'T')
-    g.rect(8, 13, 12, 13, '='); g.put(13, 13, '='); g.rect(8, 14, 8, 21, '=')
+    g.text(5, 17, 'nnnnnnn'); g.text(5, 18, '7.E'); g.text(8, 27, '"""'); g.text(8, 28, '"""'); g.put(6, 27, 'V')
+    for x, y in [(4, 22), (11, 24), (5, 31), (11, 30)]: g.put(x, y, 'T')
+    g.rect(8, 34, 8, 34, '='); g.rect(8, 21, 8, 33, '=')
     # 바다(만)
-    g.rect(25, 30, 41, 45, '~'); g.rect(23, 44, 63, 45, '~'); g.rect(10, 44, 22, 45, '~'); g.rect(42, 38, 63, 43, '~')
-    g.rect(25, 29, 42, 29, '#')
+    g.rect(31, 44, 47, 57, '~'); g.rect(29, 56, 71, 57, '~'); g.rect(15, 56, 28, 57, '~'); g.rect(48, 52, 71, 55, '~')
+    g.rect(31, 43, 48, 43, '#')
     # 행남 해안산책로
-    g.rect(23, 29, 24, 29, '='); g.rect(23, 30, 23, 41, '='); g.rect(24, 30, 24, 41, 'k')
-    g.rect(10, 42, 23, 43, '='); g.rect(10, 44, 23, 44, 'k'); g.rect(24, 42, 24, 43, 'k'); g.text(15, 42, 'rr')
-    for y in range(42, 44):
-        for x in range(10, 24): g.lv[y][x] = 0
-    g.put(22, 28, '8')
+    g.rect(29, 43, 30, 43, '='); g.rect(29, 44, 29, 53, '='); g.rect(30, 44, 30, 55, 'k')
+    g.rect(16, 54, 29, 55, '='); g.rect(16, 56, 29, 56, 'k'); g.text(21, 54, 'rr')
+    for y in range(54, 56):
+        for x in range(16, 30): g.lv[y][x] = 0
+    g.put(28, 42, '8')
     # 보행교 → 터미널 → 부두 끝 출구, 소파블록
-    g.rect(43, 29, 44, 36, '#'); g.rect(42, 30, 42, 36, 'k')
-    for y in range(29, 37): g.lv[y][43] = g.lv[y][44] = 0
-    g.rect(45, 34, 51, 36, 'C')
-    for y in range(34, 37):
-        for x in range(45, 52): g.lv[y][x] = 0
-    g.rect(42, 37, 63, 37, '#'); g.text(62, 37, 'z>'); g.rect(43, 38, 54, 38, 'k')
-    g.rect(55, 38, 63, 38, 'x'); g.rect(46, 39, 57, 39, 'x'); g.rect(52, 40, 60, 40, 'x'); g.rect(58, 41, 63, 41, 'x')
-    g.put(38, 31, 'F'); g.put(30, 40, 'b'); g.put(42, 27, 'a')
-    # 시가지 길
-    g.rect(33, 6, 34, 28, '='); g.rect(22, 6, 42, 6, '='); g.rect(14, 13, 49, 13, '='); g.rect(14, 20, 49, 20, '=')
-    g.rect(20, 8, 21, 12, '='); g.rect(47, 14, 47, 19, '=')
-    # 큰 건물(들어갈 수 있는 4채)
-    g.rect(30, 1, 36, 5, 'Y'); g.rect(22, 9, 26, 12, 'h'); g.rect(40, 9, 44, 12, 'L'); g.rect(14, 22, 18, 25, 'O')
-    # 촘촘한 시가지(들어갈 수 없는 집·상가)
-    D = lambda x, y: g.rect(x, y, x + 2, y + 1, 'd'); B = lambda x, y: g.rect(x, y, x + 4, y + 2, 'D')
-    for y in (0, 2, 4): D(22, y); D(25, y)
-    B(37, 1); D(37, 4); D(40, 4)
-    D(22, 7); D(25, 7); D(14, 8); D(17, 8); D(14, 10); D(17, 10); B(28, 8); B(35, 7); D(35, 10); D(40, 7); D(45, 8); D(45, 10)
-    D(14, 14); D(17, 14); B(14, 16); B(21, 14); D(21, 17); D(24, 17); D(27, 14); D(30, 14); B(27, 16); B(35, 14); D(35, 17); D(38, 17); B(41, 14); D(41, 17); D(44, 17); D(48, 15) if False else None
-    # 광장 둘레
-    D(5, 22); D(8, 22); D(5, 24); B(45, 21); D(50, 21); D(53, 21); B(48, 24); D(53, 24)
-    for x, y in [(28, 11), (31, 12), (20, 19), (26, 19), (40, 19), (24, 23), (40, 23), (28, 25), (12, 27)]: g.put(x, y, 'T')
-    g.text(31, 24, 'MMM'); g.put(36, 25, '6')
-    g.put(36, 6, 'J'); g.put(19, 24, 'S'); g.put(45, 13, 'P'); g.text(27, 27, 'G.B.H.1'); g.put(40, 25, '2'); g.put(26, 13, '3'); g.put(38, 20, '4'); g.put(20, 20, '5'); g.put(52, 27, 'W')
+    g.rect(49, 43, 50, 50, '#'); g.rect(48, 44, 48, 50, 'k')
+    for y in range(43, 51): g.lv[y][49] = g.lv[y][50] = 0
+    g.rect(51, 48, 57, 50, 'C')
+    for y in range(48, 51):
+        for x in range(51, 58): g.lv[y][x] = 0
+    g.rect(48, 51, 71, 51, '#'); g.text(70, 51, 'z>'); g.rect(49, 52, 60, 52, 'k')
+    g.rect(61, 52, 71, 52, 'x'); g.rect(52, 53, 63, 53, 'x'); g.rect(58, 54, 66, 54, 'x'); g.rect(64, 55, 71, 55, 'x')
+    g.put(44, 45, 'F'); g.put(36, 53, 'b'); g.put(53, 41, 'a')
+    # 골짜기를 따라 굽은 큰길(블록마다 큰길 자리가 달라요) + 건물 줄 앞 가로길
+    MAIN = {12: (35, 36), 19: (31, 32), 26: (38, 39), 33: (35, 36)}
+    for yB, (a, b) in MAIN.items(): g.rect(a, yB - 6, b, yB + 1, '=')
+    for y, x0, x1 in [(6, 20, 51), (13, 14, 57), (20, 14, 57), (27, 14, 57)]: g.rect(x0, y, x1, y, '=')
+    g.rect(18, 14, 19, 33, '='); g.rect(52, 14, 52, 33, '=')   # 비탈 단 골목(위아래로 이어져요)
+    for x in range(14, 21): g.a[34][x] = '='                   # 광장에서 비탈 단으로 오르는 넓은 계단
+    for x in range(51, 58): g.a[34][x] = '='
+    # 들어갈 수 있는 4채
+    g.rect(32, 1, 38, 5, 'Y'); g.rect(22, 9, 26, 12, 'h'); g.rect(44, 9, 48, 12, 'L'); g.rect(8, 35, 12, 38, 'O')
+    def row(yB, xa, xb, cycle, skip=()):
+        a, b = MAIN.get(yB, (99, 99)); roads = {a, b}; x, k = xa, 0
+        while x <= xb:
+            if x in roads or any(p <= x <= q for p, q in skip): x += 1; continue
+            c = cycle[k % len(cycle)]; w, d = (5, 4) if c == 'D' else (3, 3)
+            if x + w - 1 > xb or any(xx in roads or any(p <= xx <= q for p, q in skip) for xx in range(x, x + w)):
+                if c == 'D': k += 1; continue
+                x += 1; continue
+            sh = 1 if c == 'd' and (x * 7 + yB) % 3 == 0 else 0   # 집 몇 채는 한 줄 뒤로(앞마당) — 반듯한 줄을 깨요
+            g.rect(x, yB - d + 1 - sh, x + w - 1, yB - sh, c); x += w + 1; k += 1
+    row(5, 27, 45, 'dd', skip=[(31, 39)])
+    row(12, 20, 51, 'Ddd', skip=[(21, 27), (43, 49)])
+    for yB, cyc in ((19, 'dDdd'), (26, 'Ddd'), (33, 'ddDd')):
+        row(yB, 21, 50, cyc)                                    # 골짜기 바닥
+        g.rect(15, yB - 2, 17, yB, 'd'); g.rect(53, yB - 2, 55, yB, 'd')   # 비탈 단 위의 집
+    for x, c in [(14, 'd'), (18, 'd'), (44, 'D'), (50, 'd'), (54, 'D'), (60, 'd')]:
+        w, d = (5, 4) if c == 'D' else (3, 3); g.rect(x, 40 - d + 1, x + w - 1, 40, c)
+    for x, y in [(23, 7), (48, 7), (29, 15), (43, 22), (24, 29), (47, 29), (26, 39), (31, 37), (41, 37), (63, 36), (16, 15), (54, 22)]: g.put(x, y, 'T')
+    for x, y in [(30, 7), (41, 7), (26, 14), (45, 21), (33, 28)]: g.put(x, y, 'p')
+    g.text(37, 38, 'MMM'); g.put(42, 39, '6')
+    g.put(40, 7, 'J'); g.put(13, 37, 'S'); g.put(49, 14, 'P'); g.text(32, 41, 'G.B.H.1'); g.put(42, 41, '2'); g.put(28, 21, '3'); g.put(41, 28, '4'); g.put(24, 22, '5'); g.put(60, 41, 'W')
     g.faces_clear()
     return g
 

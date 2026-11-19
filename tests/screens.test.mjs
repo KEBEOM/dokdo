@@ -121,6 +121,7 @@ async function runDevice(d) {
   for (let i = 0; i < 10 && await page.$('#dialogue:not(.hidden) #nextTalk'); i++) await tap('#nextTalk');
   // walking screen, a conversation, the study quiz, the map, the dex
   await check('12-world', 500);
+  { const g = await G(() => window.__dokdo.gl); if (!g.ok || g.mode !== 'hd') problems.push(`HD-2D (WebGL) is not drawing: ${JSON.stringify({ ok: g.ok, mode: g.mode })}`); }
   // touch screens: hold the joystick to the right and the explorer walks right
   if (d.touch) {
     const box = await page.locator('#joystick').boundingBox(); if (!box) throw new Error('no joystick on a touch screen');
@@ -142,11 +143,11 @@ async function runDevice(d) {
   await tap('#dexBtn'); await check('16-dex', 600); await G(() => window.__dokdo.closeModal());
   await tap('#notebookBtn'); await check('19-study-notebook', 600); await tap('[data-page="history"]'); await check('20-study-page', 600); await G(() => window.__dokdo.closeModal());
   // inside a building: the room sits in the middle of the screen with its labels
-  await G(() => window.__dokdo.goInside('lab')); await until(() => window.__dokdo.map.id === 'town0/lab/1' && !window.__dokdo.transition);
+  await G(() => window.__dokdo.goInside('lab')); await until(() => window.__dokdo.map.id === 'town0/lab/1' && !window.__dokdo.transition, 120000); // v0.79 HD-2D: 소프트웨어 WebGL(그래픽 카드 없는 시험 컴퓨터)에선 걷기가 느려요
   await check('18-inside', 2900);
   const roomFit = await G(() => { const c = document.querySelector('#world').getBoundingClientRect(), f = window.__dokdo.map.focus; return { w: f.w * 32, h: f.h * 32, cw: c.width, ch: c.height }; });
   void roomFit;
-  for (let i = 0; i < 6 && await G(() => window.__dokdo.map.kind === 'room'); i++) { const id = await G(() => window.__dokdo.map.id); await G(() => window.__dokdo.guide()); await page.waitForFunction(id => window.__dokdo.map.id !== id && !window.__dokdo.transition, id, { timeout: 20000 }); }
+  for (let i = 0; i < 6 && await G(() => window.__dokdo.map.kind === 'room'); i++) { const id = await G(() => window.__dokdo.map.id); await G(() => window.__dokdo.guide()); await page.waitForFunction(id => window.__dokdo.map.id !== id && !window.__dokdo.transition, id, { timeout: 60000 }); }
   await G(() => { window.__dokdo.playStory(window.__dokdo.stories.BOSS_REVEAL); }); await until(() => window.__dokdo.cutscene() === 'boss-reveal');
   for (let i = 0; i < 24; i++) { if (await page.$('.cs-choice')) break; await tap('.cs-box').catch(() => {}); await page.waitForTimeout(120); }
   await page.waitForSelector('.cs-choice', { timeout: 15000 }).catch(() => {}); await check('17-cutscene-choice', 600);

@@ -44,7 +44,7 @@ export function villageResidents(zone) {
     { key: '2', actor: 'child-girl', name: '여자아이 솔', lines: ['나는 솔이야. 이번 지역에서 기억할 내용을 함께 읽어 볼까?', z.fact, '수첩을 잠깐 닫고 네 말로 설명해 봐!'] },
     { key: '3', actor: 'child-girl-ribbon', name: '여자아이 봄', lines: ['나는 봄! 탐험 수첩에 지금까지 배운 내용을 모아 두었어.', '각 지역의 기록판을 다시 만나면 지난 개념도 함께 복습할 수 있어.'] },
     { key: '4', actor: 'man', name: '도윤 아저씨', lines: [...(ul ? ['요즘 뒷산에 몽땅랜드 공사 가림막이 생겼어. 후박나무 숲을 밀고 리조트를 짓는다나.', '울릉도만이 아니래. 독도까지 개발한다는 소문이 돌더구나.'] : []), `이번 조사 주제는 ‘${z.histTitle}’란다.`, '자료를 읽을 때 누가, 언제 만들었는지 살펴보렴. 출처도 직접 확인하면 좋겠지?', z.hint] },
-    { key: '5', actor: 'woman', name: '미소 아줌마', lines: [...(ul ? ['울릉도에 온 걸 환영해! 요즘 공사 소리 때문에 우산몬들이 잠을 못 잔대.'] : []), '반가워! 탐험하다 지치면 쉼터지기에게 가 보렴.', '동료 체력을 회복하고, 수첩에서 헷갈린 개념을 천천히 다시 읽어 봐.'] }
+    { key: '5', actor: 'woman', name: '미소 아줌마', lines: [...(ul ? ['울릉도에 온 걸 환영해! 요즘 공사 소리 때문에 우산몬들이 잠을 못 잔대.'] : []), '반가워! 탐험하다 지치면 쉼터지기에게 가 보렴.', '동료 하트를 채우고, 수첩에서 헷갈린 개념을 천천히 다시 읽어 봐.'] }
   ];
 }
 
@@ -236,6 +236,7 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
   const wanted = map.kind === 'town' ? wantedRole(state.progress[state.zone] || {}) : null;
   const base = project && typeof ctx.getTransform === 'function' ? ctx.getTransform() : null;
   const seen = d => project?.seen ? project.seen(d) : d; // 3D 보기에서는 카메라에서 보이는 쪽 모습으로
+  const env = { map, state, time, motion, wanted, seen };
   const order = sceneDrawOrder(people, view, map);
   if (!base) { for (const n of order) drawOne(n); }
   else {
@@ -272,42 +273,48 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
     list.sort((a, b) => (b.key ?? b.p.z ?? 0) - (a.key ?? a.p.z ?? 0));
     for (const { n, fx, fy, p, box, wall, slab } of list) { const fa = project.fog && !n?.player ? 1 - project.fog(p.z ?? 0) : 1; if (fa < .04) continue; ctx.save(); ctx.globalAlpha *= fa; drawItem(); ctx.restore(); function drawItem() { if (slab) { ctx.save(); ctx.setTransform(base); if (project.fadeZ && p.z < project.fadeZ) ctx.globalAlpha *= .3; project.slab.draw(ctx, n, slab, fx, fy, g => { const keep = ctx; ctx = g; drawOne(slab === 'railv' ? { ...n, scenery: 'rail', w: 1 } : n); ctx = keep; }); ctx.restore(); return; } if (wall) { ctx.save(); ctx.setTransform(base); project.drawWall(ctx, wall); ctx.restore(); return; } if (box) { ctx.save(); ctx.setTransform(base); project.box.draw(ctx, n.building); ctx.restore(); return; } ctx.save(); if (!n.player && project.fadeZ && p.z < project.fadeZ) ctx.globalAlpha *= .22; ctx.setTransform(base.a * p.k, 0, 0, base.d * p.k, base.a * (p.x - fx * p.k), base.d * (p.y - fy * p.k)); drawOne(n); ctx.restore(); } } // v0.71 바닷속 안개: 멀수록 흐리게
   }
-  function drawOne(n) {
-    if (n.scenery) { drawDecor(ctx, n, map, time); return; }
-    const fx = n.x * 32 + (32 - CHARACTER_SIZE) / 2, fy = n.y * 32 + 28 - CHARACTER_SIZE;
-    if (n.furniture) drawFurniture(ctx, n.furniture, n.x, n.y, time, { open: n.used, glow: n.kind === 'rest' });
-    else if (n.kind === 'board') drawIslandArt(ctx, 'record-board', n.x * 32 - 8, n.y * 32 - 16, 48, 54);
-    else if (n.kind === 'wild' || n.kind === 'friend') { // 걸어 다니는 우산몬: 가는 쪽을 보고, 걸을 때 통통 튀어요 (사나워진 우산몬만 검은 기운)
-      if (n.kind === 'wild') darkWisps(ctx, n.x, n.y, time);
-      const f = facing(n.species), nd = seen(n.dir), flip = (nd === 'right' && f === 'left') || (nd === 'left' && f === 'right'), hop = n.walking ? Math.abs(Math.sin(time / 70)) * 3 : 0;
-      if (map?.diving && SURFACE_BIRDS.has(Number(n.species))) return; // v0.72 물 위의 새는 잠수했을 때 안 보여요(머리 위 물낯에 떠 있어요)
-      const swim = map?.[Math.round(n.y)]?.[Math.round(n.x)] === 0 && (!map.diving || SURFACE_BIRDS.has(Number(n.species))); // v0.70 물속 우산몬: 물결 위로 몸 위쪽만 보이고 둥실 떠요(v0.71 잠수하면 온몸이 보여요)
-      if (swim) {
-        const bob = Math.sin(time / 420 + n.x * 1.7) * 2, line = n.y * 32 + 20;
-        ctx.save(); ctx.beginPath(); ctx.rect(n.x * 32 - 24, n.y * 32 - 60, 80, line - (n.y * 32 - 60)); ctx.clip();
-        if (flip) { ctx.translate(n.x * 32 * 2 + 32, 0); ctx.scale(-1, 1); }
-        drawMonster(ctx, n.species, n.x * 32 - 6, n.y * 32 - 8 + bob, 44, time / 1000); ctx.restore();
-        ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1.5; const w = 14 + Math.sin(time / 300 + n.x) * 2;
-        ctx.beginPath(); ctx.ellipse(n.x * 32 + 16, line, w, 4, 0, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = .45; ctx.beginPath(); ctx.ellipse(n.x * 32 + 16, line + 1, w + 6, 6, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
-      } else {
-      groundShadow(ctx, n.x * 32 + 16, n.y * 32 + 29, 13, hop); // 발밑 그림자: 통통 튈 때는 조금 작아져요
-      ctx.save(); if (flip) { ctx.translate(n.x * 32 * 2 + 32, 0); ctx.scale(-1, 1); }
-      drawMonster(ctx, n.species, n.x * 32 - 6, n.y * 32 - 12 - hop, 44, time / 1000); ctx.restore();
-      }
+  function drawOne(n) { paintActor(ctx, n, env); }
+}
+
+// v0.77 물건·사람 하나를 2D로 그려요(2D 화면, 예전 3D, 새 3D(WebGL)의 그림 칸이 모두 함께 써요)
+// env: { map, state, time, motion, wanted, seen }
+export function paintActor(ctx, n, env) {
+  const { map, state, time, motion, wanted, seen } = env;
+  if (n.scenery) { drawDecor(ctx, n, map, time); return; }
+  const fx = n.x * 32 + (32 - CHARACTER_SIZE) / 2, fy = n.y * 32 + 28 - CHARACTER_SIZE;
+  if (n.furniture) drawFurniture(ctx, n.furniture, n.x, n.y, time, { open: n.used, glow: n.kind === 'rest' });
+  else if (n.kind === 'board') drawIslandArt(ctx, 'record-board', n.x * 32 - 8, n.y * 32 - 16, 48, 54);
+  else if (n.kind === 'wild' || n.kind === 'friend') { // 걸어 다니는 우산몬: 가는 쪽을 보고, 걸을 때 통통 튀어요 (사나워진 우산몬만 검은 기운)
+    if (n.kind === 'wild') darkWisps(ctx, n.x, n.y, time);
+    const f = facing(n.species), nd = seen(n.dir), flip = (nd === 'right' && f === 'left') || (nd === 'left' && f === 'right'), hop = n.walking ? Math.abs(Math.sin(time / 70)) * 3 : 0;
+    if (map?.diving && SURFACE_BIRDS.has(Number(n.species))) return; // v0.72 물 위의 새는 잠수했을 때 안 보여요(머리 위 물낯에 떠 있어요)
+    const swim = map?.[Math.round(n.y)]?.[Math.round(n.x)] === 0 && (!map.diving || SURFACE_BIRDS.has(Number(n.species))); // v0.70 물속 우산몬: 물결 위로 몸 위쪽만 보이고 둥실 떠요(v0.71 잠수하면 온몸이 보여요)
+    if (swim) {
+      const bob = Math.sin(time / 420 + n.x * 1.7) * 2, line = n.y * 32 + 20;
+      ctx.save(); ctx.beginPath(); ctx.rect(n.x * 32 - 24, n.y * 32 - 60, 80, line - (n.y * 32 - 60)); ctx.clip();
+      if (flip) { ctx.translate(n.x * 32 * 2 + 32, 0); ctx.scale(-1, 1); }
+      drawMonster(ctx, n.species, n.x * 32 - 6, n.y * 32 - 8 + bob, 44, time / 1000); ctx.restore();
+      ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1.5; const w = 14 + Math.sin(time / 300 + n.x) * 2;
+      ctx.beginPath(); ctx.ellipse(n.x * 32 + 16, line, w, 4, 0, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = .45; ctx.beginPath(); ctx.ellipse(n.x * 32 + 16, line + 1, w + 6, 6, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    } else {
+    groundShadow(ctx, n.x * 32 + 16, n.y * 32 + 29, 13, hop); // 발밑 그림자: 통통 튈 때는 조금 작아져요
+    ctx.save(); if (flip) { ctx.translate(n.x * 32 * 2 + 32, 0); ctx.scale(-1, 1); }
+    drawMonster(ctx, n.species, n.x * 32 - 6, n.y * 32 - 12 - hop, 44, time / 1000); ctx.restore();
     }
-    else if (n.kind === 'legend') { legendGlow(ctx, n.x, n.y, time); drawMonster(ctx, n.species, n.x * 32 - 10, n.y * 32 - 22 + Math.round(Math.sin(time / 300) * 2), 52, time / 1000); if (!n.used) marker(ctx, n.x, n.y, time, '#ffe9a0'); }
-    else if (PROP_KINDS.includes(n.kind)) drawProp(ctx, n.kind, n.x, n.y, { open: n.used, art: n.art, time, water: map[n.y]?.[n.x] === 0 });
-    else if (n.player) {
-      const wet = map?.[Math.round(n.y)]?.[Math.round(n.x)] === 0 && !map.diving, line = n.y * 32 + 22; // v0.71 얕은 물에 들어가면 무릎까지 잠기고 물결이 일어요
-      if (wet) { ctx.save(); ctx.beginPath(); ctx.rect(n.x * 32 - 40, n.y * 32 - 90, 112, line - (n.y * 32 - 90)); ctx.clip(); }
-      if (!drawExplorer(ctx, state.avatar, fx, fy, CHARACTER_SIZE, seen(state.dir), motion.walking, motion.distance || 0)) drawHuman(ctx, fx, fy, '#418e91', state.dir, 0, 'normal', null, CHARACTER_SIZE);
-      if (wet) { ctx.restore(); ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1.5; const w = 12 + Math.sin(time / 260) * 2; ctx.beginPath(); ctx.ellipse(n.x * 32 + 16, line, w, 4, 0, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = .4; ctx.beginPath(); ctx.ellipse(n.x * 32 + 16, line + 1, w + 7, 6, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
-    }
-    else if (n.actor && drawResident(ctx, n.actor, fx, fy, CHARACTER_SIZE, time, seen(n.dir || 'down'), n.walking || false, n.walkDistance || 0)) { /* drawn */ }
-    else drawHuman(ctx, fx, fy, n.color || '#a88668', 'down', 0, n.kind, n.sprite, CHARACTER_SIZE);
-    if (!n.player && wanted && n.id === wanted) marker(ctx, n.x, n.y, time);
-    if (n.kind === 'trainer' && !n.used) marker(ctx, n.x, n.y, time, '#f0a07a');
   }
+  else if (n.kind === 'legend') { legendGlow(ctx, n.x, n.y, time); drawMonster(ctx, n.species, n.x * 32 - 10, n.y * 32 - 22 + Math.round(Math.sin(time / 300) * 2), 52, time / 1000); if (!n.used) marker(ctx, n.x, n.y, time, '#ffe9a0'); }
+  else if (PROP_KINDS.includes(n.kind)) drawProp(ctx, n.kind, n.x, n.y, { open: n.used, art: n.art, time, water: map[n.y]?.[n.x] === 0 });
+  else if (n.player) {
+    const tx = Math.round(n.x), ty = Math.round(n.y), wet = map?.[ty]?.[tx] === 0 && !map.diving, deep = wet && !map.shallow?.has(`${tx},${ty}`); // v0.71 얕은 물: 무릎까지 · v0.82 깊은 물: 가슴까지 잠겨 헤엄쳐요(둥실 떠요)
+    const bob = deep ? Math.round(Math.sin(time / 380) * 1.5) : 0, sink = deep ? 4 : 0, line = n.y * 32 + (deep ? 10 + bob : 22);
+    if (wet) { ctx.save(); ctx.beginPath(); ctx.rect(n.x * 32 - 40, n.y * 32 - 90, 112, line - (n.y * 32 - 90)); ctx.clip(); }
+    if (!drawExplorer(ctx, state.avatar, fx, fy + sink + bob, CHARACTER_SIZE, seen(state.dir), motion.walking, motion.distance || 0)) drawHuman(ctx, fx, fy + sink + bob, '#418e91', state.dir, 0, 'normal', null, CHARACTER_SIZE);
+    if (wet) { ctx.restore(); ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1.5; const w = 12 + Math.sin(time / 260) * 2; ctx.beginPath(); ctx.ellipse(n.x * 32 + 16, line, w, 4, 0, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = .4; ctx.beginPath(); ctx.ellipse(n.x * 32 + 16, line + 1, w + 7, 6, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
+  }
+  else if (n.actor && drawResident(ctx, n.actor, fx, fy, CHARACTER_SIZE, time, seen(n.dir || 'down'), n.walking || false, n.walkDistance || 0)) { /* drawn */ }
+  else drawHuman(ctx, fx, fy, n.color || '#a88668', 'down', 0, n.kind, n.sprite, CHARACTER_SIZE);
+  if (!n.player && wanted && n.id === wanted) marker(ctx, n.x, n.y, time);
+  if (n.kind === 'trainer' && !n.used) marker(ctx, n.x, n.y, time, '#f0a07a');
 }
 
 // v0.68 들꽃: 줄기 위에 다섯 점 꽃. 한 칸에 두세 송이가 같은 땅선(칸 위에서 22)에 서서 바람에 살짝 흔들려요.

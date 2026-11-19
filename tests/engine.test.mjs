@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {MONSTERS,ZONES,getSpecies,starterPool,pickStarterField,STARTER_LEVEL} from '../dist/data.js';
 import {CONCEPTS,QUESTIONS,SOURCES} from '../dist/learning.js';
+import {heartsMax,toHalves,heartText,HEART_MAX,stats as hstats} from '../dist/engine.js';
 import {newState,createMonster,addMonster,healAll,gainXP,damage,enemyHit,ENEMY_POWER,attackHit,SOFTEN_RATE,PIERCE_CHANCE,LEGEND_CAPTURE,captureChance,recordAnswer,validateSave,advantage,PP_MAX,skills,knownSkills,learnedBetween} from '../dist/engine.js';
 import {createMap,npcs,pathfind,blocked,cameraFor,TILE,W,H} from '../dist/world.js';
 import {MAPS} from '../dist/maps.js';
@@ -37,15 +38,23 @@ test('every map: people on land, arrivals free, everyone and every exit reachabl
     if(map[0][0]!==0)assert.deepEqual(pathfind(map,s.x,s.y,0,0,people),[]); // v0.71: 바다는 헤엄쳐 갈 수 있어요(나무·바위 구석은 여전히 못 가요)
   }
 });
-test('a correct answer to the opponent question still hurts, but much less',()=>{
-  const me=createMonster(1,8),foe=createMonster(34,9),rng=()=>.5;
+test('a correct answer to the opponent question still hurts, but much less (v0.83 hearts: half-heart units)',()=>{
+  const me=createMonster(1,20),foe=createMonster(34,24),rng=()=>.5;
   const full=enemyHit(foe,me,{correct:false},rng),soft=enemyHit(foe,me,{correct:true},rng);
-  assert.equal(full,damage(foe,me,ENEMY_POWER,rng).amount);assert.ok(soft>=1&&soft<full,'correct answers soften the blow');assert.equal(soft,Math.max(1,Math.round(full*SOFTEN_RATE)));
+  assert.equal(full,Math.max(1,toHalves(damage(foe,me,ENEMY_POWER,rng).amount,me)),'the old blow, in half hearts');assert.ok(full>=2&&soft>=1&&soft<full,'correct answers soften the blow');assert.equal(soft,Math.max(1,Math.min(full-1,Math.round(full*SOFTEN_RATE))));
+  const weak=createMonster(34,1);assert.equal(enemyHit(weak,me,{correct:true},rng),0,'a half-heart blow is fully blocked by a correct answer');assert.ok(enemyHit(weak,me,{correct:false},rng)>=1,'unblocked: at least half a heart');
   assert.equal(SOFTEN_RATE,.6,'a correct answer takes 40% off');assert.equal(enemyHit(foe,me,{correct:true,pierce:true},rng),full,'boss pierce: full damage even when correct');assert.ok(PIERCE_CHANCE>0&&PIERCE_CHANCE<1);
-  // my attack: type advantage x1.5 when correct, half of the plain hit when wrong; neutral/weak wrong answers miss
+  // my attack: at least a whole heart when correct, more with type advantage; with advantage a wrong answer still lands a little; neutral/weak wrong answers miss
   const leaf=createMonster(1,10),light=createMonster(28,10),rock=createMonster(55,10);const fixed=()=>.5;
   const good=attackHit(leaf,light,true,1.3,fixed),plain=attackHit(leaf,rock,true,1.3,fixed),miss=attackHit(leaf,rock,false,1.3,fixed),half=attackHit(leaf,light,false,1.3,fixed);
-  assert.equal(good.mult,1.5);assert.equal(miss.amount,0);assert.ok(half.amount>0&&half.amount<good.amount);assert.equal(half.amount,Math.max(1,Math.round(good.amount/1.5*.5)));
+  assert.equal(good.mult,1.5);assert.ok(plain.amount>=2&&good.amount>=plain.amount);assert.equal(miss.amount,0);assert.ok(half.amount>0&&half.amount<good.amount);
+});
+test('v0.83 hearts: 3~5 per 우산몬 by species, half a heart more every 6 levels, never more than HEART_MAX',()=>{
+  const hs=MONSTERS.map(m=>heartsMax(m.id,1));assert.equal(Math.min(...hs),6);assert.equal(Math.max(...hs),10);assert.ok(new Set(hs).size>=3,'different 우산몬, different hearts');
+  assert.equal(heartsMax(1,7),heartsMax(1,1)+1);assert.ok(MONSTERS.every(m=>heartsMax(m.id,100)<=HEART_MAX*2));assert.equal(HEART_MAX,8);
+  assert.equal(heartText(7),'3.5');assert.equal(heartText(8),'4');
+  const old={...newState(),started:true,party:[{id:1,level:10,hp:hstats(1,10).vit/2,xp:0,pp:[...PP_MAX]}]};delete old.hearts;const v=validateSave(old);assert.equal(v.party[0].hp,Math.round(heartsMax(1,10)/2),'old saves keep their remaining ratio');assert.equal(v.hearts,1);
+  assert.equal(validateSave(v).party[0].hp,v.party[0].hp,'and convert only once');
 });
 test('damage, type advantage, capture and recovery remain finite',()=>{
   const s=newState();addMonster(s,createMonster(21,5));const foe=createMonster(47,5);assert.equal(advantage('wave','rock'),1.5);assert.equal(advantage('rock','wave'),.75);assert.ok(damage(s.party[0],foe,1,()=>.5).amount>0);

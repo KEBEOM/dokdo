@@ -71,19 +71,21 @@ export function buildingKit(key, b) {
 }
 
 // 건물의 바닥 사각형과 높이(지도 픽셀). 앞벽은 2D 그림과 같은 자리(건물 칸의 아래 끝)에 서요.
+// v0.75 3D 건물 높이: 그림은 한 층이 32(사람 키 48보다 낮아요)라서, 3D에서는 위로 BH배 늘려 한 층이 사람보다 조금 높게 보여요.
+export const BH = 1.9;
 export function buildingBox(b, kit) {
-  const cx = (b.x + b.w / 2) * TILE, x0 = cx - kit.sw / 2 + kit.u0, x1 = x0 + kit.wallW, yF = (b.y + b.h) * TILE, yB = yF - kit.depth;
-  return { x0, x1, yF, yB, yM: (yF + yB) / 2, h: kit.wallH, top: kit.wallH + kit.rise };
+  const cx = (b.x + b.w / 2) * TILE, x0 = cx - kit.sw / 2 + kit.u0, x1 = x0 + kit.wallW, yF = (b.y + b.h) * TILE, yB = yF - kit.depth, h = kit.wallH * BH;
+  return { x0, x1, yF, yB, yM: (yF + yB) / 2, h, top: h + kit.rise * 1.4 };
 }
 
 // 면 목록: 꼭짓점 [x, y, 높이, u, v] (u, v는 그 면 그림 위의 자리) + 보이는지(카메라 쪽을 향하는지)
 function faces(box, kit, cam) {
-  const { x0, x1, yF, yB, yM, h, top } = box, T = kit.tex, W = kit.wallW, D = kit.depth, cy = cam.y, cx = cam.x;
-  const rh = T.roofFront.height, run = (yF - yB) / 2, R = top - h;
+  const { x0, x1, yF, yB, yM, h, top } = box, T = kit.tex, W = kit.wallW, D = kit.depth, cy = cam.y, cx = cam.x, th = kit.wallH;
+  const rh = T.roofFront.height, run = (yF - yB) / 2, R = top - h, sR = kit.rise; // 그림 좌표(th·sR)와 세계 높이(h·R)는 따로예요
   const list = [];
-  if (cy > yF) list.push({ tex: T.front, v: [[x0, yF, 0, 0, h], [x1, yF, 0, W, h], [x1, yF, h, W, 0], [x0, yF, h, 0, 0]] });
-  if (cy < yB) list.push({ tex: T.back, v: [[x1, yB, 0, 0, h], [x0, yB, 0, W, h], [x0, yB, h, W, 0], [x1, yB, h, 0, 0]] });
-  const gable = (x, a, b) => [[x, a, 0, 0, top], [x, b, 0, D, top], [x, b, h, D, R], [x, yM, top, D / 2, 0], [x, a, h, 0, R]];
+  if (cy > yF) list.push({ tex: T.front, v: [[x0, yF, 0, 0, th], [x1, yF, 0, W, th], [x1, yF, h, W, 0], [x0, yF, h, 0, 0]] });
+  if (cy < yB) list.push({ tex: T.back, v: [[x1, yB, 0, 0, th], [x0, yB, 0, W, th], [x0, yB, h, W, 0], [x1, yB, h, 0, 0]] });
+  const gable = (x, a, b) => [[x, a, 0, 0, th + sR], [x, b, 0, D, th + sR], [x, b, h, D, sR], [x, yM, top, D / 2, 0], [x, a, h, 0, sR]];
   if (cx < x0) list.push({ tex: T.west, v: gable(x0, yB, yF) });
   if (cx > x1) list.push({ tex: T.east, v: gable(x1, yF, yB) });
   const E = cam.eye ?? EYE;

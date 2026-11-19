@@ -174,19 +174,70 @@ export const ROOM_TEMPLATES = {
 };
 
 export const roomId = (zone, kind, floor) => `town${zone}/${kind}/${floor}`;
-export function parseRoomId(id) { const m = /^town(\d)\/(lab|gym|shop|home)\/(\d)$/.exec(id || ''); return m ? { zone: +m[1], kind: m[2], floor: +m[3] } : null; }
+export function parseRoomId(id) { const m = /^town(\d)\/([a-z]+\d*)\/(\d)$/.exec(id || ''); return m ? { zone: +m[1], kind: m[2], floor: +m[3] } : null; }
 
-// All interior map definitions (8 towns × 4 buildings × their floors), shaped like normal maps (42×30).
-export const ROOM_DEFS = [];
-for (let zone = 0; zone < 8; zone++) for (const [kind, floors] of Object.entries(ROOM_TEMPLATES)) floors.forEach((f, i) => {
+function roomDef(zone, key, title, floors, f, i) {
   const w = f.art[0].length, h = f.art.length, ox = Math.floor((ROOM_W - w) / 2), oy = Math.floor((ROOM_H - h) / 2);
   const art = Array.from({ length: ROOM_H }, (_, y) => {
     const row = y >= oy && y < oy + h ? f.art[y - oy] : '';
     return (' '.repeat(ox) + row).padEnd(ROOM_W, ' ').slice(0, ROOM_W);
   });
-  ROOM_DEFS.push({
-    id: roomId(zone, kind, i + 1), kind: 'room', zone, building: kind, floor: i + 1, floors: floors.length,
-    name: `${BUILDING_ROOMS[kind]} ${f.label}`, short: `${BUILDING_ROOMS[kind]} ${f.label.split(' · ')[0]}`, townName: ZONES[zone].name,
+  return {
+    id: roomId(zone, key, i + 1), kind: 'room', zone, building: key, floor: i + 1, floors: floors.length,
+    name: `${title} ${f.label}`, short: `${title} ${f.label.split(' · ')[0]}`, townName: ZONES[zone].name,
     island: TOWN_ISLAND[zone], town: `town${zone}`, art, focus: { x: ox, y: oy, w, h }, objects: f.objects(zone)
-  });
-});
+  };
+}
+// All interior map definitions (8 towns × 4 buildings × their floors), shaped like normal maps (42×30).
+export const ROOM_DEFS = [];
+for (let zone = 0; zone < 8; zone++) for (const [kind, floors] of Object.entries(ROOM_TEMPLATES)) floors.forEach((f, i) => ROOM_DEFS.push(roomDef(zone, kind, BUILDING_ROOMS[kind], floors, f, i)));
+
+// ── v0.75 도동항 시가지의 집·가게·여객선터미널도 모두 들어가 볼 수 있어요 ─────────────────────────────
+// 가게·집 이름과 이야기는 게임 속 창작이에요. 울릉도 먹거리·나물·눈 이야기는 일반적인 사실만 담았어요.
+const PEOPLE = ['man', 'woman', 'child-girl', 'child-boy', 'child-girl-ribbon'];
+const NAMES = ['다온', '해솔', '바름', '누리', '하랑', '새벽', '여울', '가온', '도담', '라온', '마루', '별하', '소담', '아름', '예솔', '윤슬', '은솔', '초롱', '한결', '나래'];
+const who = i => ({ actor: PEOPLE[i % PEOPLE.length], name: NAMES[i % NAMES.length] });
+const SHOPS = [
+  { title: '섬마을 식당', what: '식당', lines: ['어서 와요! 울릉도에서는 따개비밥과 홍합밥을 많이 먹어요.', '바위에 붙어 사는 따개비를 넣어 지은 밥이에요. 바다가 가까운 섬이라 바다에서 나는 재료가 많지요.'] },
+  { title: '호박엿 가게', what: '기념품 가게', lines: ['울릉도 호박엿 맛보고 가요! 울릉도의 이름난 먹거리예요.', '다른 지역 기념품을 사기 전에 ‘이 지역에서 난 것인지’ 살펴보면 좋아요.'] },
+  { title: '산나물 가게', what: '나물 가게', lines: ['봄이면 산에서 명이나물을 뜯어요. 울릉도 산나물로 이름이 났지요.', '산나물은 다 뜯지 않고 뿌리를 남겨 둬야 이듬해에 또 나요.'] },
+  { title: '바다 카페', what: '카페', lines: ['창가에 앉으면 도동항에 배가 들어오는 게 보여요.', '독도행 배는 날씨가 나쁘면 뜨지 못하는 날도 있어요. 파도를 잘 살펴야 해요.'] },
+  { title: '오징어 가게', what: '건어물 가게', lines: ['울릉도는 오징어로 이름난 섬이에요. 가을이면 집집마다 오징어를 널어 말렸지요.', '요즘은 바다가 바뀌어서 예전만큼 많이 잡히지 않는대요.'] },
+  { title: '섬 마트', what: '마트', lines: ['섬에서는 물건 대부분이 배로 들어와요. 바람이 세서 배가 못 오면 물건이 늦게 와요.', '그래서 섬사람들은 날씨 소식에 늘 귀를 기울여요.'] }
+];
+const HOME_TALK = [
+  ['울릉도는 눈이 아주 많이 와. 그래서 옛 집은 처마 끝에 우데기를 둘러 눈을 막았단다.', '우데기 안쪽 길로 다니면 눈이 쌓여도 집 안팎을 오갈 수 있었지.'],
+  ['울릉도에서 가장 높은 봉우리는 성인봉이야. 맑은 날 올라가면 섬 전체가 보여.', '섬이 화산으로 생겨서 산이 바다에서 곧바로 솟아 있단다. 그래서 평평한 땅이 적어.'],
+  ['도동은 좁은 골짜기를 따라 집이 빼곡하게 들어선 마을이야.', '땅이 좁아서 집을 위로 높이 쌓았지. 창밖으로 보면 지붕 색이 알록달록해.'],
+  ['아침마다 항구에 독도행 배가 들어오는지 창밖을 봐.', '맑은 날에는 울릉도 높은 곳에서 독도가 보이기도 한대.'],
+  ['우리 할아버지는 오징어잡이 배를 타셨어. 밤바다에 집어등을 환하게 켜고 나가셨지.', '불빛을 보고 오징어가 모여든대.']
+];
+const home = i => [
+  { label: '1층 · 거실', art: ['wwwyywwwwyywww', 'wkk___o___q_Uw', 'w__tt________w', 'w__tt__mmmm0_w', 'w______mmmm__w', 'wq_____a__1__w', 'wwwwwwwDwwwwww'],
+    objects: () => ({ 0: { type: 'person', ...who(i), lines: HOME_TALK[i % HOME_TALK.length] }, 1: { type: 'sign', name: '창가 화분', furniture: 'plant', lines: ['창가에 놓인 화분에 명이나물 싹이 돋았어요.'] } }) },
+  { label: '2층 · 방', art: ['wwwyywwwwwwwww', 'we__k0k_____Nw', 'we___________w', 'w___mmmm__1__w', 'wq__mmmm_____w', 'wwwwwwwwwwwwww'],
+    objects: z => ({ 0: { type: 'sign', name: '책꽂이', furniture: 'shelf', lines: book(z, 5 + i) }, 1: { type: 'person', ...who(i + 7), lines: ['내 방에 온 걸 환영해! 창밖으로 골목이 다 보여.', HOME_TALK[(i + 2) % HOME_TALK.length][0]] } }) }
+];
+const shop = (i, upstairs) => {
+  const s = SHOPS[i % SHOPS.length], f1 = { label: `1층 · ${s.what}`, art: ['wwyywwwwwwyyww', `wkk_cccc0__k${upstairs ? 'U' : 'q'}w`, 'w____________w', 'w_tt___tt__1_w', 'w_tt___tt____w', 'wq_____a____qw', 'wwwwwwwDwwwwww'],
+    objects: () => ({ 0: { type: 'person', ...who(i + 3), name: `${s.what} 주인 ${NAMES[(i + 3) % NAMES.length]}`, lines: s.lines }, 1: { type: 'person', ...who(i + 11), name: `손님 ${NAMES[(i + 11) % NAMES.length]}`, lines: ['여기 단골이야. 탐험하다 배고프면 들러!', '울릉도에 오면 꼭 바닷가 산책로도 걸어 봐. 절벽 밑으로 길이 나 있어.'] } }) };
+  if (!upstairs) return [f1];
+  return [f1, { label: '2층 · 민박', art: ['wwwyywwwwwyyww', 'we_e_e__0___Nw', 'w____________w', 'w__mmmm___1__w', 'wq_mmmm______w', 'wwwwwwwwwwwwww'],
+    objects: () => ({ 0: { type: 'rest', name: '민박 이불', furniture: 'futon' }, 1: { type: 'person', ...who(i + 5), name: `여행자 ${NAMES[(i + 5) % NAMES.length]}`, lines: ['나는 독도에 가려고 며칠째 묵고 있어. 파도가 높아서 배가 못 떴거든.', '독도는 날씨가 좋아야 배가 섬에 닿을 수 있어. 기다리는 것도 여행이야!'] } }) }];
+};
+const TERMINAL = [
+  { label: '1층 · 대합실', art: ['wwyyyywwyyyyww', 'wccc0ccc___kUw', 'w____________w', 'w_ssss__ssss_w', 'w____________w', 'w_ssss1_ssss_w', 'wq_____a__2_qw', 'wwwwwwwDwwwwww'],
+    objects: () => ({ 0: { type: 'person', actor: 'woman', name: '매표 창구 직원', lines: ['독도행 배표는 여기서 사요. 배는 동도 선착장에 닿아요.', '파도가 높으면 배가 선착장에 대지 못하고 섬 둘레만 돌아 나오기도 해요. 날씨를 꼭 확인해요.'] }, 1: { type: 'person', actor: 'man', name: '여행객 해람', lines: ['울릉도에서 독도까지는 약 87.4km래. 배로 한참 가야 해.', '배 안에서 멀미하지 않게 창밖 수평선을 보면 좋대.'] }, 2: { type: 'sign', name: '출항 안내판', furniture: 'board', lines: ['출항 안내: 배 시간은 계절과 날씨에 따라 바뀌어요.', '독도에 내릴 수 있는지는 그날 바다 사정에 따라 정해져요.'] } }) },
+  { label: '2층 · 전망 데크', art: ['wyyyyyyyyyyyyw', 'w__0_____1__Nw', 'w____________w', 'w___mmmmmm___w', 'wq__mmmmmm__qw', 'wwwwwwwwwwwwww'],
+    objects: () => ({ 0: { type: 'landmark', name: '바다 쪽 큰 창', furniture: 'window', lines: ['좁은 만 양쪽으로 가파른 산이 솟아 있고, 그 사이로 배가 드나들어요.', '만 입구 쪽 물가에는 파도를 막는 소파블록이 쌓여 있어요.'] }, 1: { type: 'person', actor: 'child-boy', name: '배 구경하는 아이 바다', lines: ['큰 배가 들어올 때 물결이 출렁출렁해! 소파블록이 파도를 막아 줘.', '저기 절벽 밑 산책로로 사람들이 걸어가는 게 보여.'] } }) }
+];
+// 건물 하나(kind·그림 번호 v·순서 i)에 들어갈 이름과 층 계획
+export function structurePlan(kind, v, i) {
+  if (kind === 'terminal') return { title: '도동항 여객선터미널', floors: TERMINAL };
+  if (kind === 'block') { const s = SHOPS[i % SHOPS.length]; return { title: s.title, floors: shop(i, true) }; }
+  if (v === 1 || v === 4) { const s = SHOPS[i % SHOPS.length]; return { title: s.title, floors: shop(i, false) }; }
+  return { title: `${NAMES[i % NAMES.length]}네 집`, floors: home(i) };
+}
+export function structureRooms(zone, list) {
+  const out = []; for (const s of list) { const p = structurePlan(s.kind, s.v, s.i); p.floors.forEach((f, k) => out.push(roomDef(zone, s.room, p.title, p.floors, f, k))); } return out;
+}
