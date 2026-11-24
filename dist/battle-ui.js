@@ -314,7 +314,8 @@ export function createBattleUI(root, { onBlip = null, onSelect = null } = {}) {
   function enemyCalmed() { setAura(0); els.enemyWrap.classList.remove('hit'); void els.enemyWrap.offsetWidth; els.enemyWrap.classList.add('calm'); }
 
   function handleKey(e) {
-    const up = ['ArrowUp', 'w', 'W'].includes(e.key), down = ['ArrowDown', 's', 'S'].includes(e.key), ok = ['Enter', ' ', 'e', 'E'].includes(e.key);
+    const key = { KeyW: 'w', KeyS: 's', KeyE: 'e' }[e.code] || e.key; // v0.94 한글 입력 상태에서도
+    const up = ['ArrowUp', 'w', 'W'].includes(key), down = ['ArrowDown', 's', 'S'].includes(key), ok = ['Enter', ' ', 'e', 'E'].includes(key);
     const st = menuState || quizState;
     if (st && (up || down)) {
       const n = st.buttons.length; let i = st.index;

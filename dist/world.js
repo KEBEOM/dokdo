@@ -249,7 +249,8 @@ export function drawActors(ctx, state, view, time, motion = { walking: false, di
   const base = project && typeof ctx.getTransform === 'function' ? ctx.getTransform() : null;
   const seen = d => project?.seen ? project.seen(d) : d; // 3D 보기에서는 카메라에서 보이는 쪽 모습으로
   const env = { map, state, time, motion, wanted, seen };
-  const order = sceneDrawOrder(people, view, map);
+  let order = sceneDrawOrder(people, view, map);
+  if (map?.diving) order = order.filter(n => n.player || ((n.kind === 'wild' || n.kind === 'friend') && map[Math.round(n.y)]?.[Math.round(n.x)] === 0)); // v0.92 2D 바닷속: 물 위의 배·난간·건물·나무·안내판은 그리지 않아요(물속 야생 우산몬만)
   if (!base) { for (const n of order) drawOne(n); }
   else {
     // 3D 보기(v0.62): 먼 것부터 가까운 것 순서로 세워 그려요. 카메라와 내 캐릭터 사이에 있는 것은 비쳐 보이게 해요.

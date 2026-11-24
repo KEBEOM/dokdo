@@ -91,8 +91,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "육지",
     "group": "식물",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 조사 종목록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "초종용의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -114,8 +114,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "육지",
     "group": "식물",
-    "recordStatus": "종명 대조 필요",
-    "recordNote": "독도 자료에는 '도깨비쇠고비'도 등장하므로 별도 종인지 확인",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "도깨비고비의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -160,8 +160,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "육지",
     "group": "식물",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 조사 종목록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "갯괴불주머니의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -206,8 +206,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "육지",
     "group": "식물",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 조사 종목록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "갯제비쑥의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -252,8 +252,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "육지",
     "group": "식물",
-    "recordStatus": "독도 기록 재확인",
-    "recordNote": "울릉도 분포 기록과 혼동하지 않도록 독도 현장 조사 자료 대조",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "섬초롱꽃의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -321,8 +321,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "육지",
     "group": "식물",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 조사 종목록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "왕김의털의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -344,8 +344,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "육지",
     "group": "식물",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 조사 종목록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "개밀의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -367,8 +367,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "육지",
     "group": "식물",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 조사 종목록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "닭의장풀의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -483,8 +483,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "육지",
     "group": "곤충",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 조사 종목록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "독도장님노린재의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -506,8 +506,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "육지",
     "group": "곤충",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 조사 종목록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "애꽃노린재의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -529,8 +529,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "육지",
     "group": "곤충",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 조사 종목록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "애긴노린재의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -552,8 +552,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "곤충",
-    "recordStatus": "추가 자료에 언급",
-    "recordNote": "국립생물자원관 「독도의 생물다양성」(2017) 62쪽에 수록. 섬땅방아벌레 대신 넣은 종이에요(v0.40).",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "된장잠자리의 이름을 사용하는 창작 우산몬이에요. 실제 된장잠자리는 바다를 건너 아주 먼 거리를 날아다니는 잠자리로 알려져 있어요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -575,8 +575,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "육지",
     "group": "곤충",
-    "recordStatus": "추가 자료에 언급",
-    "recordNote": "국립생물자원관 「독도의 생물다양성」(2017) 70쪽에 수록. 긴뺨모래거저리 대신 넣은 종이에요(v0.40).",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "풀색노린재의 이름을 사용하는 창작 우산몬이에요. 실제 풀색노린재는 몸이 방패 모양인 초록색 노린재로, 건드리면 고약한 냄새를 내서 자기를 지켜요."
   },
   {
@@ -598,8 +598,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "육지",
     "group": "곤충",
-    "recordStatus": "추가 자료에 언급",
-    "recordNote": "국립생물자원관 「독도의 생물다양성」(2017) 87쪽에 수록. 모래섶벌레 대신 넣은 종이에요(v0.40).",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "남생이잎벌레의 이름을 사용하는 창작 우산몬이에요. 실제 남생이잎벌레는 거북 등딱지처럼 생긴 둥근 몸에 투명한 테두리가 있고, 명아주 같은 풀잎을 갉아 먹어요."
   },
   {
@@ -621,8 +621,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "육지",
     "group": "곤충",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 조사 종목록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "칠성무당벌레의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -667,8 +667,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "육지",
     "group": "곤충",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 조사 종목록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "배검은꼬마개미의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -690,8 +690,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "육지",
     "group": "곤충",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 조사 종목록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "쟈바꽃등에의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -713,8 +713,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "육지",
     "group": "곤충",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 조사 종목록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "호리꽃등에의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -736,8 +736,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "육지",
     "group": "곤충",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 조사 종목록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "명아주나무이의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -759,8 +759,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "육지",
     "group": "곤충",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 조사 종목록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "꼬마남생이무당벌레의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -782,8 +782,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "바다",
     "group": "물고기",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 해역 조사 자료 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "돌돔의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -805,8 +805,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "바다",
     "group": "물고기",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 해역 조사 자료 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "자리돔의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -851,8 +851,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "바다",
     "group": "물고기",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 해역 조사 자료 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "볼락의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -897,8 +897,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "바다",
     "group": "물고기",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 해역 조사 자료 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "개볼락의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -920,8 +920,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "바다",
     "group": "물고기",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 해역 조사 자료 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "넙치의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -943,8 +943,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "바다",
     "group": "물고기",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 해역 조사 자료 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "노래미의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -966,8 +966,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "바다",
     "group": "물고기",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 해역 조사 자료 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "놀래기의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -989,8 +989,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "바다",
     "group": "물고기",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 해역 조사 자료 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "용치놀래기의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1012,8 +1012,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "바다",
     "group": "물고기",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 해역 조사 자료 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "범돔의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1035,8 +1035,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "바다",
     "group": "물고기",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 해역 조사 자료 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "능성어의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1058,8 +1058,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "바다",
     "group": "물고기",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 해역 조사 자료 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "붉바리의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1081,8 +1081,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "바다",
     "group": "물고기",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 해역 조사 자료 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "복섬의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1104,8 +1104,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "바다",
     "group": "물고기",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 해역 조사 자료 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "말쥐치의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1127,8 +1127,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "바다",
     "group": "물고기",
-    "recordStatus": "개별 근거 추가 확인",
-    "recordNote": "어류 자료의 '혹돔굴' 명칭만으로 종 출현 확정 금지",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "혹돔의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1173,8 +1173,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "바다",
     "group": "물고기",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 해역 조사 자료 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "청황베도라치의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1288,8 +1288,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "바다",
     "group": "갑각류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 해역 조사 자료 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "거북손의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1334,8 +1334,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "바다",
     "group": "극피동물",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 해역 조사 자료 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "말똥성게의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1380,8 +1380,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "바다",
     "group": "극피동물",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 해역 조사 자료 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "아무르불가사리의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1426,8 +1426,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "바다",
     "group": "자포동물",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 해역 조사 자료 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "보석말미잘의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1472,8 +1472,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "바다",
     "group": "해조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 해역 조사 자료 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "감태의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1495,8 +1495,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "바다",
     "group": "해조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 독도 해역 조사 자료 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "대황의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1565,8 +1565,8 @@ export const MONSTERS=[
     "legendary": true,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "추가 자료에 언급",
-    "recordNote": "국립생물자원관 「독도의 생물다양성」(2017) 134쪽에 수록. 바다제비 대신 넣은 종이에요(v0.40).",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "소쩍새의 이름을 사용하는 창작 우산몬이에요. 실제 소쩍새는 귀깃이 쫑긋한 작은 올빼미로, 밤에 \"소쩍 소쩍\" 하고 울어요. 천연기념물 제324-6호예요."
   },
   {
@@ -1706,8 +1706,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "말똥가리의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1777,8 +1777,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "추가 자료에 언급",
-    "recordNote": "독도 간헐 관찰 사례로 소개; 계절/연도 조사 대조 권장",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "황로의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1800,8 +1800,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "검은댕기해오라기의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1823,8 +1823,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "민물가마우지의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1846,8 +1846,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "쇠가마우지의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1869,8 +1869,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "아비의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1892,8 +1892,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "메추라기의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1915,8 +1915,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "검은가슴물떼새의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1938,8 +1938,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "꺅도요의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1961,8 +1961,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "깝작도요의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -1984,8 +1984,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "꼬까도요의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -2007,8 +2007,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "청호반새의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -2030,8 +2030,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "물총새의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -2053,8 +2053,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "후투티의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -2076,8 +2076,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "꾀꼬리의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -2099,8 +2099,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "박새의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -2122,8 +2122,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "상모솔새의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -2145,8 +2145,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "섬개개비의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -2168,8 +2168,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "추가 자료에 언급",
-    "recordNote": "국립생물자원관 「독도의 생물다양성」(2017) 135쪽에 수록. 한국동박새 대신 넣은 종이에요(v0.40).",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "칼새의 이름을 사용하는 창작 우산몬이에요. 실제 칼새는 낫처럼 휜 긴 날개로 아주 빠르게 날고, 바닷가 절벽 틈에 둥지를 지어요."
   },
   {
@@ -2191,8 +2191,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "귀제비의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -2237,8 +2237,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "호랑지빠귀의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -2260,8 +2260,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "개똥지빠귀의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {
@@ -2283,8 +2283,8 @@ export const MONSTERS=[
     "legendary": false,
     "area": "하늘",
     "group": "조류",
-    "recordStatus": "개별 근거 미확인",
-    "recordNote": "앞선 99종 목록 수록; 실제 독도 관찰 기록 대조 필요",
+    "recordStatus": "국가 생물종 목록에 독도 기록",
+    "recordNote": "국립생물자원관 「독도 생물종 목록집」(2015)에 실려 있어요",
     "detail": "되새의 이름을 사용하는 창작 우산몬이에요. 레벨이 올라가도 이름은 바뀌지 않아요."
   },
   {

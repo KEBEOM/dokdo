@@ -1,11 +1,10 @@
-import {assetImage,assetTintTag,monsterAssetKey} from './assets.js';
+import {assetImage,assetTintTag} from './assets.js';
 import {tintCanvas} from './season.js';
 import {paintCliffs} from './heights.js';
 import {TERRAIN_ATLAS} from './terrain-atlas.js';
 import {V2_TERRAIN,V2_DETAILS,v2TileRect} from './tileset-v2.js';
 import {UW_ATLAS,UW_FLOOR} from './uw-atlas.js';
 import {seabedLayout} from './seabed.js';
-import {MONSTER_DOTS} from './monster-dots.js';
 
 const TILE=32;
 // v0.45: 3번 칸은 풀숲이 아니라 독도의 ‘바위 들판’(응회암 땅·자갈·이끼·해국). 풀숲 그림(tall)은 컷신에서만 써요.
@@ -257,7 +256,6 @@ function paintSeabed(ctx,map,flat=true){
     const g=ctx.createLinearGradient(X0,Y0,dx?X1:X0,dy?Y1:Y0);g.addColorStop(0,c+'99');g.addColorStop(1,c+'00');ctx.fillStyle=g;ctx.fillRect(dx>0?x*TILE+TILE-14:x*TILE,dy>0?y*TILE+TILE-14:y*TILE,dx?14:TILE,dy?14:TILE);}}
   if(flat)for(let y=0;y<map.length;y++)for(let x=0;x<map[0].length;x++){if(map[y][x]===0)continue;ctx.fillStyle=map[y][x]===6?'#6f7a80':(x+y)%3?'#2c3a42':'#33434b';ctx.fillRect(x*TILE,y*TILE,TILE,TILE);}
   const at=assetImage(UW_ATLAS.key);if(at&&flat)for(const it of L.items){const f=UW_ATLAS.frames[it.id];if(!f)continue;const w=f[2],h=f[3],cx=(it.x+(it.w||1)/2)*TILE,by=it.y*TILE+28;ctx.drawImage(at,f[0],f[1],w,h,Math.round(cx-w/2),Math.round(by-h),w,h);} // 2D 대체 화면: 납작하게
-  const dots=assetImage(MONSTER_DOTS.key);if(flat&&dots)for(const it of L.items){if(!it.mon)continue;const f=MONSTER_DOTS.frames[String(it.mon).padStart(3,'0')];if(!f)continue;const cx=it.x*TILE+16,by=it.y*TILE+30;ctx.save();ctx.imageSmoothingEnabled=false;if(it.flip){ctx.translate(cx*2,0);ctx.scale(-1,1);}ctx.drawImage(dots,f[0],f[1],f[2],f[3],cx-Math.floor(f[2]/2),by-f[3],f[2],f[3]);ctx.restore();} // v0.89 바닥 우산몬(2D) · v0.91 원래 도트 1:1
   ctx.restore();return;}
  const depth=seaDepth(map);
  for(let y=0;y<map.length;y++)for(let x=0;x<map[0].length;x++){
@@ -280,7 +278,7 @@ export function drawTerrain(ctx,map,time,{x=0,y=0,width=768,height=480,seabed=fa
    paintCliffs(ground.getContext('2d'),map,v2); // v0.70 언덕·절벽·계단·사다리
    tintCanvas(ground,'ground'); // v0.68: 계절 색(풀 테두리까지 한 번에)
   }
-  if(seabed){const k=map.id+'|'+cachedTint+'|'+cachedSheet+'|'+seabed+'|'+(assetImage(UW_FLOOR.key)?1:0)+(assetImage(UW_ATLAS.key)?1:0)+'|'+(assetImage(MONSTER_DOTS.key)?1:0);if(!seaGround||seaKey!==k){seaKey=k;seaGround=document.createElement('canvas');seaGround.width=ground.width;seaGround.height=ground.height;const g=seaGround.getContext('2d');g.drawImage(ground,0,0);paintSeabed(g,map,seabed!=='floor');}ctx.drawImage(seaGround,0,0);return;}
+  if(seabed){const k=map.id+'|'+cachedTint+'|'+cachedSheet+'|'+seabed+'|'+(assetImage(UW_FLOOR.key)?1:0)+(assetImage(UW_ATLAS.key)?1:0);if(!seaGround||seaKey!==k){seaKey=k;seaGround=document.createElement('canvas');seaGround.width=ground.width;seaGround.height=ground.height;const g=seaGround.getContext('2d');g.drawImage(ground,0,0);paintSeabed(g,map,seabed!=='floor');}ctx.drawImage(seaGround,0,0);return;}
   ctx.drawImage(ground,0,0);
  }else paintGround(ctx,map,sheet);
  // Four-sided shoreline. Never paint foam where a pier joins the water.

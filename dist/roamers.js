@@ -28,6 +28,8 @@ export function habitatTile(map, x, y, hab) {
   const t = map[y]?.[x]; if (t === undefined) return false;
   if (map.solid?.has(`${x},${y}`)) return false; // v0.74 소파블록·물 위 바위 칸에는 살지 않아요
   if (map.hull?.has(`${x},${y}`)) return false; // v0.87 배 밑 칸에도 살지 않아요(물 위에선 배가 막아요)
+  if (map.uwSolid?.has(`${x},${y}`)) return false; // v0.92 바닷속 바위 지형·쉬는 우산몬 칸에도 들어가지 않아요(잠수하면 겹쳐 보여요)
+  if (hab === 'deep') return t === 0 && !!map.shallow && !map.shallow.has(`${x},${y}`); // v0.93 바닷속 우산몬: 깊은 물(잠수해야 만나요)
   if ((hab === 'sea' || hab === 'surface') && map.shallow) return t === 0; // v0.71: 얕은 물(걸어서)과 깊은 물(잠수해서) 모두 — 나도 들어가서 만날 수 있어요
   if (hab === 'sea' || hab === 'surface') return t === 0 && N4.some(([a, b]) => { const n = map[y + b]?.[x + a]; return n !== undefined && n !== 0 && !map.solid?.has(`${x + a},${y + b}`); }); // 물가에서 한 칸 안쪽 물(부딪혀 만날 수 있게)
   if (hab === 'shore') return (t === 4 || t === 1 || t === 3) && N8.some(([a, b]) => map[y + b]?.[x + a] === 0);
@@ -75,6 +77,18 @@ export function roamerPool(zone, now = null) {
   return fit.length ? fit : all;
 }
 
+// v0.93 바닷속(잠수)에서 만나는 야생 우산몬: 바다 생물 우산몬(물고기·문어·전복·성게·해삼·불가사리·산호·말미잘·바닷말·독도새우) 가운데
+// 이 장 둘레(앞뒤 한 장)의 우산몬. 갯바위 우산몬(홍합·바위게·거북손)은 물가 땅에 살아서 빼요. 때(밤·계절)가 맞는 것만.
+const SHORE_ONLY = new Set([54, 55, 56]);
+export function deepPool(zone, now = null) {
+  const sea = MONSTERS.filter(m => m.stage === 1 && !isUnique(m) && SEA.has(m.id) && !SHORE_ONLY.has(m.id));
+  const local = sea.filter(m => Math.abs(m.zone - Math.min(6, zone)) <= 1).map(m => m.id), all = local.length >= 4 ? local : sea.map(m => m.id), fit = all.filter(id => fitsNow(id, now));
+  return fit.length ? fit : all;
+}
+// 깊은 물이 넓을수록 많이(3~8마리)
+export const deepCount = map => { if (!map.shallow || map.kind === 'room' || map.kind === 'meadow') return 0; // v0.94 첫 동료를 고르는 초원엔 사나워진 우산몬이 없어요(아직 동료가 없어요)
+  let n = 0; for (let y = 0; y < map.length; y++) for (let x = 0; x < map[0].length; x++) if (habitatTile(map, x, y, 'deep')) n++; return n < 20 ? 0 : Math.min(8, Math.max(3, Math.floor(n / 40))); };
+
 // v0.69 마을 사람의 첫인사: 밤이면 밤 이야기, 낮이면 계절 이야기(그때만 나오는 우산몬 귀띔)
 const TALK = {
   night: ['벌써 밤이네! 밤에는 볼락이나 참문어처럼 밤에 움직이는 우산몬이 길에 나온대.', '깜깜하지? 밤바다 쪽에서 슴새가 둥지로 돌아오는 소리가 들려.', '밤이 깊었어. 숲길에서 ‘휘-’ 소리가 나면 호랑지빠귀일 거야.'],
@@ -88,9 +102,9 @@ export function timeTalk(name, season, night) {
   return list[h % list.length];
 }
 
-const walksHere = map => map.kind === 'route' || map.kind === 'meadow';
+const walksHere = map => map.kind === 'route' || map.kind === 'meadow' || !!map.diving; // v0.93 잠수하면 마을 바닷속에도
 export function createRoamers(rng = Math.random, when = () => null) {
-  let list = [], mapId = null, nextSpawn = 0, seq = 0, pausedAt = 0, pausedTotal = 0, friends = [];
+  let list = [], mapId = null, nextSpawn = 0, nextDeep = 0, seq = 0, pausedAt = 0, pausedTotal = 0, friends = [], diving = false, deepWant = 0;
   // 멈춘 시간을 뺀 시계: 결투·대화 중에는 흐르지 않아요
   const T = now => (pausedAt || now) - pausedTotal;
   const between = ([a, b]) => a + rng() * (b - a);
@@ -122,17 +136,26 @@ export function createRoamers(rng = Math.random, when = () => null) {
     list.push(r); return r;
   }
 
+  // v0.93 바닷속 우산몬 한 마리: 깊은 물 빈칸(내 둘레 4칸 밖)에. deep 표시 — 잠수했을 때만 보이고 부딪혀요
+  function spawnDeep(map, others, player, now) {
+    const spots = []; for (let y = 0; y < map.length; y++) for (let x = 0; x < map[0].length; x++) { if (!isFree(map, x, y, others, player, null, 'deep')) continue; if (player && near({ x, y }, player, 4)) continue; spots.push({ x, y }); }
+    const pool = deepPool(map.zone, when()); if (!spots.length || !pool.length) return null;
+    const species = pool[Math.floor(rng() * pool.length)], p = spots[Math.floor(rng() * spots.length)], m = MONSTERS.find(m => m.id === species);
+    const r = { uid: `${map.id}:deep-${++seq}`, id: 'wild', kind: 'wild', deep: true, species, name: `사나워진 ${m.name}`, x: p.x, y: p.y, fromX: p.x, fromY: p.y, dir: 'down', moving: null, nextMove: now + between(WAIT_MS), bornAt: now };
+    list.push(r); return r;
+  }
   // 지도가 바뀌면 새로 채워요. 마을·건물 안에서는 아무도 없어요.
   function sync(map, others, player, time) {
     if (map.id === mapId) return;
     const now = T(time);
-    mapId = map.id; list = []; nextSpawn = now + between(RESPAWN_MS);
+    mapId = map.id; list = []; nextSpawn = now + between(RESPAWN_MS); nextDeep = 0; deepWant = deepCount(map);
     if (map.kind === 'route') for (let i = 0; i < ROAMER_COUNT; i++) spawn(map, others, player, now);
     if (map.kind === 'meadow') for (const id of friends) spawn(map, others, player, now, id);
   }
 
   function update(map, others, player, now, paused) {
-    if (!walksHere(map)) { list = []; return; }
+    diving = !!map.diving;
+    if (!walksHere(map)) { list = []; nextDeep = 0; return; }
     if (paused) { if (!pausedAt) pausedAt = now; return; }
     if (pausedAt) { pausedTotal += now - pausedAt; pausedAt = 0; }
     now = T(now);
@@ -142,24 +165,28 @@ export function createRoamers(rng = Math.random, when = () => null) {
       if (r.moving && now - r.moving.t0 >= STEP_MS) r.moving = null;
       if (r.moving || now < r.nextMove) continue;
       const order = DIRS.slice().sort(() => rng() - .5);
-      const step = order.find(([dx, dy]) => isFree(map, r.x + dx, r.y + dy, others, player, r, habitat(r.species)));
+      if (r.deep && !diving) continue; // 물 위에 있을 땐 바닷속 우산몬은 쉬어요
+      const step = order.find(([dx, dy]) => isFree(map, r.x + dx, r.y + dy, others, player, r, r.deep ? 'deep' : habitat(r.species)));
       r.nextMove = now + STEP_MS + between(WAIT_MS);
       if (!step || rng() < .25) continue;                        // 가끔은 제자리에서 두리번
       const [dx, dy, dir] = step;
       r.dir = dir; r.fromX = r.x; r.fromY = r.y; r.x += dx; r.y += dy; r.moving = { t0: now };
     }
-    if (map.kind === 'route' && list.length < ROAMER_COUNT && now >= nextSpawn) { spawn(map, others, player, now); nextSpawn = now + between(RESPAWN_MS); }
+    if (map.kind === 'route' && list.filter(r => !r.deep).length < ROAMER_COUNT && now >= nextSpawn) { spawn(map, others, player, now); nextSpawn = now + between(RESPAWN_MS); }
+    if (diving && deepWant) { const have = list.filter(r => r.deep).length; // 처음 잠수하면 한꺼번에, 그 뒤엔 결투로 사라진 만큼 잠시 뒤에
+      if (!nextDeep) { for (let i = have; i < deepWant; i++) spawnDeep(map, others, player, now); nextDeep = now + between(RESPAWN_MS); }
+      else if (have < deepWant && now >= nextDeep) { spawnDeep(map, others, player, now); nextDeep = now + between(RESPAWN_MS); } }
   }
 
   // 그릴 위치(칸 사이를 부드럽게)와 함께
   function snapshot(time) {
     const now = T(time);
-    return list.map(r => {
+    return list.filter(r => !r.deep || diving).map(r => {
       const p = r.moving ? Math.min(1, (now - r.moving.t0) / STEP_MS) : 1;
       return { ...r, drawX: r.fromX + (r.x - r.fromX) * p, drawY: r.fromY + (r.y - r.fromY) * p, walking: p < 1 };
     });
   }
-  const at = (x, y) => list.find(r => r.x === x && r.y === y) || null;
+  const at = (x, y) => list.find(r => r.x === x && r.y === y && (!r.deep || diving)) || null;
   // 결투가 끝난 우산몬은 사라지고, 잠시 뒤 다른 자리에 새로 나타나요.
   function remove(uid, time = 0) { const now = T(time); list = list.filter(r => r.uid !== uid); nextSpawn = now + between(RESPAWN_MS); }
   function reset() { list = []; mapId = null; pausedAt = 0; pausedTotal = 0; }

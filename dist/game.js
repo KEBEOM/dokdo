@@ -10,6 +10,7 @@ import { createGL, hdCamera, fpCamera } from './gl3d.js';
 import { MONSTERS, ZONES, TYPES, getSpecies, isUnique, pickStarterField, STARTER_LEVEL, keeperName } from './data.js';
 import { CONCEPTS, QUESTIONS, SOURCES } from './learning.js';
 import { STUDY_PAGES } from './study.js';
+import { SPECIES, PLACES, KB_SOURCES, KB_NOTE, wrongNote } from './knowledge.js';
 import { stampSVG } from './stamps.js';
 import { heartText, toHalves } from './engine.js';
 import { newState, validateSave, createMonster, damage, enemyHit, attackHit, advantage, TYPE_RING, TYPE_REASON, healAll, gainXP, PARTY_MAX, captureChance, runChance, xpForDefeat, BENCH_RATE, addMonster, recordAnswer, BOSS_KINDS, PIERCE_CHANCE, QUESTION_POWER } from './engine.js';
@@ -32,7 +33,7 @@ import { createRoamers } from './roamers.js';
 import { MOVE_DURATION, moveView } from './movement.js';
 import { selectBattleQuestion, shuffledChoices, quizFormat, oxShown } from './battle-quiz.js';
 import { pickRecord } from './records.js';
-import { seabedLayout, fishAt, UW_INFO, UW_NOTE, UW_MON_NOTE } from './seabed.js';
+import { seabedLayout, UW_INFO, UW_NOTE } from './seabed.js';
 import { UW_ATLAS, UW_FLOOR } from './uw-atlas.js';
 import { createMap, npcs, blocked, pathfind, drawWorld, drawActors, drawFlatDecor, TILE, W, H, wantedRole, VILLAIN_BY_ZONE, ROLE_ACTOR, buildingArt, doorColumns } from './world.js';
 import { MAPS, getMapDef, townId, nextMapId, prevMapId } from './maps.js';
@@ -41,7 +42,7 @@ import { OPENING, GUIDE, LEGEND, arrivalScene, VILLAIN_TALES, BOSS_REVEAL, BOSS_
 import { createBattleUI } from './battle-ui.js';
 import { josa } from './text.js';
 
-const VERSION = '0.91';
+const VERSION = '0.95';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -446,12 +447,10 @@ function setFlag(flag) { if (flag) state.flags[flag] = true; labelKey = ''; }
 // The person or object right in front of you (not just beside you).
 // v0.87 바닷속: 바로 앞(또는 지금 칸)의 바다 생물·바위·물고기
 function seabedAhead() {
-  if (!map.diving) return null; const [dx, dy] = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[state.dir] || [0, 1], L = seabedLayout(map), t = performance.now() / 1000;
+  if (!map.diving) return null; const [dx, dy] = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[state.dir] || [0, 1], L = seabedLayout(map);
   const hit = it => (it.foot || [[it.x, it.y]]).some(([x, y]) => (x === state.x + dx && y === state.y + dy) || (x === state.x && y === state.y));
-  const ok = i => !i.edge && (i.mon || UW_INFO[i.group]), around = it => (it.foot || [[it.x, it.y]]).some(([x, y]) => Math.max(Math.abs(x - state.x), Math.abs(y - state.y)) <= 1); // v0.91 바로 앞이 아니어도 둘레 한 칸(대각선 포함)
-  const it = L.items.find(i => ok(i) && hit(i)) || L.items.filter(i => i.mon && around(i))[0] || L.items.find(i => ok(i) && around(i)); if (it) return it.mon ? uwMonInfo(it.mon) : { ...UW_INFO[it.group], group: it.group };
-  // 헤엄치는 물고기 우산몬: 실제 자리 또는 화면에 보이는 자리(바닥에서 떠 있는 만큼 북쪽으로 보여요) 가까이면
-  const f = L.fish.find(f => { const p = fishAt(f, t), vy = p.y - (f.lift || 0) / 32 * 1.4; return Math.hypot(p.x - state.x, p.y - state.y) < 1.8 || Math.hypot(p.x - state.x, vy - state.y) < 1.6; }); return f ? uwMonInfo(f.mon) : null;
+  const ok = i => !i.edge && UW_INFO[i.group], around = it => (it.foot || [[it.x, it.y]]).some(([x, y]) => Math.max(Math.abs(x - state.x), Math.abs(y - state.y)) <= 1); // v0.91 바로 앞이 아니어도 둘레 한 칸(대각선 포함)
+  const it = L.items.find(i => ok(i) && hit(i)) || L.items.find(i => ok(i) && around(i)); return it ? { ...UW_INFO[it.group], group: it.group } : null;
 }
 // v0.91 잠수 중 가까운 야생·친구 우산몬(바로 앞이면 ahead)
 function diveMon() {
@@ -461,12 +460,7 @@ function diveMon() {
   const near = list.filter(n => Math.max(Math.abs((n.drawX ?? n.x) - state.x), Math.abs((n.drawY ?? n.y) - state.y)) <= 1.2).sort((p, q) => Math.hypot(p.x - state.x, p.y - state.y) - Math.hypot(q.x - state.x, q.y - state.y))[0];
   return near ? { n: near, ahead: false } : null;
 }
-// v0.89 바닷속에서 쉬거나 헤엄치는 바다 생물 우산몬: 살펴보면 이름·사는 곳과 그 생물 이야기 · 도감에 ‘본 우산몬’으로
-function uwMonInfo(id) {
-  const sp = getSpecies(id); if (!sp) return null;
-  return { mon: id, group: `mon${id}`, name: sp.name, lines: [`바닷속에서 ${sp.name}${/[가-힣]/.test(sp.name.slice(-1)) && (sp.name.slice(-1).charCodeAt(0) - 44032) % 28 ? '이' : '가'} 쉬고 있어요. 다가가도 싸우지 않아요.`, ...(UW_MON_NOTE[id] ? [UW_MON_NOTE[id]] : []), `${sp.group || '바다 생물'} · ${sp.area || '바다'}. 기록 확인: ${sp.recordStatus}. 모습과 능력은 게임용 창작이에요.`] };
-}
-function lookSeabed(s) { if (s.mon) { talk(s.name, s.lines, () => { if (!state.seen.includes(s.mon)) state.seen.push(s.mon); const k = `uwm:${s.mon}`; if (!state.flags[k]) { setFlag(k); const n = Object.keys(state.flags).filter(f => f.startsWith('uwm:') && state.flags[f]).length; toast(`바닷속에서 만난 우산몬 ${n}종 · 도감에 적었어요`); } updateUI(); }, '바닷속 우산몬 · 게임용 창작'); return; } talk(s.name, s.lines, () => { const k = `uw:${s.group}`; if (!state.flags[k]) { setFlag(k); const n = Object.keys(UW_INFO).filter(g => state.flags[`uw:${g}`]).length; toast(`바닷속 관찰 ${n} / ${Object.keys(UW_INFO).length}`); } }, UW_NOTE); }
+function lookSeabed(s) { talk(s.name, s.lines, () => { const k = `uw:${s.group}`; if (!state.flags[k]) { setFlag(k); const n = Object.keys(UW_INFO).filter(g => state.flags[`uw:${g}`]).length; toast(`바닷속 관찰 ${n} / ${Object.keys(UW_INFO).length}`); } }, UW_NOTE); }
 function facingNPC() { const [dx, dy] = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[state.dir] || [0, 1]; return liveNPCs().find(n => n.x === state.x + dx && n.y === state.y + dy) || null; }
 function interact(n) {
   if (!n) { // E / ‘대화’: facing a door with nobody right in front of you means going in
@@ -691,7 +685,15 @@ function deepWater() { if (!inWater() || map.diving) return false; return !map.s
 // v0.91 잠수 중엔 물 밖(땅·부두·물가)이 벽처럼 막혀요 — 물 위로 올라오는 건 ‘물 위로’(Q)로만
 function diveWall(x, y) { return !!map.diving && map.kind !== 'room' && map[y]?.[x] !== 0; }
 function isDiving() { if (!inWater()) diveWanted = false; return diveWanted; }
-function toggleDive() { if (!inWater() || busy() || battle) return; diveWanted = !diveWanted; sfx('toggle'); }
+// v0.94 글자 자판은 자판 자리(e.code)로: 한글 입력 상태면 e.key가 ㅂ·ㄷ·ㅈ…이 돼서 Q·E·WASD가 안 먹었어요
+const LETTER_KEY = { KeyQ: 'q', KeyE: 'e', KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd' };
+function toggleDive() { if (!inWater() || busy() || battle) return;
+  // v0.92 바꾼 뒤의 자리가 막히면 바꾸지 않아요: 배 밑에서 올라오면 배 안에 갇히고, 바닷속 바위·쉬는 우산몬 자리로 잠수하면 그 안에 들어가요
+  const k = `${moving?.toX ?? state.x},${moving?.toY ?? state.y}`; // 걷는 중이면 도착할 칸 기준(예전엔 걷는 중 Q를 무시했어요)
+  if (diveWanted && (map.hull?.has(k) || map.solid?.has(k))) { toast('배 밑이라 올라올 수 없어요. 옆으로 조금 헤엄쳐 가요.'); sfx('bump'); return; }
+  if (!diveWanted && map.uwSolid?.has(k)) { toast('바로 밑에 바위가 있어요. 옆으로 가서 잠수해요.'); sfx('bump'); return; }
+  diveWanted = !diveWanted; sfx('toggle');
+  if (diveWanted) { const r = roamers.list.find(r => r.deep && r.x === state.x && r.y === state.y); if (r) { path = []; pathAction = null; startBattle('wild', r.species, { roamer: r.uid }); } } } // v0.93 바로 밑에 바닷속 우산몬이 있으면 바로 만나요
 function updateDiveButton() { const b = $('#diveBtn'), show = inWater() && !battle && state.started; b.classList.toggle('hidden', !show); if (!show) return; assetImage(UW_ATLAS.key); assetImage(UW_FLOOR.key); assetImage('scenery/uw-walls'); assetImage('monsters/dots'); /* v0.87 물에 들어가면 바닷속 그림을 미리 불러요 */ const label = map.diving ? '⬆ 물 위로' : '🫧 잠수하기'; if (b.dataset.label !== label) { b.dataset.label = label; b.innerHTML = `${label} <small>Q</small>`; b.setAttribute('aria-label', label); } b.classList.toggle('down', !!map.diving); }
 $('#diveBtn').onclick = e => { toggleDive(); e.currentTarget.blur(); };
 function paintUnderwater(g, K, now) {
@@ -828,7 +830,7 @@ function landed() {
 async function changeMap(id, spawnKey = 'a', { heal = false, instant = false, dir = null } = {}) {
   if (fp) closeFP(); // v0.86 지도를 옮기면 1인칭 보기는 닫아요
   if (!id || transition) return;
-  transition = true; settleMovement(); path = []; pathAction = null; keys.clear();
+  transition = true; settleMovement(); path = []; pathAction = null; keys.clear(); diveWanted = false; // v0.92 다른 지도로 가면 물 위에서 시작해요(잠수가 이어지지 않게)
   if (!instant) { scene.classList.add('map-fading'); await wait(260); }
   const def = getMapDef(id);
   state.map = def.id; state.zone = def.zone; map = createMap(def.id);
@@ -880,8 +882,9 @@ window.addEventListener('keydown', e => {
   }
   if (battle) { battleUI.handleKey(e); return; }
   if (vectors[e.key]) { e.preventDefault(); if (!e.repeat) keys.press(e.key, performance.now()); path = []; pathAction = null; }
-  if ((e.key === 'q' || e.key === 'Q') && !e.repeat && $('#modal').classList.contains('hidden') && !dialogueState) { toggleDive(); return; } // v0.72 잠수·물 위로
-  if (['e', 'E', ' ', 'Enter'].includes(e.key) && !e.repeat) {
+  const lk = LETTER_KEY[e.code] || e.key; // v0.94 한글 입력 상태(Q → ㅂ, E → ㄷ)에서도 자판 자리로
+  if ((lk === 'q' || lk === 'Q') && !e.repeat && $('#modal').classList.contains('hidden') && !dialogueState) { toggleDive(); return; } // v0.72 잠수·물 위로
+  if (['e', 'E', ' ', 'Enter'].includes(lk) && !e.repeat) {
     if (!$('#modal').classList.contains('hidden')) return;
     if (document.activeElement?.tagName === 'BUTTON' && !dialogueState) return;
     e.preventDefault(); if (dialogueState) nextTalk(); else interact();
@@ -955,7 +958,7 @@ function frame(now) {
   music(musicFor());
   if (state.started && !document.hidden && now - (frame.legendAt || 0) > 700) { frame.legendAt = now; checkLegends(); }
   if (avatarChoice) $$('canvas[data-explorer-sprite]').forEach(c => paintExplorerCard(c, c.dataset.explorerSprite, now, avatarChoice.selected === c.dataset.explorerSprite));
-  const door = !busy() && !facingNPC() && doorAhead(), sb = !door && !busy() && seabedAhead(), n = !door && !sb && !busy() && !map.diving && nearestNPC(); $('#interactionPrompt').classList.toggle('hidden', !n && !door && !sb);
+  const sw = map.diving && !busy() ? diveMon() : null, door = !sw?.ahead && !busy() && !facingNPC() && doorAhead(), sb = !door && !sw?.ahead && !busy() && seabedAhead(), n = sw?.ahead ? sw.n : !door && !sb && !busy() && (map.diving ? sw?.n : nearestNPC()); // v0.92 안내 글도 E와 같은 순서(잠수 중 바로 앞 우산몬 먼저) $('#interactionPrompt').classList.toggle('hidden', !n && !door && !sb);
   if (sb) $('#interactionPrompt').textContent = `${matchMedia('(pointer:coarse)').matches ? '대화' : 'E'} · ${sb.name} 살펴보기`;
   if (door) $('#interactionPrompt').textContent = `${matchMedia('(pointer:coarse)').matches ? '대화' : 'E'} · ${door.name} 들어가기${map.def.island !== '울릉도' && ['gym', 'lab', 'shop', 'home'].includes(door.kind) ? ' · 이야기 시설' : ''}`; // v0.82 독도의 수호관·연구소·상점·집은 창작 시설
   else if (n && !sb) $('#interactionPrompt').textContent = `${matchMedia('(pointer:coarse)').matches ? '대화' : 'E'} · ${n.name}`;
@@ -985,7 +988,7 @@ function beginStudy(kind = 'review', concept = null, opts = {}) {
         recordAnswer(state, q, correct, assisted);
         $$('[data-answer]').forEach(btn => { btn.disabled = true; if (Number(btn.dataset.answer) === q.answer) btn.classList.add('correct'); });
         if (!correct) b.classList.add('wrong'); sfx(correct ? 'correct' : 'wrong');
-        $('#feedbackArea').innerHTML = `<div class="feedback"><strong>${correct ? '잘 연결했어요!' : '근거를 다시 살펴볼까요?'}</strong><br>${esc(q.explanation)}<br><span class="source-link">출처: ${esc(sourceCite(q.source))}</span></div><div class="modal-actions"><button id="nextQuestion" class="primary">${!correct ? '근거를 읽고 다시 풀기' : index < questions.length - 1 ? '다음 기록' : '조사 마치기'} →</button></div>`;
+        $('#feedbackArea').innerHTML = `<div class="feedback"><strong>${correct ? '잘 연결했어요!' : '근거를 다시 살펴볼까요?'}</strong>${correct ? '' : wrongHTML(q, answer)}<br>${esc(q.explanation)}<br><span class="source-link">출처: ${esc(sourceCite(q.source))}</span></div><div class="modal-actions"><button id="nextQuestion" class="primary">${!correct ? '근거를 읽고 다시 풀기' : index < questions.length - 1 ? '다음 기록' : '조사 마치기'} →</button></div>`;
         $('#nextQuestion').onclick = () => {
           if (!correct) { assisted = true; show(); return; }
           assisted = false; index++;
@@ -1063,6 +1066,7 @@ const bossTeam = () => [43, 58, ownsTree() ? 26 : TREE];
 let testQuestion = null; // screen-size checks (?test) ask the longest question on purpose
 function startBattle(kind, id, opts = {}) {
   if (battle || !state.started) return;
+  if (!state.party.length) { if (opts.roamer) roamers.remove(opts.roamer, performance.now()); toast('아직 함께할 동료가 없어요. 먼저 첫 동료를 골라요.'); return; } // v0.94 동료 없이 결투가 시작되면 멈췄어요
   settleMovement(); path = []; pathAction = null; keys.clear();
   if (!state.party.some(m => m.hp > 0)) { healAll(state); state.active = 0; }
   if (state.party[state.active]?.hp <= 0) state.active = state.party.findIndex(m => m.hp > 0);
@@ -1101,7 +1105,9 @@ function refreshBattle() {
 }
 // 출처 표시: 공공누리·자유이용 조건에 따라 문제마다 근거 자료의 이름을 밝혀요
 const sourceCite = url => SOURCES.find(s => s.url === url)?.cite || '학습 자료';
-function explanationHTML(q) { return `<p class="dq-explain">${esc(q.explanation)}</p><span class="source-link">출처: ${esc(sourceCite(q.source))}</span>`; }
+/* v0.95 오답 설명: 고른 답이 왜 아닌지 먼저 짚고, 바른 해설과 출처(기관·자료 이름만)를 보여 줘요 */
+const wrongHTML = (q, choice) => { const w = wrongNote(q, choice); return w ? `<p class="dq-wrong"><b>고른 답 ‘${esc(q.options[choice])}’</b> ${esc(w)}</p>` : ''; };
+function explanationHTML(q, choice = null) { return `${wrongHTML(q, choice)}<p class="dq-explain">${esc(q.explanation)}</p><span class="source-link">출처: ${esc(sourceCite(q.source))}</span>`; }
 // 결투 글 줄이기(v0.65): ‘ [특성 이름]’ 꼬리말을 배지로 바꿔요
 const noteBadges = note => [...String(note || '').matchAll(/\[([^\]]+)\]/g)].map(m => `✦ ${m[1]}`);
 // ── 문제 결투 (v0.42) ───────────────────────────────────────────────────────────
@@ -1141,7 +1147,8 @@ async function askQuiz(b, phase, header, chosen = null) {
   Object.assign(b.quiz, { answered: true, assisted: res.assisted, correct, choice: res.choice });
   recordAnswer(state, q, correct, res.assisted, { mode: 'battle', phase, opponent: enemy().id });
   battleUI.reveal(q, res.choice); sfx(correct ? 'correct' : 'wrong'); save();
-  return { q, correct };
+  const said = format === 'ox' ? (res.choice === shown ? res.choice : null) : format === 'order' ? null : res.choice; /* 빠른 판단에서 ‘아니야’로 정답을 버린 경우·순서 놓기는 고른 보기가 없어요 */
+  return { q, correct, choice: said };
 }
 async function attackWithQuiz(b, q = null) {
   const a = active(), e = enemy(), dark = berserk(b);
@@ -1171,9 +1178,9 @@ async function attackWithQuiz(b, q = null) {
   if (d.amount > 0) { e.hp = Math.max(0, e.hp - d.amount); sfx(d.mult > 1 ? 'hitStrong' : d.mult < 1 ? 'hitWeak' : 'hit'); battleUI.damage(d.amount, 'enemy'); refreshBattle(); }
   // 결과는 짧은 한 줄 + 배지(v0.65): 숫자는 문장에, 상성·특성은 배지에
   const tags = [...(d.amount > 0 && d.mult > 1 ? ['상성 좋음 ×1.5'] : d.amount > 0 && d.mult < 1 ? ['상성 나쁨 ×0.75'] : []), ...noteBadges(note)], gauge = dark ? '검은 기운' : '기운';
-  if (r.correct) await battleUI.explain(`정답! ${gauge} −${heartText(d.amount)}♥`, explanationHTML(r.q), 'good', tags);
-  else if (d.amount > 0) await battleUI.explain(`아쉬워요! 그래도 ${gauge} −${heartText(d.amount)}♥`, explanationHTML(r.q), 'bad', tags);
-  else await battleUI.explain('아쉬워요! 이번에는 채우지 못했어요.', explanationHTML(r.q), 'bad', tags);
+  if (r.correct) await battleUI.explain(`정답! ${gauge} −${heartText(d.amount)}♥`, explanationHTML(r.q, r.choice), 'good', tags);
+  else if (d.amount > 0) await battleUI.explain(`아쉬워요! 그래도 ${gauge} −${heartText(d.amount)}♥`, explanationHTML(r.q, r.choice), 'bad', tags);
+  else await battleUI.explain('아쉬워요! 이번에는 채우지 못했어요.', explanationHTML(r.q, r.choice), 'bad', tags);
   // 연속 풀이: 결투마다 한 번, 맞히면 곧바로 한 문제 더
   if (battle === b && r.correct && tr === 'double' && !ts.doubled && e.hp > 0) { ts.doubled = true; await battleUI.say(`${name(a)}의 ${traitName(a)}! 한 문제 더 풀 수 있다!`, { tone: 'good' }); if (battle === b) await attackWithQuiz(b); }
 }
@@ -1257,10 +1264,10 @@ async function enemyTurn(b) {
   if (tr === 'counter' && r.correct) { e.hp = Math.max(1, e.hp - Math.max(1, Math.round(e.maxHp * .05))); note = ` [${traitName(a)}: 두루마리가 조금 채워졌다]`; }
   if (tr === 'thorns' && d > 0 && e.hp > 1) { e.hp = Math.max(1, e.hp - Math.max(1, Math.round(d * .2))); note = ` [${traitName(a)}]`; }
   tip(b, '내 하트는 왼쪽 위에서 볼 수 있어요. 줄어들면 쉼터나 회복젤로 채워요.'); if (d > 0) { sfx('hurt'); battleUI.damage(d, 'player'); } refreshBattle(); updateUI();
-  if (pierce) await battleUI.explain(`정답! 하지만 뚫고 들어왔다. 하트 −${heartText(d)}`, explanationHTML(r.q), 'bad', ['관통', ...noteBadges(note)]);
-  else if (r.correct && d === 0) await battleUI.explain('정답! 완전히 막아 냈다. 하트 그대로!', explanationHTML(r.q), 'good', ['완전 방어', ...noteBadges(note)]);
-  else if (r.correct) await battleUI.explain(`정답! 잘 막았다. 하트 −${heartText(d)}`, explanationHTML(r.q), 'good', ['충격 40% 줄임', ...noteBadges(note)]);
-  else await battleUI.explain(`막지 못했다! 하트 −${heartText(d)}`, explanationHTML(r.q), 'bad', noteBadges(note));
+  if (pierce) await battleUI.explain(`정답! 하지만 뚫고 들어왔다. 하트 −${heartText(d)}`, explanationHTML(r.q, r.choice), 'bad', ['관통', ...noteBadges(note)]);
+  else if (r.correct && d === 0) await battleUI.explain('정답! 완전히 막아 냈다. 하트 그대로!', explanationHTML(r.q, r.choice), 'good', ['완전 방어', ...noteBadges(note)]);
+  else if (r.correct) await battleUI.explain(`정답! 잘 막았다. 하트 −${heartText(d)}`, explanationHTML(r.q, r.choice), 'good', ['충격 40% 줄임', ...noteBadges(note)]);
+  else await battleUI.explain(`막지 못했다! 하트 −${heartText(d)}`, explanationHTML(r.q, r.choice), 'bad', noteBadges(note));
 }
 async function allyFainted(b) {
   battleUI.allyAct?.('tired'); sfx('faint');
@@ -1485,6 +1492,12 @@ function showDex(filter = 'all') {
 }
 // 도감: 도트 그림이 기본, ‘실제 사진 보기’를 누르면 실제 생물 사진으로 바뀌어요 (사진은 자르지 않고 전체를 보여 줘요).
 // 전설의 우산몬은 ‘노멀폼 / 변환폼’ 버튼으로 두 모습을 볼 수 있어요.
+/* v0.95 실제 생물 사전: 학명·무리·사는 곳·생김새와 생활·독도 이야기·보호 상태(knowledge.js) */
+function speciesHTML(m) {
+  const k = SPECIES[m.id]; if (!k) return '';
+  const row = (t, v) => v ? `<div class="kb-row"><dt>${t}</dt><dd>${v}</dd></div>` : '';
+  return `<details class="kb-box" open><summary>📘 실제 생물 사전 · ${esc(m.motif)}</summary><dl>${row('학명', k.sci ? `<i>${esc(k.sci)}</i>` : '')}${row('무리', esc(k.group))}${row('사는 곳', esc(k.home))}${row('생김새와 생활', esc(k.look))}${row('독도·울릉도', esc(k.dokdo))}${row('보호', k.protect ? `<span class="kb-protect">${esc(k.protect)}</span>` : '')}${row('확인할 점', esc(k.check))}</dl>${k.src.length ? `<span class="source-link">자료: ${esc(k.src.join(' · '))}</span>` : ''}</details>`;
+}
 function dexDetail(id, filter, view = 'dot') {
   const m = getSpecies(id), seen = state.seen.includes(id), credit = PHOTO_CREDITS[id], hasForms = m.forms === 2;
   const photo = seen && view === 'photo' && credit, dotId = view === 'form2' && hasForms ? `${id}-2` : String(id);
@@ -1494,7 +1507,7 @@ function dexDetail(id, filter, view = 'dot') {
   const toggles = seen ? `<div class="dex-view">${[['dot', '도트 그림'], ...(hasForms ? [['form2', '변환폼']] : []), ...(credit ? [['photo', '실제 사진 보기']] : [])].map(([v, label]) => `<button data-view="${v}" class="${view === v ? 'selected' : ''}" aria-pressed="${view === v}">${label}</button>`).join('')}</div>` : '';
   const statBars = seen && m.base ? `<div class="base-stats" aria-label="기본 능력치">${[['체력', 'hp'], ['공격', 'attack'], ['방어', 'defense'], ['스피드', 'speed']].map(([l, k]) => `<div><span>${l}</span><i><b style="width:${Math.round(m.base[k] / 140 * 100)}%"></b></i><em>${m.base[k]}</em></div>`).join('')}</div>` : '';
   const legendNote = m.legendary ? `<br><strong>전설의 우산몬</strong>${hasForms ? ' · 결투에서 형태변환을 쓸 수 있어요' : ''}` : '';
-  openModal(head(seen ? m.name : '아직 만나지 못한 친구', `NO.${String(id).padStart(3, '0')}${m.legendary ? ' · 전설' : ''}`) + `<div class="monster-detail${photo ? ' with-photo' : ''}">${picture}<div><span class="type-chip">${seen ? TYPES[m.type].name : '발견 전'}</span><p>${seen ? m.detail : `${ZONES[m.zone].name} 부근에서 단서를 찾아보세요.`}</p>${whenNote(m.id) ? `<p class="when-note">🕒 ${esc(whenNote(m.id))}</p>` : ''}${seen ? `<p class="trait-line">${traitChip(m)} ${esc(traitOf(m.id).text)}</p>` : ''}</div></div>${toggles}${statBars}${seen ? `<div class="fact-box"><strong>실제 생물 모티브 · ${m.motif}</strong><br>${esc(m.area)} · ${esc(m.group)}<br>기록 확인: ${esc(m.recordStatus)}<br>${esc(m.recordNote)}${legendNote}<br>모습과 능력은 게임용 창작이에요.${m.source ? `<br><span class="source-link">관련 자료: ${esc(sourceCite(m.source))}</span>` : ''}</div>` : ''}<div class="modal-actions"><button id="backDex" class="neutral">← 도감으로</button></div>`, () => {
+  openModal(head(seen ? m.name : '아직 만나지 못한 친구', `NO.${String(id).padStart(3, '0')}${m.legendary ? ' · 전설' : ''}`) + `<div class="monster-detail${photo ? ' with-photo' : ''}">${picture}<div><span class="type-chip">${seen ? TYPES[m.type].name : '발견 전'}</span><p>${seen ? m.detail : `${ZONES[m.zone].name} 부근에서 단서를 찾아보세요.`}</p>${whenNote(m.id) ? `<p class="when-note">🕒 ${esc(whenNote(m.id))}</p>` : ''}${seen ? `<p class="trait-line">${traitChip(m)} ${esc(traitOf(m.id).text)}</p>` : ''}</div></div>${toggles}${statBars}${seen ? `<div class="fact-box"><strong>실제 생물 모티브 · ${m.motif}</strong><br>${esc(m.area)} · ${esc(m.group)}<br>기록 확인: ${esc(m.recordStatus)}<br>${esc(m.recordNote)}${legendNote}<br>모습과 능력은 게임용 창작이에요.${m.source ? `<br><span class="source-link">관련 자료: ${esc(sourceCite(m.source))}</span>` : ''}</div>${speciesHTML(m)}` : ''}<div class="modal-actions"><button id="backDex" class="neutral">← 도감으로</button></div>`, () => {
     $('#backDex').onclick = () => showDex(filter);
     $$('[data-view]').forEach(b => b.onclick = () => dexDetail(id, filter, b.dataset.view));
   });
@@ -1570,10 +1583,11 @@ function showMap() {
   }).join('');
   const routeMarks = routes.map(r => `<span class="wm-route ${map.id === r.id ? 'here' : ''}" style="${pct(routeSpot(r))}">${map.id === r.id ? '★ ' : ''}${esc(state.visited.includes(r.zone + 1) || map.id === r.id ? r.name : '…')}</span>`).join('');
   openModal(head('울릉도·독도 탐험 지도', '실제 지명 · 마을과 길은 게임 속 창작') + `<p>가 본 마을을 누르면 바로 이동해요(동료도 회복). 처음 가는 곳은 점선 길을 따라 걸어가요.</p>
-    <div class="world-map"><canvas id="worldMapArt" width="320" height="200" aria-hidden="true"></canvas><span class="wm-island small" style="left:10%;top:27%">울릉도</span><span class="wm-ferry" style="left:6%;top:64%">⛴ 약 87.4km</span><span class="wm-island" style="left:51%;top:66%">서도</span><span class="wm-island" style="left:75%;top:82%">동도</span>${DOKDO_NAMES.map(([n]) => `<span class="wm-name" style="${pct(WM_AT[n])}">${esc(n)}</span>`).join('')}<span class="wm-compass" aria-hidden="true">N<br>▲</span>${routeMarks}${townMarks}</div>
+    <div class="world-map"><canvas id="worldMapArt" width="320" height="200" aria-hidden="true"></canvas><span class="wm-island small" style="left:10%;top:27%">울릉도</span><span class="wm-ferry" style="left:6%;top:64%">⛴ 약 87.4km</span><span class="wm-island" style="left:51%;top:66%">서도</span><span class="wm-island" style="left:75%;top:82%">동도</span>${DOKDO_NAMES.map(([n]) => `<button class="wm-name" data-wmplace="${esc(n)}" style="${pct(WM_AT[n])}">${esc(n)}</button>`).join('')}<span class="wm-compass" aria-hidden="true">N<br>▲</span>${routeMarks}${townMarks}</div>
     <div class="wm-legend"><span><i class="here">★</i> 지금 여기</span><span><i class="visited">✓</i> 인증 받은 마을</span><span><i class="visited">≈</i> 가 본 마을</span><span><i class="locked">?</i> 아직 못 가 본 곳</span></div>
-    <button class="text-button wm-names-btn" id="wmNames">📍 고시된 독도 지명 ${DOKDO_NAMES.length}곳 보기</button><p class="footer-note">독도의 섬 모양과 지명 자리는 국토지리정보원 독도 지명 고시 좌표를 따랐어요(섬 둘레는 대략). 마을·건물·길은 게임 속 창작이에요. 울릉도는 실제로 훨씬 크고 멀리(약 87.4km) 있어서 왼쪽 위에 작게 줄여 그렸어요.</p>`, () => {
-    drawWorldMap($('#worldMapArt')); $('#wmNames').onclick = e => { const on = $('.world-map').classList.toggle('show-names'); e.currentTarget.textContent = on ? '📍 지명 숨기기' : `📍 고시된 독도 지명 ${DOKDO_NAMES.length}곳 보기`; };
+    <button class="text-button wm-names-btn" id="wmNames">📍 고시된 독도 지명 ${DOKDO_NAMES.length}곳 보기</button><div id="wmPlace" class="fact-box wm-place" hidden></div><p class="footer-note">독도의 섬 모양과 지명 자리는 국토지리정보원 독도 지명 고시 좌표를 따랐어요(섬 둘레는 대략). 마을·건물·길은 게임 속 창작이에요. 울릉도는 실제로 훨씬 크고 멀리(약 87.4km) 있어서 왼쪽 위에 작게 줄여 그렸어요.</p>`, () => {
+    drawWorldMap($('#worldMapArt')); $('#wmNames').onclick = e => { const on = $('.world-map').classList.toggle('show-names'); e.currentTarget.textContent = on ? '📍 지명 숨기기 · 이름을 누르면 뜻이 나와요' : `📍 고시된 독도 지명 ${DOKDO_NAMES.length}곳 보기`; };
+    $$('[data-wmplace]').forEach(b => b.onclick = () => { const n = b.dataset.wmplace, p = PLACES[n], box = $('#wmPlace'); if (!p) return; $$('[data-wmplace]').forEach(x => x.classList.toggle('picked', x === b)); box.hidden = false; box.innerHTML = `<strong>${esc(n)}</strong> · ${esc(p.where)}<br>${esc(p.origin)}<br><button class="text-button" id="wmDict">지식 사전에서 모든 지명 보기 →</button>`; $('#wmDict').onclick = () => showDictionary('place', n); box.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }); });
     $$('[data-zone]').forEach(b => b.onclick = () => travel(Number(b.dataset.zone)));
   });
 }
@@ -1600,8 +1614,21 @@ function stampCeremony(zone, then) {
 }
 // ── 공부 수첩 (v0.47): [독도 공부] 쪽 읽기 · [배움의 기록] 학습 기록 ──
 const studyRead = () => STUDY_PAGES.filter(p => state.flags[`study:${p.id}`]).length;
-function noteTabs(active) { return `<div class="note-tabs" role="tablist">${[['study', '독도 공부'], ['record', '배움의 기록']].map(([k, l]) => `<button role="tab" data-tab="${k}" class="${active === k ? 'selected' : ''}" aria-selected="${active === k}">${l}</button>`).join('')}</div>`; }
-function bindTabs() { $$('[data-tab]').forEach(b => b.onclick = () => b.dataset.tab === 'study' ? showStudy() : showNotebook()); }
+function noteTabs(active) { return `<div class="note-tabs" role="tablist">${[['study', '독도 공부'], ['dict', '지식 사전'], ['record', '배움의 기록']].map(([k, l]) => `<button role="tab" data-tab="${k}" class="${active === k ? 'selected' : ''}" aria-selected="${active === k}">${l}</button>`).join('')}</div>`; }
+function bindTabs() { $$('[data-tab]').forEach(b => b.onclick = () => b.dataset.tab === 'study' ? showStudy() : b.dataset.tab === 'dict' ? showDictionary() : showNotebook()); }
+/* v0.95 지식 사전: 독도 지명의 뜻 · 만난 생물의 실제 정보 · 자료 출처(모두 게임 안 글, 바깥 링크 없음) */
+function showDictionary(part = 'place', pick = null) {
+  const parts = [['place', `📍 독도 지명 ${Object.keys(PLACES).length}곳`], ['life', `🌿 만난 생물 ${state.seen.length}/100`], ['src', '📚 자료 출처']];
+  let body = '';
+  if (part === 'place') body = `<p>국가지명위원회가 정한 독도의 이름들이에요. 이름마다 뜻과 이야기가 담겨 있어요.</p><div class="kb-list">${Object.entries(PLACES).map(([n, p]) => `<div class="kb-item${pick === n ? ' picked' : ''}" data-place="${esc(n)}"><strong>${esc(n)}</strong><small>${esc(p.where)}</small><p>${esc(p.origin)}</p></div>`).join('')}</div>`;
+  else if (part === 'life') { const seen = MONSTERS.filter(m => state.seen.includes(m.id)); body = `<p>만난 우산몬의 모티브가 된 실제 생물이에요. 더 많은 우산몬을 만나면 사전이 채워져요.</p>${seen.length ? `<div class="kb-list">${seen.map(m => { const k = SPECIES[m.id] || {}; return `<button class="kb-item kb-life" data-kbdex="${m.id}"><strong>${esc(m.motif)}</strong><small>${k.sci ? `<i>${esc(k.sci)}</i> · ` : ''}${esc(k.group || m.group)}</small><p>${esc(k.look || '')}</p>${k.protect ? `<span class="kb-protect">${esc(k.protect)}</span>` : ''}</button>`; }).join('')}</div>` : '<p class="footer-note">아직 만난 우산몬이 없어요.</p>'}`; }
+  else body = `<div class="resource-list">${KB_SOURCES.map(([who, doc, use]) => `<div class="resource-item">${esc(who)} ${esc(doc)}<small>${esc(use)}</small></div>`).join('')}</div><p class="footer-note">${esc(KB_NOTE)}</p>`;
+  openModal(head('공부 수첩', '지식 사전') + noteTabs('dict') + `<div class="filter-row kb-parts">${parts.map(([k, l]) => `<button data-kbpart="${k}" class="${part === k ? 'selected' : ''}">${l}</button>`).join('')}</div>${body}`, () => {
+    bindTabs(); $$('[data-kbpart]').forEach(b => b.onclick = () => showDictionary(b.dataset.kbpart));
+    $$('[data-kbdex]').forEach(b => b.onclick = () => dexDetail(Number(b.dataset.kbdex), 'all'));
+    if (pick) document.querySelector(`[data-place="${CSS.escape(pick)}"]`)?.scrollIntoView({ block: 'center' });
+  });
+}
 const sourceOf = r => typeof r === 'number' ? SOURCES[r] : typeof r === 'string' ? SOURCES.find(s => s.url === r) : r;
 function showStudy(pageId = null) {
   const at = STUDY_PAGES.findIndex(p => p.id === pageId), p = STUDY_PAGES[at];
@@ -1627,7 +1654,7 @@ function showNotebook() {
   });
 }
 function showSources() {
-  openModal(head('사실과 창작을 구분해요') + `<p>지역 이름은 실제 독도의 지명이에요. 우산몬·마을·건물·NPC 대사·기억의 세계는 창작입니다. 배경음악과 효과음도 이 게임을 위해 새로 지은 곡으로, 녹음한 소리 파일 없이 브라우저가 그 자리에서 만들어요(우리 5음 음계와 세마치·굿거리·자진모리·휘모리 장단을 본떴어요). 시간을 건너온 조상님 이서부·이규운·안응복·심흥탁·홍순팔도 창작 인물이고, 그들이 들려주는 이사부·이규원·안용복·심흥택·홍순칠의 활동은 실제 기록이에요. 실제 역사와 자연은 아래 자료를 바탕으로 살펴봐요. 타이틀 그림은 생성형 AI로 만든 그림을 실제 독도(동도의 등대·경비대 건물·태극기, 맞은편 서도, 괭이갈매기)에 맞게 다듬어 썼어요.</p><h3 class="source-head">문제와 공부 수첩의 자료</h3><p>문제 ${QUESTIONS.length}개는 모두 아래 공공 자료 가운데 하나에 근거해요. 이용 조건이 분명한 곳만 골랐어요. 한국민족문화대백과사전 본문은 저작권법 제24조의2(공공저작물의 자유이용)에 따라, 정책브리핑 글은 공공누리 제1유형(출처표시)에 따라 출처를 밝히고 썼어요. 문제와 해설은 자료의 사실을 초등학생 눈높이로 새로 쓴 글이에요.</p><div class="resource-list">${SOURCES.map(s => `<div class="resource-item">${esc(s.title)}<small>${esc(s.license)} · 문제 ${QUESTIONS.filter(q => q.source === s.url).length}개</small></div>`).join('')}<div class="resource-item">교육부 · 2022 개정 교육과정 고시</div></div><div class="fact-box">중심 성취기준: 사회 [6사01-02]<br>자료 신뢰성: 국어 [6국06-02]<br>생태계 보전: 과학 [4과14-01~03]의 선수학습 복습</div><p class="footer-note">개별 생물 모티브는 도감의 자료 링크에서 확인할 수 있어요. 수업 효과는 아직 검증하지 않았어요.</p>`);
+  openModal(head('사실과 창작을 구분해요') + `<p>지역 이름은 실제 독도의 지명이에요. 우산몬·마을·건물·NPC 대사·기억의 세계는 창작입니다. 배경음악과 효과음도 이 게임을 위해 새로 지은 곡으로, 녹음한 소리 파일 없이 브라우저가 그 자리에서 만들어요(우리 5음 음계와 세마치·굿거리·자진모리·휘모리 장단을 본떴어요). 시간을 건너온 조상님 이서부·이규운·안응복·심흥탁·홍순팔도 창작 인물이고, 그들이 들려주는 이사부·이규원·안용복·심흥택·홍순칠의 활동은 실제 기록이에요. 실제 역사와 자연은 아래 자료를 바탕으로 살펴봐요. 타이틀 그림은 생성형 AI로 만든 그림을 실제 독도(동도의 등대·경비대 건물·태극기, 맞은편 서도, 괭이갈매기)에 맞게 다듬어 썼어요.</p><h3 class="source-head">문제와 공부 수첩의 자료</h3><p>문제 ${QUESTIONS.length}개는 모두 아래 공공 자료 가운데 하나에 근거해요. 이용 조건이 분명한 곳만 골랐어요. 한국민족문화대백과사전 본문은 저작권법 제24조의2(공공저작물의 자유이용)에 따라, 정책브리핑 글은 공공누리 제1유형(출처표시)에 따라 출처를 밝히고 썼어요. 문제와 해설은 자료의 사실을 초등학생 눈높이로 새로 쓴 글이에요.</p><div class="resource-list">${SOURCES.map(s => `<div class="resource-item">${esc(s.title)}<small>${esc(s.license)} · 문제 ${QUESTIONS.filter(q => q.source === s.url).length}개</small></div>`).join('')}<div class="resource-item">교육부 · 2022 개정 교육과정 고시</div></div><div class="fact-box">중심 성취기준: 사회 [6사01-02]<br>자료 신뢰성: 국어 [6국06-02]<br>생태계 보전: 과학 [4과14-01~03]의 선수학습 복습</div><h3 class="kb-h">지식 사전 자료</h3><div class="resource-list">${KB_SOURCES.map(([who, doc, use]) => `<div class="resource-item">${esc(who)} ${esc(doc)}<small>${esc(use)}</small></div>`).join('')}</div><p class="footer-note">${esc(KB_NOTE)} 개별 생물 모티브는 도감의 ‘실제 생물 사전’과 공부 수첩의 ‘지식 사전’에서 볼 수 있어요. 수업 효과는 아직 검증하지 않았어요.</p>`);
 }
 function exportLearning() {
   const quote = v => '"' + String(v).replace(/"/g, '""') + '"';

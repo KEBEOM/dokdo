@@ -33,8 +33,6 @@ import { buildingKit, buildingBox } from './box3d.js';
 import { LEVEL_H, cliffWalls, cliffTextures, shoreWalls, shoreTextures } from './heights.js';
 import { V2_TERRAIN } from './tileset-v2.js';
 import { assetImage, assetTintTag, monsterAssetKey } from './assets.js';
-import { facing, fieldMonsterFrame } from './sprites.js';
-import { MONSTER_DOTS } from './monster-dots.js';
 import { sceneDrawOrder, paintActor, buildingArt, PROP_KINDS, doorColumns } from './world.js';
 import { HD2D_ATLAS, HD2D_TEXTURES } from './hd2d-atlas.js';
 import { HD2D_GROUND, HD2D_TREES } from './hd2d-nature.js';
@@ -44,7 +42,7 @@ import { STORY_ATLAS, INTERIOR_HD } from './story-atlas.js';
 import { UW_ATLAS } from './uw-atlas.js';
 import { FURN_ATLAS, UW_WALLS, REGION_ATLAS } from './furniture-atlas.js';
 import { furnitureGroups, pieceSize } from './furniture.js';
-import { seabedLayout, fishAt, uwBlock, uwQuay } from './seabed.js';
+import { seabedLayout, uwBlock, uwQuay } from './seabed.js';
 const UW_FLOOR_H = -58, UW_CEIL_H = -3; // v0.87 바닷속: 바닥 높이 · 섬 밑동·안벽 윗면(물낯 바로 아래)
 
 const T = 32, WATER = -6;
@@ -283,7 +281,7 @@ export function createGL(canvas) {
   }
 
   // ── 지도마다 한 번: 땅·벽·건물·물 (그림자는 해가 움직이면 그것만 다시) ──
-  let scene = null, fishBuf = null, fishN = 0; // v0.87 바닷속 물고기(매 장면)
+  let scene = null;
   // v0.87 바닷속 장면: 물 위의 것은 하나도 없이 — 바닥(해저 타일) · 섬 밑동 바위벽 · 항구 콘크리트 안벽 · 바다숲·생물·바위 판
   let quayCv = null;
   function quayCanvas() { // 안벽 블록(가로 32 · 세로 16, 엇갈려 쌓기) + 아래쪽 물때
@@ -291,26 +289,6 @@ export function createGL(canvas) {
     for (let r = 0; r < 4; r++) for (let i = -1; i < 3; i++) { const x = i * 32 + (r % 2 ? 16 : 0), y = r * 16, v = 132 + ((i * 7 + r * 13) % 5) * 6; g.fillStyle = `rgb(${v - 8},${v},${v + 4})`; g.fillRect(x, y, 32, 16); g.fillStyle = '#5c666c'; g.fillRect(x, y + 15, 32, 1); g.fillRect(x + 31, y, 1, 16); g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(x, y, 31, 1); }
     for (let i = 0; i < 90; i++) { const x = (i * 37) % 64, y = (i * 53) % 64; g.fillStyle = i % 3 ? 'rgba(40,60,50,.18)' : 'rgba(90,120,80,.22)'; g.fillRect(x, y, 2, 1); }
     return (quayCv = c);
-  }
-  // v0.89 바닷속 우산몬: 이 지도에 나오는 종만 44px로 줄여 한 장에 모아요(바닥 우산몬 판 · 헤엄치는 물고기 우산몬)
-  let uwMon = null;
-  const UWM = 44;
-  function uwMonAtlas(map) {
-    const L = seabedLayout(map), ids = [...new Set([...L.items.filter(i => i.mon).map(i => i.mon), ...L.fish.map(f => f.mon).filter(Boolean)])].sort((a, b) => a - b), key = ids.join(',') + '|' + assetTintTag();
-    if (uwMon?.key === key && uwMon.ok) return uwMon; if (typeof document === 'undefined') return null;
-    const per = 11, c = document.createElement('canvas'); c.width = per * (UWM + 8); c.height = Math.max(1, Math.ceil(ids.length / per)) * (UWM + 10); const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
-    const frames = {}, dots = assetImage(MONSTER_DOTS.key); let ok = !!dots;
-    ids.forEach((id, i) => { const x = (i % per) * (UWM + 8), y = Math.floor(i / per) * (UWM + 10), f = fieldMonsterFrame(id); // v0.91 원래 도트 그림 1:1(도트가 빠지지 않게)
-      if (f) { frames[id] = [x, y, f[2], f[3]]; if (dots) g.drawImage(dots, f[0], f[1], f[2], f[3], x, y, f[2], f[3]); }
-      else { frames[id] = [x, y, UWM, UWM]; const img = assetImage(monsterAssetKey(id)); if (img) g.drawImage(img, x, y, UWM, UWM); else ok = false; } });
-    if (uwMon?.c) { const t = texOf.get(uwMon.c); if (t) { gl.deleteTexture(t); texOf.delete(uwMon.c); } }
-    return (uwMon = { key, c, frames, ok, width: c.width, height: c.height });
-  }
-  const monFlip = (id, wantRight) => { const f = facing(id); return f === 'front' ? false : (f === 'right') !== wantRight; };
-  function uwMonCards(map, cards, floorH) { // 바닥에서 쉬는 우산몬 판(살펴볼 수 있어요)
-    const A = uwMonAtlas(map); if (!A) return 1;
-    for (const it of seabedLayout(map).items) if (it.mon && A.frames[it.mon]) cards.push({ key: `mon${it.mon}`, f: A.frames[it.mon], x: (it.x + .5) * T + (((it.x * 7 + it.y * 3) % 7) - 3), z: it.y * T + 24, h: floorH ?? lv(map, it.x, it.y), mon: true, flip: monFlip(it.mon, !!it.flip) });
-    return A.ok ? 0 : 1;
   }
   const uwWallCv = {}; // v0.88 「해안 벽 확장팩」 안벽·자연 암벽 그림에서 자른 이어 붙이기 재질(128×128)
   function uwWall(kind) {
@@ -334,7 +312,7 @@ export function createGL(canvas) {
     if (rockImg && rock.v.length) meshes.push({ tex: rockImg, buf: upload(rock.v), n: rock.v.length / 8, wrap: true });
     if (qc && quay.v.length) meshes.push({ tex: qc, buf: upload(quay.v), n: quay.v.length / 8, wrap: true });
     const cards = []; if (uwImg) for (const it of seabedLayout(map).items) { if (it.edge) continue; const f = UW_ATLAS.frames[it.id]; if (f) cards.push({ key: it.id, f, x: (it.x + (it.w || 1) / 2) * T + (it.big ? 0 : (((it.x * 7 + it.y * 3) % 9) - 4)), z: it.y * T + (it.big ? 30 : 24), h: F, uw: true }); }
-    const monMissing = uwMonCards(map, cards, F), missing = (!rockImg || !uwImg || !qc || !packWalls || monMissing) ? 1 : 0;
+    const missing = (!rockImg || !uwImg || !qc || !packWalls) ? 1 : 0;
     return { id: map.id, tag: assetTintTag(), hd2d: true, uw: true, meshes, missing, gw, gh, statics: { buf: null, n: 0, atlas: null, flat: { n: 0 }, blobs: { n: 0 } }, casters: [], shade: null, sunKey: '', water: null, cards: cardBuffer(cards, map), lamps: [],
       models: null, hideStatic: new Set(), hideLandmarks: new Set(), interior: false, pier: false, doorMats: 0, rockCaps: 0, landmarks: {} };
   }
@@ -493,7 +471,6 @@ export function createGL(canvas) {
     const pushCard = (key, fx, fz, h) => { const f = cardFrame(key); if (f) cards.push({ key, f, x: fx, z: fz, h, story: key.startsWith('story_') }); return f; };
     const uwImg = map.diving ? assetImage(UW_ATLAS.key) : null; if (map.diving && !uwImg) missing++;
     if (uwImg) for (const it of seabedLayout(map).items) { const f = UW_ATLAS.frames[it.id]; if (f) cards.push({ key: it.id, f, x: (it.x + (it.w || 1) / 2) * T + (it.big || it.edge ? 0 : (((it.x * 7 + it.y * 3) % 9) - 4)), z: it.y * T + (it.edge ? 6 : it.big ? 30 : 24), h: lv(map, it.x, it.y), uw: true }); } // v0.87 바닷속 판
-    if (map.diving) missing += uwMonCards(map, cards); // v0.89 바닷속 우산몬
     if (o.hd2d && !map.diving) for (const ob of map.parsed?.objects || []) { // v0.88 실제 시설의 관찰용 외관(「지상·수중 v2」): 지명 자리 칸 위에 그림 판 하나 · 들어가는 문 없음
       const f = ob.region && REGION_ATLAS.frames[ob.region]; if (!f) continue; if (!assetImage(REGION_ATLAS.key)) { missing++; continue; }
       const r = ob.rock || [ob.x - 1, ob.y - 1, ob.x + 1, ob.y], cx = (r[0] + r[2] + 1) / 2 * T, cz = (r[3] + 1) * T - 2, L = lv(map, ob.x, ob.y);
@@ -574,12 +551,12 @@ export function createGL(canvas) {
   }
   // 그림 판 → 세운 판 꼭짓점(발 자리는 그림 아랫변 가운데, 1픽셀 = 지도 1픽셀)
   function cardBuffer(cards, map) { // 그림 모음 두 장(에셋팩 · v0.81 팩 이야기 건물)마다 한 묶음
-    const part = story => { const arr = [], A = story === 'mon' ? (uwMon || { width: 1, height: 1 }) : story === 'rg' ? REGION_ATLAS : story === 'uw' ? UW_ATLAS : story ? STORY_ATLAS : HD2D_ATLAS, AW = A.width, AH = A.height;
-      for (const c of cards.filter(c => story === 'mon' ? c.mon : story === 'rg' ? c.rg : story === 'uw' ? c.uw : !c.uw && !c.rg && !c.mon && !!c.story === story)) { const [fx, fy, w, h] = c.f, [u0, u1] = c.flip ? [(fx + w) / AW, fx / AW] : [fx / AW, (fx + w) / AW], v0 = fy / AH, v1 = (fy + h) / AH, L = -w / 2, R = w / 2;
+    const part = story => { const arr = [], A = story === 'rg' ? REGION_ATLAS : story === 'uw' ? UW_ATLAS : story ? STORY_ATLAS : HD2D_ATLAS, AW = A.width, AH = A.height;
+      for (const c of cards.filter(c => story === 'rg' ? c.rg : story === 'uw' ? c.uw : !c.uw && !c.rg && !!c.story === story)) { const [fx, fy, w, h] = c.f, u0 = fx / AW, u1 = (fx + w) / AW, v0 = fy / AH, v1 = (fy + h) / AH, L = -w / 2, R = w / 2;
         const q = [[L, -1, u0, v1], [R, -1, u1, v1], [R, h - 1, u1, v0], [L, h - 1, u0, v0]]; for (const i of [0, 1, 2, 0, 2, 3]) arr.push(c.x, c.h, c.z, q[i][0], q[i][1], q[i][2], q[i][3], 0, 0, 0); } // 아랫줄 1px은 테두리라 땅 밑으로
       return { buf: upload(arr), n: arr.length / 10 }; };
-    const hd = part(false), st = part(true), uw = part('uw'), region = part('rg'), mon = part('mon');
-    return { buf: hd.buf, n: hd.n, story: st, uw, region, mon, count: cards.length, keys: cards.map(c => c.key) };
+    const hd = part(false), st = part(true), uw = part('uw'), region = part('rg');
+    return { buf: hd.buf, n: hd.n, story: st, uw, region, count: cards.length, keys: cards.map(c => c.key) };
   }
   // 그림자: 해를 등진 면의 위쪽 모서리를 땅에 눕힌 판(해가 움직이면 이것만 다시)
   function buildShade(casters, sun) {
@@ -724,7 +701,7 @@ export function createGL(canvas) {
   function render(o) {
     const t0 = performance.now(), { map, view: V } = o, sun = o.sun, fbw = canvas.width, fbh = canvas.height, q = o.quality ?? 1, hd2d = !!V.hd && hd2dMap(map);
     if (!scene || scene.id !== map.id || scene.tag !== assetTintTag() || scene.want !== hd2d || scene.dive !== !!map.diving || (scene.missing && frames % 30 === 0)) {
-      if (scene) { if (scene.models) gl.deleteBuffer(scene.models.buf); for (const m of scene.meshes) { gl.deleteBuffer(m.buf); if (m.mat) { const t = texOf.get(m.mat.canvas); if (t) { gl.deleteTexture(t); texOf.delete(m.mat.canvas); } } } if (scene.shade) gl.deleteBuffer(scene.shade.buf); if (scene.water) gl.deleteBuffer(scene.water.buf); gl.deleteBuffer(scene.cards.buf); if (scene.cards.uw) gl.deleteBuffer(scene.cards.uw.buf); if (scene.cards.region) gl.deleteBuffer(scene.cards.region.buf); if (scene.cards.mon) gl.deleteBuffer(scene.cards.mon.buf); gl.deleteBuffer(scene.cards.story.buf); }
+      if (scene) { if (scene.models) gl.deleteBuffer(scene.models.buf); for (const m of scene.meshes) { gl.deleteBuffer(m.buf); if (m.mat) { const t = texOf.get(m.mat.canvas); if (t) { gl.deleteTexture(t); texOf.delete(m.mat.canvas); } } } if (scene.shade) gl.deleteBuffer(scene.shade.buf); if (scene.water) gl.deleteBuffer(scene.water.buf); gl.deleteBuffer(scene.cards.buf); if (scene.cards.uw) gl.deleteBuffer(scene.cards.uw.buf); if (scene.cards.region) gl.deleteBuffer(scene.cards.region.buf); gl.deleteBuffer(scene.cards.story.buf); }
       scene = buildScene(map, o.ground, { hd2d }); scene.want = hd2d; scene.dive = !!map.diving; groundAtMs = o.now;
     }
     if (scene.sunKey !== sun.join()) { if (scene.shade) gl.deleteBuffer(scene.shade.buf); scene.shade = buildShade(scene.casters, sun); scene.sunKey = sun.join(); }
@@ -807,15 +784,8 @@ export function createGL(canvas) {
     gl.uniform1f(sprite.u.uCutOn, 1);
     gl.uniform1f(sprite.u.uGlow, 0);
     if (scene.statics.n) { gl.bindTexture(gl.TEXTURE_2D, texture(scene.statics.atlas)); bindSprite(scene.statics.buf); gl.drawArrays(gl.TRIANGLES, 0, scene.statics.n); draws++; }
-    if (map.diving && uwMon?.c) { // v0.87 물고기 → v0.89 물고기 우산몬: 매 장면 자리를 다시(가는 쪽을 보게 뒤집어요)
-      const arr = [], AW = uwMon.width, AH = uwMon.height, t = o.now / 1000; let nf = 0;
-      for (const fsh of seabedLayout(map).fish) { const f = uwMon.frames[fsh.mon]; if (!f) continue; const p = fishAt(fsh, t), [fx, fy, w, h] = f, u0 = fx / AW, u1 = (fx + w) / AW, v0 = fy / AH, v1 = (fy + h) / AH, [a, b] = monFlip(fsh.mon, p.dir > 0) ? [u1, u0] : [u0, u1];
-        const X = p.x * T + 16, Z = p.y * T + 24, Hh = lv(map, Math.round(p.x), Math.round(p.y)) + fsh.lift + Math.sin(t * 1.3 + fsh.phase) * 3, L = -w / 2, R = w / 2;
-        const q = [[L, 0, a, v1], [R, 0, b, v1], [R, h, b, v0], [L, h, a, v0]]; for (const i of [0, 1, 2, 0, 2, 3]) arr.push(X, Hh, Z, q[i][0], q[i][1], q[i][2], q[i][3], 0, 0, 0); nf++; }
-      fishBuf = upload(arr, fishBuf); fishN = arr.length / 10; info.fish = nf;
-    } else fishN = 0;
-    for (const [cb, key] of [[scene.cards, HD2D_ATLAS.key], [scene.cards.story, STORY_ATLAS.key], [scene.cards.uw, UW_ATLAS.key], [scene.cards.region, REGION_ATLAS.key], [scene.cards.mon, uwMon?.c], [{ n: fishN, buf: fishBuf }, uwMon?.c]]) if (cb?.n && key && (typeof key !== 'string' || assetImage(key))) { // 그림 판: 카메라와 수직(깊이 = 아랫변 줄) · 내 캐릭터를 가리면 도트 무늬로 비쳐요
-      gl.uniform1f(sprite.u.uTilt, V.fp ? 0 : HD.pitch); gl.bindTexture(gl.TEXTURE_2D, texture(typeof key === 'string' ? assetImage(key) : key)); bindSprite(cb.buf); gl.drawArrays(gl.TRIANGLES, 0, cb.n); draws++; gl.uniform1f(sprite.u.uTilt, V.tilt);
+    for (const [cb, key] of [[scene.cards, HD2D_ATLAS.key], [scene.cards.story, STORY_ATLAS.key], [scene.cards.uw, UW_ATLAS.key], [scene.cards.region, REGION_ATLAS.key]]) if (cb?.n && assetImage(key)) { // 그림 판: 카메라와 수직(깊이 = 아랫변 줄) · 내 캐릭터를 가리면 도트 무늬로 비쳐요
+      gl.uniform1f(sprite.u.uTilt, V.fp ? 0 : HD.pitch); gl.bindTexture(gl.TEXTURE_2D, texture(assetImage(key))); bindSprite(cb.buf); gl.drawArrays(gl.TRIANGLES, 0, cb.n); draws++; gl.uniform1f(sprite.u.uTilt, V.tilt);
     }
     gl.uniform1f(sprite.u.uCutOn, 0);
     if (dyn.n) { gl.bindTexture(gl.TEXTURE_2D, texture(A.c)); bindSprite(dyn.buf); gl.drawArrays(gl.TRIANGLES, 0, dyn.n); draws++; }
@@ -846,7 +816,7 @@ export function createGL(canvas) {
       gl.uniform1f(post.u.uFocus, cutU[3] ? cutU[1] / fbh : .45); gl.uniform1f(post.u.uTime, o.now / 1000); gl.uniform1f(post.u.uLight, o.light); gl.uniform1f(post.u.uDof, V.hd ? 1 : .55);
       gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf); gl.enableVertexAttribArray(post.a.aP); gl.vertexAttribPointer(post.a.aP, 2, gl.FLOAT, false, 8, 0); gl.drawArrays(gl.TRIANGLES, 0, 6); draws += 2; disableAll();
     }
-    frames++; Object.assign(info, { frames, meshes: scene.meshes.length, statics: scene.statics.n / 6, dynamic: dyn.n / 6, draws, post: usePost, shadows: q >= 1 ? scene.shade.n / 6 : 0, cards: scene.cards.count, cardKeys: scene.cards.keys, water: !!scene.water, quality: q, lamps: scene.lamps, hd2d: scene.hd2d, models: scene.models ? scene.models.n / 3 : 0, glbLandmarks: [...scene.hideLandmarks], interior: scene.interior, pier: scene.pier, doorMats: scene.doorMats || 0, uwCards: scene.cards.uw?.n ? scene.cards.uw.n / 6 : 0, uwMons: scene.cards.mon?.n ? scene.cards.mon.n / 6 : 0, fish: map.diving ? info.fish || 0 : 0, rockCaps: scene.rockCaps || 0, storyCards: scene.cards.story.n / 6, playerDrawn: !!player, dynCap: dyn.A.h, ms: Math.round((performance.now() - t0) * 10) / 10 });
+    frames++; Object.assign(info, { frames, meshes: scene.meshes.length, statics: scene.statics.n / 6, dynamic: dyn.n / 6, draws, post: usePost, shadows: q >= 1 ? scene.shade.n / 6 : 0, cards: scene.cards.count, cardKeys: scene.cards.keys, water: !!scene.water, quality: q, lamps: scene.lamps, hd2d: scene.hd2d, models: scene.models ? scene.models.n / 3 : 0, glbLandmarks: [...scene.hideLandmarks], interior: scene.interior, pier: scene.pier, doorMats: scene.doorMats || 0, uwCards: scene.cards.uw?.n ? scene.cards.uw.n / 6 : 0, rockCaps: scene.rockCaps || 0, storyCards: scene.cards.story.n / 6, playerDrawn: !!player, dynCap: dyn.A.h, ms: Math.round((performance.now() - t0) * 10) / 10 });
     return true;
   }
   return { ok: true, render, info, groundAt: (map, x, y) => groundAt(map, x, y), landmark: name => scene?.landmarks?.[name] || null, reset() { scene = null; } };

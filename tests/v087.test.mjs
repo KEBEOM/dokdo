@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 const dist = new URL('../dist/', import.meta.url);
 const { UW_ATLAS, UW_FLOOR } = await import('../dist/uw-atlas.js');
-const { seabedLayout, fishAt, UW_INFO, uwGroup } = await import('../dist/seabed.js');
+const { seabedLayout, UW_INFO, uwGroup } = await import('../dist/seabed.js');
 const { createMap, blocked } = await import('../dist/world.js');
 const { MAPS } = await import('../dist/maps.js');
 // 그림: 바닥 12장(32×32) · 판 그림(바다풀 10·바위 8·생물 13·물고기 5·물가 바위벽 12)
@@ -19,13 +19,12 @@ for (const d of MAPS.filter(m => m.kind !== 'room')) {
   for (const it of L.items) { assert.equal(m[it.y][it.x], 0, `${d.id} ${it.id} 물 칸`); if (it.mon) { assert.ok(it.mon >= 34 && it.mon <= 66, '바닷속 생물은 바다 생물 우산몬(v0.89)'); continue; } assert.ok(UW_ATLAS.frames[it.id], it.id); if (!it.edge) assert.ok(UW_INFO[uwGroup(it.id)], `${it.id} 설명`); }
   for (const k of L.solid) { const [x, y] = k.split(',').map(Number); assert.ok(!blocked(m, x, y) || m.solid.has(k) || m.hull.has(k), '물 위에선 막히지 않아요(배 칸 빼고)'); m.diving = true; assert.ok(blocked(m, x, y), '잠수하면 바위 바닥 칸은 막혀요'); m.diving = false; }
   for (let y = 0; y < m.length; y++) for (let x = 0; x < m[0].length; x++) if (m[y][x] === 0) assert.ok(L.floor[y][x], '물 칸마다 바닥 타일'); else assert.equal(L.floor[y][x], null);
-  for (const f of L.fish) { const a = fishAt(f, 0), b = fishAt(f, 3); assert.ok(Math.hypot(a.x - b.x, a.y - b.y) > .1, '물고기는 움직여요'); assert.ok([1, -1].includes(a.dir)); }
   total += L.items.length;
 }
 assert.ok(total > 300, `바닷속 판 ${total}개`);
-const r0 = seabedLayout(createMap('route0')); assert.ok(r0.items.some(i => i.big) && r0.fish.length >= 2 && r0.items.some(i => i.mon), '숫돌바위 길 바닷속: 바위 지형·물고기·바닥 우산몬');
+const r0 = seabedLayout(createMap('route0')); assert.ok(r0.items.some(i => i.big) && r0.items.some(i => i.group === 'kelp'), '숫돌바위 길 바닷속: 바위 지형·바닷말 숲');
 // 설명: 동해·독도 이야기와 이어지고, 검수 안내가 붙어요
-{ const { UW_MON_NOTE } = await import('../dist/seabed.js'); assert.match(UW_MON_NOTE[58], /갯녹음/); assert.match(UW_MON_NOTE[53], /해녀/); } assert.match(UW_INFO.algae.lines.join(''), /미역바위/);
+assert.match(UW_INFO.kelp.lines.join(''), /갯녹음/); assert.match(UW_INFO.rock.lines.join(''), /해녀/); assert.match(UW_INFO.algae.lines.join(''), /미역바위/);
 const game = readFileSync(new URL('game.js', dist), 'utf8'), gl3 = readFileSync(new URL('gl3d.js', dist), 'utf8');
 assert.ok(/UW_NOTE/.test(game) && /seabedAhead\(\)/.test(game), 'E로 살펴보기');
 assert.ok(/scene\.dive !== !!map\.diving/.test(gl3), '잠수하면 장면을 바닷속으로 다시 만들어요');
@@ -37,4 +36,4 @@ assert.ok(/!\(map\.diving && !n\.player && \(n\.actor \|\|/.test(gl3) && /map\.d
 assert.ok(/function buildUnderwater/.test(gl3) && /if \(map\.diving && o\.hd2d && map\.kind !== 'room'\) return buildUnderwater/.test(gl3) && /models: null, hideStatic/.test(gl3), '바닷속 장면은 따로 만들어요');
 { const { uwBlock, uwQuay } = await import('../dist/seabed.js'); const r0 = createMap('route0'); assert.ok(uwQuay(r0, 5, 24) && uwBlock(r0, 5, 24), '선착장은 바닷속에서 콘크리트 안벽'); const sut = r0.parsed.objects.find(o => o.name === '숫돌바위'); assert.ok(uwBlock(r0, sut.rock[0], sut.rock[1]), '숫돌바위 자리는 바닷속에서 바위 밑동'); assert.ok(!uwBlock(r0, 8, 31) && r0.hull.has('8,31'), '여객선 칸은 바닷속에서 지나가요(배 밑)'); }
 const { execFileSync } = await import('node:child_process'); for (const f of ['game.js', 'gl3d.js', 'battle-ui.js', 'terrain.js']) execFileSync(process.execPath, ['--check', new URL(f, dist).pathname]); // 줄 가운데 주석이 뒤 코드를 끄지 않았는지(문법 검사)
-console.log(`PASS v0.87 바닷속: 바닥 12종 · 판 ${Object.keys(UW_ATLAS.frames).length}장 · 지도 판 ${total}개 · 물고기 · 살펴보기`);
+console.log(`PASS v0.87 바닷속: 바닥 12종 · 판 ${Object.keys(UW_ATLAS.frames).length}장 · 지도 판 ${total}개 · 살펴보기`);

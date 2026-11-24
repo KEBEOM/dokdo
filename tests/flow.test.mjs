@@ -467,7 +467,7 @@ assert.equal(await page.$('#viewBtn'), null, 'no 2D/3D view button any more');
     if (spot) {
       await G(() => window.__dokdo.closeModal()); await page.evaluate(([x, y]) => window.__dokdo.place(x, y, 'down'), spot); await page.waitForTimeout(400);
       assert.ok(await page.isVisible('#diveBtn'), 'dive button in water'); assert.ok(!(await G(() => window.__dokdo.diving)), 'no diving by itself');
-      await page.keyboard.press('q'); await page.waitForTimeout(300); assert.ok(await G(() => window.__dokdo.diving), 'Q dives'); { await until(() => !window.__dokdo.gl.ok || window.__dokdo.gl.uwCards > 0, 20000).catch(() => {}); const gu = await G(() => window.__dokdo.gl); if (gu.ok) assert.ok(gu.uwCards > 0 && gu.fish > 0, `v0.87 바닷속: 바다숲·생물·바위 판과 물고기 ${JSON.stringify({ uw: gu.uwCards, fish: gu.fish })}`); } assert.match(await page.textContent('#diveBtn'), /물 위로/);
+      await page.keyboard.press('q'); await page.waitForTimeout(300); assert.ok(await G(() => window.__dokdo.diving), 'Q dives'); { await until(() => !window.__dokdo.gl.ok || window.__dokdo.gl.uwCards > 0, 20000).catch(() => {}); const gu = await G(() => window.__dokdo.gl); if (gu.ok) assert.ok(gu.uwCards > 0, `v0.87 바닷속: 바다숲·바위 판 ${JSON.stringify({ uw: gu.uwCards })}`); } assert.match(await page.textContent('#diveBtn'), /물 위로/);
       await page.keyboard.press('q'); await page.waitForTimeout(300); assert.ok(!(await G(() => window.__dokdo.diving)), 'Q comes up');
       await G(() => { const s = window.__dokdo.map.spawns.a; window.__dokdo.place(s.x, s.y, 'down'); }); await page.waitForTimeout(400); assert.ok(!(await page.isVisible('#diveBtn')), 'no dive button on land');
     }
