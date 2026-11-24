@@ -281,7 +281,7 @@ def main():
     with open(js, 'w', encoding='utf-8') as f:
         f.write('// HD-2D 땅 재질·나무 그림 자리 (scripts/make-hd2d-nature.py가 만들어요)\n')
         f.write('// 땅: 4×4칸(칸마다 128, 이음매 없음) · 재질 번호 1부터. 나무: 발 자리는 그림 아랫변 가운데.\n')
-        f.write('export const HD2D_GROUND = ' + json.dumps({'key': 'scenery/hd2d-ground', 'noise': 'scenery/hd2d-noise', 'cols': 4, 'rows': 4, 'size': 128, 'slots': {name: i + 1 for i, (name, _) in enumerate(mats)}}) + ';\n')
+        f.write('export const HD2D_GROUND = ' + json.dumps({'key': 'scenery/hd2d-ground', 'noise': 'scenery/hd2d-noise', 'cols': 4, 'rows': 4, 'size': 128, 'seasons': {k: f'scenery/hd2d-ground-{k}' for k in ('spring', 'summer', 'autumn', 'winter')}, 'slots': {name: i + 1 for i, (name, _) in enumerate(mats)}}) + ';\n')
         f.write('export const HD2D_TREES = ' + json.dumps({'key': 'scenery/hd2d-trees', 'width': AW, 'height': AH, 'frames': frames}) + ';\n')
     print('ground', [m for m, _ in mats], 'trees', list(frames), AW, AH)
 

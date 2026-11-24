@@ -6,7 +6,7 @@ import { FURN_ATLAS } from './furniture-atlas.js';
 import { assetImage } from './assets.js';
 
 const T = 32;
-export const PACK_FURNITURE = new Set(['counter', 'shelf', 'table', 'sofa', 'bed', 'desk', 'plant', 'crates', 'trophy', 'pc', 'chest', 'board']); // v0.90 조사 상자·실내 알림판도
+export const PACK_FURNITURE = new Set(['counter', 'shelf', 'table', 'sofa', 'bed', 'desk', 'plant', 'crates', 'trophy', 'pc', 'chest', 'board', 'tank', 'telescope', 'lectern', 'post', 'futon']); // v0.90 조사 상자·실내 알림판도 · v0.96 수조·망원경·독서대·수련 기둥·이불(02 가구)
 // 방 종류: 상점(쉼터)·연구소·수호관은 그대로, 마을 집·가게 건물(house*·block*)은 집, 여객선터미널은 상점
 export function roomKind(map) { const b = String(map?.def?.building || ''); return b === 'shop' || b === 'lab' || b === 'gym' ? b : b.startsWith('terminal') ? 'shop' : 'home'; }
 // 가구 글자 → 팩 그림(방 종류·덩어리 폭에 따라). null이면 예전 도트 가구
@@ -15,22 +15,24 @@ export function furnitureSprite(kind, rk, g = { w: 1, h: 1, books: false }) {
     case 'counter': return { shop: 'shop_counter', gym: 'gym_reception', lab: 'lab_desk' }[rk] || 'shop_counter';
     case 'shelf': if (rk === 'shop') return g.w === 1 ? 'shop_fridge' : 'shop_shelf'; if (g.books || rk === 'gym') return 'home_bookshelf'; return rk === 'lab' ? 'lab_cabinet' : 'home_wardrobe';
     case 'table': return 'home_table';
-    case 'sofa': return rk === 'home' ? null : 'gym_bench'; // 집 소파는 팩에 없어서 예전 그림
+    case 'sofa': return rk === 'home' ? 'home_sofa' : 'gym_bench'; // v0.96 집 소파(02 가구)
     case 'bed': return 'home_bed';
     case 'desk': return g.w >= 2 ? 'lab_desk' : 'lab_console';
     case 'pc': return 'lab_console';
     case 'plant': return 'home_pot';
     case 'crates': return 'shop_crate';
     case 'trophy': return 'gym_display';
-    case 'chest': return 'shop_crate'; // 조사 상자: 나무 상자(열면 뚜껑이 열린 모습을 덧그려요)
-    case 'board': return 'sign_harbor'; // 실내 알림판: 빈 판(종이는 덧그려요)
+    case 'chest': return FURN_ATLAS.frames.chest_closed ? 'chest_closed' : 'shop_crate'; // 조사 상자(v0.96 02 가구: 닫힘·열림 두 장)
+    case 'board': return FURN_ATLAS.frames.board_indoor ? 'board_indoor' : 'sign_harbor'; // 실내 알림판(v0.96: 종이가 붙은 그림)
+    case 'tank': return 'lab_tank'; case 'telescope': return 'lab_telescope'; case 'lectern': return 'lectern'; case 'post': return 'gym_post'; case 'futon': return 'home_futon'; // v0.96 02 가구
+    // 액자(frame)는 벽에 거는 그림이라 바닥 칸에 세우면 바닥에 놓인 것처럼 보여요 → 벽 자리가 생길 때까지 예전 그림
   }
   return null;
 }
 // 키 상한(px): 캐릭터 키가 48px이라 가구·소품이 사람보다 거대해 보이지 않게(옷장·책장도 사람보다 조금 큰 정도)
 export const CHARACTER_PX = 48;
 export const MAX_H = { home_wardrobe: 60, home_bookshelf: 60, shop_shelf: 60, shop_fridge: 60, lab_cabinet: 60, gym_display: 48, lab_console: 44, home_bed: 44, lab_desk: 40,
-  shop_counter: 38, gym_reception: 38, home_table: 34, home_chair: 34, home_pot: 30, shop_crate: 26, gym_bench: 22, sign_harbor: 40, prop_lamp: 72, prop_lifering: 44, prop_bin: 30, prop_bollard: 18 };
+  shop_counter: 38, gym_reception: 38, home_sofa: 34, home_futon: 30, lab_tank: 40, lab_telescope: 50, lectern: 42, frame_wall: 30, chest_closed: 26, chest_open: 26, board_indoor: 42, gym_post: 50, home_table: 34, home_chair: 34, home_pot: 30, shop_crate: 26, gym_bench: 22, sign_harbor: 40, prop_lamp: 72, prop_lifering: 44, prop_bin: 30, prop_bollard: 18 };
 const capOf = id => { const f = FURN_ATLAS.frames[id]; return Math.min(1, (MAX_H[id] || CHARACTER_PX) / f[3]); };
 const cache = new WeakMap();
 // 방 하나의 가구 덩어리: Map('x,y' → { draw: piece } | { skip: true })
@@ -71,12 +73,12 @@ export function drawPackFurniture(ctx, map, kind, x, y, opts = {}) {
   if (!PACK_FURNITURE.has(kind)) return false; const G = furnitureGroups(map), c = G?.get(`${x},${y}`); if (!c) return false;
   const img = furnitureImage(); if (!img) return false;
   if (c.skip) return true;
-  const p = c.draw, f = FURN_ATLAS.frames[p.sprite], { w, h } = pieceSize(p), cx = (p.x0 + p.w / 2) * T, by = (p.y0 + p.h) * T - 2;
+  const p = c.draw, openChest = p.sprite === 'chest_closed' && opts.open && FURN_ATLAS.frames.chest_open, f = FURN_ATLAS.frames[openChest ? 'chest_open' : p.sprite], { w, h } = pieceSize(p), cx = (p.x0 + p.w / 2) * T, by = (p.y0 + p.h) * T - 2;
   ctx.save(); ctx.globalAlpha *= .22; ctx.fillStyle = '#2b1d12'; ctx.beginPath(); ctx.ellipse(cx, by - 1, w * .46, 4, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore(); // 바닥 그림자
   const smooth = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = Math.abs(w - f[2]) > 1; ctx.drawImage(img, f[0], f[1], f[2], f[3], Math.round(cx - w / 2), by - h, w, h); ctx.imageSmoothingEnabled = smooth;
   const X = Math.round(cx - w / 2), Y = by - h;
-  if (p.kind === 'chest' && opts.open) { ctx.fillStyle = '#2b1a0e'; ctx.fillRect(X + 3, Y + 2, w - 6, Math.round(h * .28)); ctx.fillStyle = '#8a5a32'; ctx.fillRect(X + 1, Y - 5, w - 2, 5); ctx.fillStyle = '#b07a46'; ctx.fillRect(X + 1, Y - 5, w - 2, 1); } // 열린 상자: 속이 보이고 뚜껑이 뒤로
-  if (p.kind === 'board') for (const [fx, fy, fw, fh, c] of [[.18, .2, .22, .3, '#fff8e6'], [.46, .16, .2, .26, '#e9f1f6'], [.7, .24, .14, .22, '#f6e3d6']]) { ctx.fillStyle = c; ctx.fillRect(Math.round(X + w * fx), Math.round(Y + h * fy), Math.max(2, Math.round(w * fw)), Math.max(2, Math.round(h * fh))); ctx.fillStyle = '#c0392b'; ctx.fillRect(Math.round(X + w * (fx + fw / 2)), Math.round(Y + h * fy), 1, 1); } // 알림판 종이(글자 없음)
+  if (p.kind === 'chest' && opts.open && !openChest) { ctx.fillStyle = '#2b1a0e'; ctx.fillRect(X + 3, Y + 2, w - 6, Math.round(h * .28)); ctx.fillStyle = '#8a5a32'; ctx.fillRect(X + 1, Y - 5, w - 2, 5); ctx.fillStyle = '#b07a46'; ctx.fillRect(X + 1, Y - 5, w - 2, 1); } // 열린 상자: 속이 보이고 뚜껑이 뒤로
+  if (p.kind === 'board' && p.sprite !== 'board_indoor') for (const [fx, fy, fw, fh, c] of [[.18, .2, .22, .3, '#fff8e6'], [.46, .16, .2, .26, '#e9f1f6'], [.7, .24, .14, .22, '#f6e3d6']]) { ctx.fillStyle = c; ctx.fillRect(Math.round(X + w * fx), Math.round(Y + h * fy), Math.max(2, Math.round(w * fw)), Math.max(2, Math.round(h * fh))); ctx.fillStyle = '#c0392b'; ctx.fillRect(Math.round(X + w * (fx + fw / 2)), Math.round(Y + h * fy), 1, 1); } // 알림판 종이(글자 없음)
   if (opts.glow || p.rest) { ctx.save(); ctx.globalAlpha *= .22 + .12 * Math.sin((opts.time || 0) / 300); ctx.fillStyle = '#fff3c4'; ctx.beginPath(); ctx.ellipse(cx, by - h * .45, w * .55, h * .5, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore(); } // 쉼 침대는 은은하게 빛나요
   return true;
 }

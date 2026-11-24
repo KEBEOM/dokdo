@@ -3,7 +3,9 @@ import {tintCanvas} from './season.js';
 import {paintCliffs} from './heights.js';
 import {TERRAIN_ATLAS} from './terrain-atlas.js';
 import {V2_TERRAIN,V2_DETAILS,v2TileRect} from './tileset-v2.js';
-import {UW_ATLAS,UW_FLOOR} from './uw-atlas.js';
+import {UW_ATLAS,UW_FLOOR as UW_FLOOR0} from './uw-atlas.js';
+import {PACK96} from './pack96.js';
+const UW_FLOOR=PACK96.seabed||UW_FLOOR0; // v0.96 해저 바닥(09): 깊이 4단계 × 3변형 + 단계 전환 타일
 import {seabedLayout} from './seabed.js';
 
 const TILE=32;
@@ -251,8 +253,8 @@ function paintSeabed(ctx,map,flat=true){
   const seam=!!UW_FLOOR.seamless; // v0.90 이음매 없는 타일은 뒤집지 않고 그대로(뒤집으면 가장자리가 안 맞아요)
   for(let y=0;y<map.length;y++)for(let x=0;x<map[0].length;x++){const id=L.floor[y][x];if(!id)continue;const i=UW_FLOOR.ids.indexOf(id),fx=!seam&&hash(x,y,97)<.5,fy=!seam&&hash(x,y,98)<.5;
    ctx.save();ctx.translate(x*TILE+(fx?TILE:0),y*TILE+(fy?TILE:0));ctx.scale(fx?-1:1,fy?-1:1);ctx.drawImage(fl,i*32,0,32,32,0,0,TILE,TILE);ctx.restore();}
-  if(seam&&UW_FLOOR.band)for(let y=0;y<map.length;y++)for(let x=0;x<map[0].length;x++){const id=L.floor[y][x];if(!id)continue;const b=UW_FLOOR.band[id]; // 띠가 바뀌는 곳: 옆 띠의 색을 12px 안쪽까지 옅게 섞어요(양쪽에서 하니 가운데서 반반)
-   for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){const nid=L.floor[y+dy]?.[x+dx];if(!nid||UW_FLOOR.band[nid]===b)continue;const c=UW_FLOOR.bandColor[UW_FLOOR.band[nid]],X0=x*TILE+(dx>0?TILE:0),Y0=y*TILE+(dy>0?TILE:0),X1=X0-dx*14,Y1=Y0-dy*14;
+  if(seam&&UW_FLOOR.band)for(let y=0;y<map.length;y++)for(let x=0;x<map[0].length;x++){const id=L.floor[y][x];if(!id)continue;const b=UW_FLOOR.band[id];if(b==null)continue; // 띠가 바뀌는 곳: 옆 띠의 색을 12px 안쪽까지 옅게 섞어요(양쪽에서 하니 가운데서 반반)
+   for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){const nid=L.floor[y+dy]?.[x+dx];if(!nid||UW_FLOOR.band[nid]==null||UW_FLOOR.band[nid]===b||(UW_FLOOR.blend&&Math.abs(UW_FLOOR.band[nid]-b)===1))continue; /* 한 단계 차이는 전환 타일이 맡아요 */const c=UW_FLOOR.bandColor[UW_FLOOR.band[nid]],X0=x*TILE+(dx>0?TILE:0),Y0=y*TILE+(dy>0?TILE:0),X1=X0-dx*14,Y1=Y0-dy*14;
     const g=ctx.createLinearGradient(X0,Y0,dx?X1:X0,dy?Y1:Y0);g.addColorStop(0,c+'99');g.addColorStop(1,c+'00');ctx.fillStyle=g;ctx.fillRect(dx>0?x*TILE+TILE-14:x*TILE,dy>0?y*TILE+TILE-14:y*TILE,dx?14:TILE,dy?14:TILE);}}
   if(flat)for(let y=0;y<map.length;y++)for(let x=0;x<map[0].length;x++){if(map[y][x]===0)continue;ctx.fillStyle=map[y][x]===6?'#6f7a80':(x+y)%3?'#2c3a42':'#33434b';ctx.fillRect(x*TILE,y*TILE,TILE,TILE);}
   const at=assetImage(UW_ATLAS.key);if(at&&flat)for(const it of L.items){const f=UW_ATLAS.frames[it.id];if(!f)continue;const w=f[2],h=f[3],cx=(it.x+(it.w||1)/2)*TILE,by=it.y*TILE+28;ctx.drawImage(at,f[0],f[1],w,h,Math.round(cx-w/2),Math.round(by-h),w,h);} // 2D 대체 화면: 납작하게

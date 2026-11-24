@@ -115,7 +115,7 @@ export const MAPS = [
    'TTTTTTTTTTTTTTTTTT......Tr.ddd..YYYYYYY.ddd...rT......TTTTTTTTTTTTTTTTTT',
    'TTTTTTTTTTTTTTTTTTT........ddd..YYYYYYY..............TTTTTTTTTTTTTTTTTTT',
    'TTTTTTTTTTTTTTTTTTTr================================rTTTTTTTTTTTTTTTTTTT',
-   'TTTTTTTTTTTTTTTTTTTr...T......p....==...Jp......T...rTTTTTTTTTTTTTTTTTTT',
+   'TTTTTTTTTTTTTTTTTTTr9..T......p....==...Jp......T...rTTTTTTTTTTTTTTTTTTT',
    'TTTTTTTTTTTTTTTTTTTr...............==...............rTTTTTTTTTTTTTTTTTTT',
    'TTTTTTTTTTTTTTTTTTTr..hhhhh........==DDDDD..LLLLL...rTTTTTTTTTTTTTTTTTTT',
    'TTTTTTTTTTTTTTTTTTTr..hhhhh.ddd.ddd==DDDDD..LLLLL...rTTTTTTTTTTTTTTTTTTT',
@@ -158,7 +158,7 @@ export const MAPS = [
    'TTTTTTTTTTTTTTTTTTTTTTTTTTTTr=k~~~~~~~~~~~~~~~~~k##........TTTTTTTTT....',
    'TTTTTTTTTTTTTTTTTTTTTTTTTTTTr=k~~~~~~~~~~~~~~~~~k##CCCCCCCrTT...........',
    'TTTTTTTTTTT.............TTTTr=k~~~~~~~~~~~~~~~~~k##CCCCCCCrT............',
-   'TTTTTTTTT.TT.............TTTr=k~~~~~~~~~~~~~~~~~k##CCCCCCC..............',
+   'TTTTTTTTT.TT.............TTTr=k~~~~~~~~~~~~~~~~~k##CCCCCCC0.............',
    'TTTTTTTTTT.TT.............TTr=k~~~~~~~~~~~~~~~~~######################z>',
    'TTTTTTTTTTT.TT.............Tr=k~~~~~~~~~~~~~~~~~~kkkkkkkkkkkkxxxxxxxxxxx',
    'TTTTTTTTTTTT.TT..............=k~~~~~b~~~~~~~~~~~~~~~xxxxxxxxxxxx~~~~~~~~',
@@ -168,6 +168,8 @@ export const MAPS = [
    'rrrrrrrrrrrrrrr~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
   ],
     objects: {
+      '9': { type: 'landmark', art: 'stone', region: 'ul_dokdo_observatory', onTop: true, rock: [12, 3, 16, 5], name: '독도전망대', lines: ['언덕 위로 보이는 건 도동항 뒤 망향봉 꼭대기의 독도전망대예요. 도동 약수공원에서 케이블카를 타면 5분쯤 걸려 올라가요.', '날씨가 맑은 날에는 이곳에서 맨눈으로 독도가 보인다고 해요.', '그림은 게임용 시안이라 실제 모양·크기·자리와 다를 수 있어요(사진과 대조하지 않았어요).'] }, // v0.96 07 명소(관찰용 외관)
+      '0': { type: 'landmark', art: 'stone', region: 'ul_haengnam_lighthouse', onTop: true, rock: [61, 45, 66, 47], name: '행남 등대', lines: ['절벽 위로 보이는 건 도동항에서 바닷가 절벽길(행남 해안산책로)을 따라가면 나오는 등대예요. 도동 등대라고도 불러요.', '산책로는 저동 쪽 해안산책로와 이어져 있어요.', '그림은 게임용 시안이라 실제 모양·크기·자리와 다를 수 있어요(사진과 대조하지 않았어요).'] }, // v0.96 07 명소
       '8': { type: 'sign', name: '행남 해안산책로 안내판', lines: ['도동항에서 바닷가 절벽을 따라 저동항 쪽으로 이어지는 산책로예요. 가는 길에 행남등대를 지나요.', '게임 속 길은 짧게 줄여 그렸어요. 풀숲에서는 야생 우산몬이 나타나요.'] },
       '7': { type: 'sign', name: '몽땅랜드 공사 가림막', lines: ['노란 가림막에 커다란 글씨가 적혀 있어요. ‘몽땅랜드 우산몬 리조트 공사 예정지 · 출입 금지’', '가림막 너머로 파헤쳐진 흙과 쓰러진 나무가 보여요.', '아래쪽에 작은 글씨가 있어요. ‘2단계: 독도 테마파크(비밀)’ …비밀을 이렇게 크게 써 두다니!'] },
       '6': { type: 'sign', name: '도동항 안내판', lines: ['여기는 울릉도 도동항이에요. 독도로 가는 여객선이 이곳에서 떠나요.', '독도는 울릉도에서 동남쪽으로 약 87.4km 떨어져 있어요. 배는 동도의 접안 시설에 닿아요.', '이 게임의 마을과 건물은 창작이에요.'] }
@@ -898,7 +900,7 @@ export const STARTER_MEADOW = {
   art: [
    'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
    'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
-   'TTTT...T....T....T....T....T...:T:...TTTTT',
+   'TTTT...T.3..T....T.4..T....T...:T:...TTTTT',
    'TTTT.......................:::::::::::TTTT',
    'TT.."""""................::::~~~~~~~:::TTT',
    'TT.."""""...............rr:~~~~~~~~~~~::TT',
@@ -928,6 +930,8 @@ export const STARTER_MEADOW = {
    'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT'
   ],
   objects: {
+      '3': { type: 'landmark', art: 'stone', region: 'ul_albong_far', rock: [4, 0, 11, 1], name: '알봉(멀리 보이는 모습)', lines: ['나리분지 안에 솟은 작은 봉우리 알봉(538m)이에요.', '성인봉 일대가 꺼져 내려앉아 생긴 칼데라 분지 안에서, 그 뒤에 다시 화산이 터져 생긴 봉우리(중앙화구구)예요.', '그림은 게임용 시안이라 실제 모양·크기·자리와 다를 수 있어요(사진과 대조하지 않았어요).'] }, // v0.96 07 명소(원경)
+      '4': { type: 'landmark', art: 'stone', region: 'ul_seonginbong_far', rock: [16, 0, 24, 1], name: '성인봉(멀리 보이는 모습)', lines: ['울릉도에서 가장 높은 봉우리 성인봉(986.5m)이에요. 나리분지는 성인봉 북쪽에 있어요.', '게임 지도에서는 잘 보이게 초원 뒤쪽에 그렸어요. 실제 방향과는 달라요.', '그림은 게임용 시안이라 실제 모양·크기·자리와 다를 수 있어요(사진과 대조하지 않았어요).'] }, // v0.96 07 명소(원경)
     '1': { type: 'person', actor: 'professor', name: '김박사', lines: ['여기 있는 우산몬들은 모두 검은 기운에 물들지 않은 친구들이에요.', '천천히 돌아다니며 말을 걸어 보세요. 속성과 능력치를 보고 마음이 가는 친구를 데려가면 돼요.', '어떤 친구를 골라도 끝까지 함께할 수 있어요!'] },
     '2': { type: 'sign', name: '나리분지 안내판', flag: 'meadow:sign', lines: ['나리분지 · 울릉도', '울릉도는 산이 바다에서 곧바로 솟은 화산섬이라 평평한 땅이 매우 적어요.', '나리분지는 화산의 분화구 둘레가 무너져 내려앉아 생긴 넓은 분지로, 울릉도에서 가장 넓은 평지예요.', '둘레를 산이 감싸고 있어서, 섬 한가운데에 숨은 초원처럼 보인답니다.'] }
   }

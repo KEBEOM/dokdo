@@ -12,7 +12,7 @@ const { MAPS } = await import('../dist/maps.js');
 const { ROOM_DEFS } = await import('../dist/interiors.js');
 
 // 그림 파일: 가구 16 · 빈 표지판 4 · 소품 4 / 지역 12 / 바닷속 벽 재질 2장
-assert.equal(Object.keys(FURN_ATLAS.frames).length, 24); assert.equal(Object.keys(REGION_ATLAS.frames).length, 12);
+assert.equal(Object.keys(FURN_ATLAS.frames).length, 24 + 10); /* v0.96 02 가구 10장 더함 */ assert.equal(Object.keys(REGION_ATLAS.frames).length, 12 + 8); /* v0.96 울릉도 명소 8장 더함 */
 for (const k of [FURN_ATLAS.key, REGION_ATLAS.key, UW_WALLS.key]) assert.ok(existsSync(new URL(`assets/${k}.png`, dist)), k);
 for (const [id, f] of Object.entries(FURN_ATLAS.frames)) { const [w, h] = FURN_META[id].size; assert.deepEqual([f[2], f[3]], [w + 2, h + 2], `${id}: 최종 크기 + 1px 테두리`); }
 

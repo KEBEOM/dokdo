@@ -1,3 +1,4 @@
+import { PACK96 } from './pack96.js'; // v0.96 해저 바닥(09)
 // v0.87 바닷속(잠수했을 때): 바닥 타일·바다숲·생물·바위 지형·물고기 자리를 지도마다 한 번 정해요(같은 지도는 늘 같은 자리).
 // 그림은 uw-atlas.js(「바닷속 HD-2D 에셋 v1」), 그리기는 terrain.js(바닥)·gl3d.js(세운 판·물고기), 충돌·살펴보기는 game.js가 이 표를 읽어요.
 // 생물 설명은 동해·독도 바다에 맞춘 짧은 안내예요. 수업 자료로 쓰기 전에 선생님이 한 번 검수해 주세요.
@@ -39,15 +40,27 @@ const FOOT = { basalt_formation_large: 3, basalt_formation_small: 2, basalt_boul
 // 바닥 타일: 깊이(물가에서 몇 칸)마다 고르는 무리
 // (색이 비슷한 타일끼리 묶었어요: 모래색 → 회녹색 → 청록 → 짙은 청록)
 // v0.90 깊이마다 한 띠(얕은 모래 → 자갈·해조 → 빛무늬 → 깊은 바닥)만 써요: 같은 띠의 타일은 이음매 없이 이어지고, 띠가 바뀌는 곳은 terrain.js가 색을 섞어요
-const FLOOR = [null, ['sand_shallow_01', 'sand_shallow_02'], ['sand_rocks_01', 'sand_rocks_02', 'sand_seaweed_01', 'sand_seaweed_02'], ['sand_rocks_01', 'sand_seaweed_02', 'sand_rocks_02', 'sand_seaweed_01'],
+// v0.96 해저 바닥(09): 깊이 → 단계(1~2칸 얕은 모래 · 3~4칸 모래+작은 자갈 · 5~6칸 물빛 모래 · 7칸~ 깊은 해저), 단계마다 세 변형을 섞어요.
+// 한 단계 더 깊은 칸과 맞닿은 칸은 그쪽 방향의 전환 타일(blend_12/23/34_n·s·w·e)로 바꿔요(모서리 전용 타일은 없어 n→s→w→e 먼저 닿는 쪽).
+const UWF = PACK96.seabed || null;
+const BAND_OF_DEPTH = [null, 0, 0, 1, 1, 2, 2, 3, 3, 3]; // 단계마다 두 칸 넓이(전환 타일이 얕은 쪽 칸을 차지해도 단계가 사라지지 않게)
+const FLOOR = UWF ? BAND_OF_DEPTH.map(b => b == null ? null : UWF.ids.filter(k => UWF.band[k] === b)) : [null, ['sand_shallow_01', 'sand_shallow_02'], ['sand_rocks_01', 'sand_rocks_02', 'sand_seaweed_01', 'sand_seaweed_02'], ['sand_rocks_01', 'sand_seaweed_02', 'sand_rocks_02', 'sand_seaweed_01'],
   ['sand_sunlight_01', 'sand_sunlight_02'], ['sand_deep_01', 'sand_deep_02', 'sand_deep_03', 'sand_deep_04'], ['sand_deep_01', 'sand_deep_02', 'sand_deep_03', 'sand_deep_04']];
+function blendFloor(floor) {
+  if (!UWF?.blend) return floor;
+  const H = floor.length, W = floor[0].length, out = floor.map(r => r.slice());
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const id = floor[y][x]; if (!id) continue; const b = UWF.band[id];
+    for (const [d, dx, dy] of [['n', 0, -1], ['s', 0, 1], ['w', -1, 0], ['e', 1, 0]]) { const nb = UWF.band[floor[y + dy]?.[x + dx]];
+      if (nb === b + 1) { out[y][x] = UWF.blend[`${b + 1}${b + 2}`]?.[d] || id; break; } } }
+  return out;
+}
 const cache = new Map();
 export function seabedLayout(map) {
   if (!map || map.kind === 'room') return { floor: null, items: [], fish: [], solid: new Set() };
   const key = map.id; if (cache.has(key)) return cache.get(key);
   const H = map.length, W = map[0].length, depth = seaDepth(map), z = String(map.id).split('').reduce((a, c) => a + c.charCodeAt(0), 0);
   const wet = (x, y) => map[y]?.[x] === 0 && !map.solid?.has(`${x},${y}`), used = new Set(), items = [], solid = new Set();
-  const floor = Array.from({ length: H }, (_, y) => Array.from({ length: W }, (_, x) => { if (map[y][x] !== 0) return null; const d = Math.min(6, depth[y][x]), list = FLOOR[d] || FLOOR[6]; return list[Math.floor(hash(x, y, z + 5) * list.length)]; }));
+  const floor = Array.from({ length: H }, (_, y) => Array.from({ length: W }, (_, x) => { if (map[y][x] !== 0) return null; const d = Math.min(UWF ? 9 : 6, depth[y][x]), list = FLOOR[d] || FLOOR[FLOOR.length - 1]; return list[Math.floor(hash(x, y, z + 5) * list.length)]; })); const floorB = blendFloor(floor);
   const take = (id, x, y, extra = {}) => { items.push({ id, x, y, group: GROUP[id], ...extra }); used.add(`${x},${y}`); };
   // 1) 바위 지형: 깊은 곳(물가에서 4칸 넘게), 둘레가 모두 물인 자리에 지도마다 몇 개
   const big = Object.keys(FOOT), spots = [];
@@ -69,5 +82,5 @@ export function seabedLayout(map) {
     else if (d >= 1 && d <= 4 && r < .17) take(pick(['whelk_shell', 'whelk_shell_hollow', 'snail_shell', 'basalt_pebbles', 'basalt_pebbles']), x, y);
   }
   const fish = []; // v0.93 헤엄치는 장식 물고기는 없어요(물고기 우산몬은 야생 우산몬으로 만나요)
-  const out = { floor, items, fish, solid }; cache.set(key, out); return out;
+  const out = { floor: floorB, items, fish, solid }; cache.set(key, out); return out;
 }

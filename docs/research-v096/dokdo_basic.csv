@@ -1,0 +1,14 @@
+﻿topic,item,value,unit,location,source,checked_date,uncertainty,elementary_summary
+면적,동도,73297,m²,동도,경상북도·독도 일반현황|https://www.gb.go.kr/Main/finace/page.do?mnu_uid=15954,2026-11-20,,동도는 서도보다 면적이 작아요.
+면적,서도,88740,m²,서도,경상북도·독도 일반현황|https://www.gb.go.kr/Main/finace/page.do?mnu_uid=15954,2026-11-20,,서도는 두 큰 섬 중 면적이 더 커요.
+면적,주변 부속 도서,25517,m²,독도,경상북도·독도 일반현황|https://www.gb.go.kr/Main/finace/page.do?mnu_uid=15954,2026-11-20,,주변의 작은 바위섬까지 합쳐 독도예요.
+면적,독도 합계,187554,m²,독도,경상북도·독도 일반현황|https://www.gb.go.kr/Main/finace/page.do?mnu_uid=15954,2026-11-20,,두 섬과 작은 섬들을 합친 넓이예요.
+높이,동도 우산봉,98.6,m,동도,경상북도·독도 일반현황|https://www.gb.go.kr/Main/finace/page.do?mnu_uid=15954,2026-11-20,,동도는 100m가 채 안 되는 봉우리가 있어요.
+높이,서도 대한봉,168.5,m,서도,경상북도·독도 일반현황|https://www.gb.go.kr/Main/finace/page.do?mnu_uid=15954,2026-11-20,,서도가 동도보다 높아요.
+둘레,동도,2.8,km,동도,경상북도·독도 일반현황|https://www.gb.go.kr/Main/finace/page.do?mnu_uid=15954,2026-11-20,,동도 둘레는 약 2.8km예요.
+둘레,서도,2.6,km,서도,경상북도·독도 일반현황|https://www.gb.go.kr/Main/finace/page.do?mnu_uid=15954,2026-11-20,,서도 둘레는 약 2.6km예요.
+거리,동도·서도 최단거리,151,m,두 섬 사이,국토지리정보원·대한민국 국가지도집|https://nationalatlas.ngii.go.kr/pages/page_415.php,2026-11-20,,두 섬은 가장 가까운 곳이 약 151m 떨어져 있어요.
+지질,독도 일부 절벽,응회암·화산각력암·조면암 등,암종,동도 및 서도,대한지질학회·울릉도·독도 국가지질공원의 지질유산적 가치와 관리현황|https://jgsk.or.kr/_common/do.php?a=full&aidx=8772&bidx=661,2026-11-20,,독도 바위는 모두 같은 암석이 아니에요.
+지질,서도 주상절리,일부 조면안산암,암석/구조,서도,독도종합정보시스템·지형 및 지질|https://www.dokdo.re.kr/home/cms/cmsCont.do?cntnts_sn=66,2026-11-20,,주상절리는 서도 일부에서 확인돼요.
+연대,독도 형성 시작,약 460만 년 전,연전,독도,경상북도·독도 일반현황|https://www.gb.go.kr/Main/finace/page.do?mnu_uid=15954,2026-11-20,기관 개괄치; 화산활동은 단일 시점 아님,독도는 수백만 년 전 화산 활동으로 형성됐어요.
+해저,독도 해저 화산체 높이,2300,m(대략),해저 기저부~정상,독도종합정보시스템·지형 및 지질|https://www.dokdo.re.kr/home/cms/cmsCont.do?cntnts_sn=66,2026-11-20,,물 아래로도 거대한 화산체가 이어져요.
