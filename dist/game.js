@@ -81,7 +81,7 @@ const glCanvas = document.createElement('canvas'); glCanvas.id = 'gl3d'; glCanva
 let glView = null, hdView = null, force2D = false; // force2D: 시험용(WebGL이 없는 기기 흉내)
 function glOn() {
   if (force2D) return false;
-  if (!glView) { glView = createGL(glCanvas); if (glView.ok && glView.info.software && !gqSaved) { gfxQ = 0; resizeScene(); } } // 그래픽 카드 없이 그리는 기기는 ‘낮음’부터
+  if (!glView) { glView = createGL(glCanvas); if (glView.ok && glView.info.software && !gqSaved) { gfxQ = 0; if (!viewSaved) viewPick = 'normal'; resizeScene(); } } // 그래픽 카드 없이 그리는 기기는 ‘낮음’·시야 ‘보통’부터(넓은 시야는 그릴 게 많아 느려요) // 그래픽 카드 없이 그리는 기기는 ‘낮음’부터
   return glView.ok;
 }
 const hdOn = () => glOn();
@@ -90,8 +90,8 @@ const moveYaw = () => 0, lookYaw = () => 0; // HD-2D 카메라는 늘 북쪽을 
 // 그래픽 품질(이 기기에 기억): 0 낮음(0.6배 해상도·그림자·화면 효과·물거품 끔) · 1 보통 · 2 높음(빛 먼지·물 반짝임, 선명하게)
 // v0.97 시야: 화면에 지도를 얼마나 넓게 보여 줄지(3D는 카메라를 뒤로, 2D는 한 화면의 칸 수를 늘려요). 기본은 ‘넓게’
 const VIEW_ZOOM = { near: .8, normal: 1, wide: 1.3, wider: 1.6 }, VIEW_LABEL = { near: '가까이', normal: '보통', wide: '넓게', wider: '아주 넓게' };
-let viewPick = 'wide'; try { const v = localStorage.getItem('dokdo-view'); if (v && VIEW_ZOOM[v]) viewPick = v; } catch { /* 넓게 */ }
-function setViewZoom(v) { if (!VIEW_ZOOM[v]) return; viewPick = v; try { localStorage.setItem('dokdo-view', v); } catch { /* 괜찮아요 */ } resizeScene(); }
+let viewPick = 'wide', viewSaved = false; try { const v = localStorage.getItem('dokdo-view'); if (v && VIEW_ZOOM[v]) { viewPick = v; viewSaved = true; } } catch { /* 넓게 */ }
+function setViewZoom(v) { if (!VIEW_ZOOM[v]) return; viewPick = v; viewSaved = true; try { localStorage.setItem('dokdo-view', v); } catch { /* 괜찮아요 */ } resizeScene(); }
 let gfxQ = 1, gqSaved = false; try { const q = localStorage.getItem('dokdo-gq'); if (q !== null) { gfxQ = Math.max(0, Math.min(2, Math.round(+q) || 0)); gqSaved = true; } } catch { /* 보통 */ }
 function setQuality(q) { gfxQ = Math.max(0, Math.min(2, Math.round(+q) || 0)); gqSaved = true; try { localStorage.setItem('dokdo-gq', String(gfxQ)); } catch { /* 괜찮아요 */ } resizeScene(); }
 // v0.79 해 방향·빛 색: 아침엔 동쪽, 낮엔 남쪽 하늘 높이, 저녁엔 서쪽에서 비춰요(그림자는 반대쪽). 밤엔 서늘한 달빛.
