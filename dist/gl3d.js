@@ -740,6 +740,7 @@ export function createGL(canvas) {
   // 그래픽 카드 없이 CPU로 그리는 브라우저(소프트웨어 WebGL)면 game.js가 품질을 ‘낮음’으로 시작해요
   let renderer = ''; try { const ext = gl.getExtension('WEBGL_debug_renderer_info'); renderer = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)); } catch { /* 몰라도 괜찮아요 */ }
   const info = { renderer, software: /swiftshader|llvmpipe|softpipe|software|basic render/i.test(renderer), ok: true, frames: 0, meshes: 0, statics: 0, dynamic: 0, draws: 0, post: false, cards: 0, water: false, quality: 1, lamps: [] };
+  if (info.software) sharpOK = false; info.sharp = sharpOK; // v0.97 그래픽 카드 없이 그리는 기기는 예전처럼 가장 가까운 점(또렷한 쌍선형은 계산이 많아 느려요)
 
   // o: { map, ground, view(chaseView·hdCamera), now, people, viewPos, state, motion, wanted, seen, fogColor, seaColor, sun, light(0..1), post, season,
   //      tint(빛 색), night(0..1, 가로등), quality(0 낮음 · 1 보통 · 2 높음) }
