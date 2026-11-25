@@ -106,7 +106,7 @@ vec4 groundColor(){ // 칸마다 재질: 경계는 잡음으로 ±0.45칸 흔들
   vec2 px = floor(vWP.xz); vec2 j = (texture2D(uNoise, floor(px / 2.0) / 128.0).rg - .5) * .9;
   vec2 cell = floor(px / 32.0 + j); float id = floor(texture2D(uMat, (cell + .5) / uMapSize).r * 255.0 + .5);
   if (id < .5) return texture2D(uTex, vUV);
-  float sl = id - 1.0; vec2 f = fract((px + .5) / 128.0);
+  float sl = id - 1.0; vec2 f = clamp(fract(vWP.xz / 128.0), .5 / 128.0, 1.0 - .5 / 128.0); /* v0.97 칸 안 위치를 소수까지(부드럽게) · 옆 칸 그림이 섞이지 않게 반 점 안쪽 */
   return texture2D(uMatTex, (vec2(mod(sl, 4.0), floor(sl / 4.0)) + f) * vec2(.25, .25)); } // 재질 그림 4×4칸
 void main(){
   if (uMode > 1.5) { gl_FragColor = vec4(.12, .16, .30, .26); return; }                                                             // 건물·절벽 그림자
@@ -123,10 +123,22 @@ void main(){
   float sw = aAxis.z * sin(uTime * 1.3 + aFoot.x * .045 + aFoot.z * .03) * 3.0 * clamp(aOff.y / 64.0, 0.0, 1.0);    // 바람: 위로 갈수록 더 흔들려요
   vec3 p = aFoot + r * (aOff.x + sw) + up * aOff.y;
   gl_Position = uMVP * vec4(p, 1.0); vUV = aUV; vDist = distance(aFoot.xz, uCam.xz); vW = gl_Position.w; }`;
-const FS_SPRITE = FS_COMMON + `
-uniform sampler2D uTex; uniform float uGlow; varying vec2 vUV; varying float vDist, vW;
-void main(){ vec4 c = texture2D(uTex, vUV); if (uGlow > 0.0) { gl_FragColor = vec4(c.rgb * c.a * uGlow, 1.0); return; } // 가로등 불빛(더하기)
+// v0.97 걸을 때 지지직거림(그림 판이 화면 픽셀과 딱 맞지 않을 때 가장 가까운 점만 고르면 한 칸씩 튀어요):
+//   ‘또렷한 쌍선형’ — 그림 한 점의 안쪽은 그 색 그대로, 점과 점 사이 경계만 화면 1px 폭으로 부드럽게 섞어요(도트는 또렷, 깜빡임은 없게).
+//   그림은 미리 곱한 알파로 올려 투명한 칸의 검은색이 테두리에 번지지 않게 해요. uSharp 0이면 예전처럼 가장 가까운 점.
+const FS_SPRITE_EXT = `#extension GL_OES_standard_derivatives : enable
+`;
+const FS_SPRITE_BODY = `
+uniform sampler2D uTex; uniform float uGlow, uSharp; uniform vec2 uTexSize; varying vec2 vUV; varying float vDist, vW;
+vec4 sample(){
+#ifdef SHARP
+  if (uSharp > .5) { vec2 t = vUV * uTexSize, s = floor(t + .5), d = max(fwidth(t), vec2(1e-4)); t = s + clamp((t - s) / d, -.5, .5);
+    vec4 c = texture2D(uTex, t / uTexSize); return vec4(c.rgb / max(c.a, 1e-3), c.a); }
+#endif
+  return texture2D(uTex, vUV); }
+void main(){ vec4 c = sample(); if (uGlow > 0.0) { gl_FragColor = vec4(c.rgb * c.a * uGlow, 1.0); return; } // 가로등 불빛(더하기)
   if (c.a < .5) discard; if (cut(vW)) discard; gl_FragColor = vec4(air(c.rgb, vDist), 1.0); }`;
+const FS_SPRITE = FS_COMMON + FS_SPRITE_BODY;
 // GLB 모델: 정점마다 색·재질. 재질 1~4는 팩 표면 무늬를 세계 좌표로(1무늬 픽셀 = 지도 1픽셀, 거울 반복), 0은 단색 + 도트 잡음
 const VS_MODEL = `attribute vec3 aPos, aNrm, aCol; attribute float aCls;
 uniform mat4 uMVP; uniform vec3 uCam; varying vec3 vWP, vN, vCol; varying float vCls, vDist, vW;
@@ -200,11 +212,11 @@ export function chaseView(cam, P) {
   return { M, eye: [cam.x, eye, cam.y], right: [cam.rx, 0, cam.ry], fwd: [cam.fx, cam.fy], tilt: 0, hd: false, W, H };
 }
 // HD-2D 시점: (tx, ty) 높이 th 를 비스듬히 내려다봐요. project·unproject 는 화면(장면 픽셀) ↔ 지도
-export function hdCamera(tx, ty, th, yaw, W, H, pxScale = 1) { // pxScale: 이 장면 1단위가 그림판(캔버스) 몇 px인지
+export function hdCamera(tx, ty, th, yaw, W, H, pxScale = 1, zoom = 1) { // pxScale: 이 장면 1단위가 그림판(캔버스) 몇 px인지 · zoom: v0.97 시야(1 보통, 1보다 크면 더 넓게)
   const s = Math.sin(yaw), c = Math.cos(yaw), cp = Math.cos(HD.pitch), sp = Math.sin(HD.pitch);
   const f = [s * cp, -sp, -c * cp], r = [c, 0, s], u = [s * sp, cp, -c * sp], tgt = [tx, th + 22, ty];
   // v0.91 도트가 고르게: 내 캐릭터 자리에서 지도 1px이 화면 정수 px(1·2·3…)이 되게 카메라 거리를 살짝 맞춰요(굵기가 들쭉날쭉하지 않게)
-  const t = Math.tan(HD.fov / 2), sy = 1 / t, px0 = H / 2 * sy / HD.dist * pxScale, pxk = Math.max(1, Math.round(px0)), dist = H / 2 * sy * pxScale / pxk;
+  const t = Math.tan(HD.fov / 2), sy = 1 / t, px0 = H / 2 * sy / HD.dist * pxScale, pxk = zoom === 1 ? Math.max(1, Math.round(px0)) : Math.max(.5, px0 / zoom), /* 넓은 시야는 정수로 맞추지 않아요(또렷한 쌍선형이라 도트가 흔들리지 않아요) */ dist = H / 2 * sy * pxScale / pxk;
   const eye = [tgt[0] - f[0] * dist, tgt[1] - f[1] * dist, tgt[2] - f[2] * dist];
   const sx = sy * H / W, near = 20, far = 7000, A = (far + near) / (far - near), Bn = -2 * far * near / (far - near);
   const tr = -dot3(r, eye), tu = -dot3(u, eye), tfw = -dot3(f, eye);
@@ -241,18 +253,18 @@ export function createGL(canvas) {
   const program = (vs, fs, attrs) => { const p = gl.createProgram(); gl.attachShader(p, compile(gl.VERTEX_SHADER, vs)); gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(p); if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
     const a = {}, u = {}; for (const n of attrs) a[n] = gl.getAttribLocation(p, n);
     const cnt = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS); for (let i = 0; i < cnt; i++) { const n = gl.getActiveUniform(p, i).name; u[n] = gl.getUniformLocation(p, n); } return { p, a, u }; };
-  let mesh, sprite, mote, post, copy, water, model;
+  let mesh, sprite, mote, post, copy, water, model, sharpOK = false;
   try {
-    mesh = program(VS_MESH, FS_MESH, ['aPos', 'aUV', 'aNrm']); sprite = program(VS_SPRITE, FS_SPRITE, ['aFoot', 'aOff', 'aUV', 'aAxis']); water = program(VS_WATER, FS_WATER, ['aPos', 'aUV']); model = program(VS_MODEL, FS_MODEL, ['aPos', 'aNrm', 'aCol', 'aCls']);
+    mesh = program(VS_MESH, FS_MESH, ['aPos', 'aUV', 'aNrm']); sprite = null; if (gl.getExtension('OES_standard_derivatives')) try { sprite = program(VS_SPRITE, FS_SPRITE_EXT + '#define SHARP 1\n' + FS_SPRITE, ['aFoot', 'aOff', 'aUV', 'aAxis']); sharpOK = true; } catch (e) { console.warn('gl3d sharp', e); } if (!sprite) sprite = program(VS_SPRITE, FS_SPRITE, ['aFoot', 'aOff', 'aUV', 'aAxis']); water = program(VS_WATER, FS_WATER, ['aPos', 'aUV']); model = program(VS_MODEL, FS_MODEL, ['aPos', 'aNrm', 'aCol', 'aCls']);
     mote = program(VS_MOTE, FS_MOTE, ['aSeed']); post = program(VS_POST, FS_POST, ['aP']); copy = program(VS_COPY, FS_COPY, ['aP']);
   } catch (e) { console.warn('gl3d', e); return off; }
 
   // ── 그림 → 텍스처 ──
   const texOf = new Map();
-  function texture(src, update = false, wrap = 0) { // wrap 1 반복 · 2 거울 반복(이음매가 보이는 그림) — 가로세로 2의 거듭제곱 그림만
+  function texture(src, update = false, wrap = 0, smooth = false) { // smooth: v0.97 'sprite' 그림 판(또렷한 쌍선형·미리 곱한 알파) · true 땅 재질(부드럽게) // wrap 1 반복 · 2 거울 반복(이음매가 보이는 그림) — 가로세로 2의 거듭제곱 그림만
     let t = texOf.get(src); const fresh = !t, W = wrap === 2 ? gl.MIRRORED_REPEAT : wrap ? gl.REPEAT : gl.CLAMP_TO_EDGE;
-    if (fresh) { t = gl.createTexture(); texOf.set(src, t); gl.bindTexture(gl.TEXTURE_2D, t); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, W); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, W); }
-    if (fresh || update) { gl.bindTexture(gl.TEXTURE_2D, t); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src); }
+    if (fresh) { t = gl.createTexture(); texOf.set(src, t); gl.bindTexture(gl.TEXTURE_2D, t); const FL = smooth ? gl.LINEAR : gl.NEAREST; gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, FL); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, FL); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, W); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, W); }
+    if (fresh || update) { gl.bindTexture(gl.TEXTURE_2D, t); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, smooth === 'sprite'); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src); }
     return t;
   }
   function upload(arr, buf = null) { const b = buf || gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(arr), buf ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW); return b; }
@@ -380,7 +392,7 @@ export function createGL(canvas) {
         } else add(ground, b => b.quad([[a0, lo, b0], [a1, lo, b1], [a1, h, b1], [a0, h, b0]], [[u0, v1], [u1, v1], [u1, v0], [u0, v0]], [dx, 0, dy])); }
     }
     // ── GLB 모델 놓기 ──
-    const mv = [], hideStatic = new Set(), hideLandmarks = new Set(), lmk = {}; // lmk: 지명 → GLB 가운데·높이(1인칭으로 바라볼 곳)
+    const mv = [], hideStatic = new Set(), hideLandmarks = new Set(), lmk = {}, rockSpots = []; // rockSpots: v0.97 바위 무더기 위 HD 바위 그림 자리 // lmk: 지명 → GLB 가운데·높이(1인칭으로 바라볼 곳)
     const put = (id, o2) => { // o2: { x, z, h(바닥 높이), yaw, sx, sy, sz } — 모델 원점(바닥 가운데)을 (x, h, z)에
       const m = glbModel(id); if (!m) return null; const { x, z, h = 0, yaw = 0, sx = 1, sy = sx, sz = sx } = o2, cs = Math.cos(yaw), sn = Math.sin(yaw);
       for (let i = 0; i < m.n; i++) {
@@ -451,9 +463,12 @@ export function createGL(canvas) {
       const under = new Set(); for (const bd of [...map.buildings, ...(map.structures || [])]) for (let i = 0; i < bd.w; i++) for (let j = 0; j < bd.h; j++) under.add(`${bd.x + i},${bd.y + j}`);
       for (const d of map.decor) under.add(`${d.x},${d.y}`);
       const skip = (x, y) => glbSkip.some(([a, b, c2, d2]) => x >= a && x <= c2 && y >= b && y <= d2);
+      const rockD = new Map(); { const q = []; for (const k of map.rockTiles || []) { const [x, y] = k.split(',').map(Number); if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => !map.rockTiles.has(`${x + a},${y + b}`))) { rockD.set(k, 0); q.push([x, y]); } }
+        for (let i = 0; i < q.length; i++) { const [x, y] = q[i], d = rockD.get(`${x},${y}`); for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nk = `${x + a},${y + b}`; if (map.rockTiles.has(nk) && !rockD.has(nk)) { rockD.set(nk, d + 1); q.push([x + a, y + b]); } } } }
+      const rockDepth = (map, x, y) => Math.min(4, rockD.get(`${x},${y}`) || 0); // 바위 무더기 가장자리에서 몇 칸 안쪽인지
       const capH = new Map(), rims = [];
       for (const k of map.solid) { const [x, y] = k.split(',').map(Number); if (map[y]?.[x] === undefined || (map[y][x] === 0 && !map.rockTiles?.has(k)) || under.has(k) || skip(x, y) || pier?.has(k)) continue;
-        if (map.rockTiles?.has(k)) capH.set(k, map[y][x] === 0 ? 16 + Math.round(hsh(x, y, 1) * 8) : 7 + Math.round(hsh(x, y, 1) * 7)); // 바위 덩어리 7~14px · 바다의 바위섬(군함바위 등)은 물 위로 16~24px
+        if (map.rockTiles?.has(k)) capH.set(k, map[y][x] === 0 ? 16 + rockDepth(map, x, y) * 6 + Math.round(hsh(x, y, 1) * 3) : 7 + rockDepth(map, x, y) * 3 + Math.round(hsh(x, y, 1) * 2)); // v0.97 바위 덩어리: 가장자리는 낮고 가운데로 갈수록 높게(제멋대로 들쭉날쭉한 계단 모양 대신 둥근 무더기) · 바다의 바위섬은 물 위로 16px부터
         else if (cl?.rim.has(k) && !cl.face.has(k) && !cl.stairs.has(k)) rims.push([x, y, cl.rim.get(k)]); } // 절벽 끝 칸: 낮은 돌담(아래)
       const capTop = (x, y) => { const h = capH.get(`${x},${y}`); if (h === undefined) return null; const c = cornerHeights(map, x, y); return Math.max(c.nw, c.ne, c.sw, c.se) + h; };
       for (const [k, h] of capH) { const [x, y] = k.split(',').map(Number), top = capTop(x, y), c = cornerHeights(map, x, y), X0 = x * T, X1 = X0 + T, Z0 = y * T, Z1 = Z0 + T;
@@ -471,9 +486,15 @@ export function createGL(canvas) {
           add(faceImg, b => { for (const [p0, p1, n] of [[[a1, b1], [a0, b1], [0, 1]], [[a0, b0], [a1, b0], [0, -1]], [[a0, b1], [a0, b0], [-1, 0]], [[a1, b0], [a1, b1], [1, 0]]]) { const u0 = (p0[0] + p0[1]) / FS, u1 = (p1[0] + p1[1]) / FS; b.quad([[p0[0], lo, p0[1]], [p1[0], lo, p1[1]], [p1[0], hi, p1[1]], [p0[0], hi, p0[1]]], [[u0, -lo / FS], [u1, -lo / FS], [u1, -hi / FS], [u0, -hi / FS]], [n[0], 0, n[1]]); } }); } }
       for (const d of map.decor) if (d.kind === 'crag') { let hit = false; for (let i = 0; i < d.w && !hit; i++) for (let j = 0; j < d.h && !hit; j++) hit = capH.has(`${d.x + i},${d.y - j}`); if (hit) hideStatic.add(`crag|${d.x},${d.y}`); } // 바위 덩어리로 그린 곳의 예전 바위 그림은 빼요
       scene_caps = capH.size + rims.length;
+      // v0.97 바위 무더기(바위섬·바위 지대): 계단 모양 덩어리 위에 HD-2D 팩 바위 그림을 세 칸·두 줄마다 세워 둥근 바위 모양이 보이게
+      for (const [k] of capH) { if (!map.rockTiles?.has(k)) continue; const [x, y] = k.split(',').map(Number), sea = map[y][x] === 0, j = Math.floor(hsh(x, y, 5) * 3);
+        if ((x + j) % 3 !== 0 || y % 2 !== (j % 2)) continue; const c = cornerHeights(map, x, y);
+        const key = map.def?.island === '울릉도' ? ['hn_rocks_a', 'hn_rocks_b'][j % 2] : sea ? ['dd_wave_rock', 'dd_rock_flat', 'dd_small_rocks'][j] : ['dd_small_rocks', 'dd_rock_flat', 'dd_shore_rock'][j];
+        rockSpots.push([key, x * T + 16 + (hsh(x, y, 6) - .5) * 10, (y + 1) * T - 4, Math.max(c.nw, c.ne, c.sw, c.se) + (sea ? 0 : 2)]); }
     }
     const roofs = new Set(), cards = [], lamps = [], F = HD2D_ATLAS.frames;
     const pushCard = (key, fx, fz, h) => { const f = cardFrame(key); if (f) cards.push({ key, f, x: fx, z: fz, h, story: key.startsWith('story_') }); return f; };
+    if (atlasImg) for (const [key, x, z, h] of rockSpots) pushCard(key, x, z, h);
     const uwImg = map.diving ? assetImage(UW_ATLAS.key) : null; if (map.diving && !uwImg) missing++;
     if (uwImg) for (const it of seabedLayout(map).items) { const f = UW_ATLAS.frames[it.id]; if (f) cards.push({ key: it.id, f, x: (it.x + (it.w || 1) / 2) * T + (it.big || it.edge ? 0 : (((it.x * 7 + it.y * 3) % 9) - 4)), z: it.y * T + (it.edge ? 6 : it.big ? 30 : 24), h: lv(map, it.x, it.y), uw: true }); } // v0.87 바닷속 판
     if (o.hd2d && !map.diving) for (const ob of map.parsed?.objects || []) { // v0.88 실제 시설의 관찰용 외관(「지상·수중 v2」): 지명 자리 칸 위에 그림 판 하나 · 들어가는 문 없음
@@ -592,6 +613,8 @@ export function createGL(canvas) {
     A.g.translate(r.x + c.ax - f.x, r.y + c.ay - f.y);
     const fl = env.flora && PACK96.flora, fkey = fl && (n.scenery === 'tree' || (n.scenery === 'tuft' && env.map.def?.island !== '울릉도')) ? floraName(env.map, n, env.season) : null, flf = fkey && fl.frames[fkey];
     if (flf) { A.g.drawImage(env.flora, flf[0], flf[1], flf[2], flf[3], Math.round(f.x - flf[2] / 2), f.y - flf[3] + 2, flf[2], flf[3]); A.g.restore(); return { ...c, u0: r.x / A.size, v0: r.y / A.h, u1: (r.x + c.w) / A.size, v1: (r.y + c.h) / A.h }; } /* v0.96 식생(04): 발 = 아랫변 가운데 */
+    const rk = n.scenery === 'rock' && env.cards ? rockName(env.map, n) : null, rf = rk && HD2D_ATLAS.frames[rk];
+    if (rf) { const w = 46, h = Math.round(rf[3] * w / rf[2]); A.g.imageSmoothingEnabled = true; A.g.drawImage(env.cards, rf[0], rf[1], rf[2], rf[3], Math.round(f.x - w / 2), f.y - h + 3, w, h); A.g.restore(); return { ...c, u0: r.x / A.size, v0: r.y / A.h, u1: (r.x + c.w) / A.size, v1: (r.y + c.h) / A.h }; } /* v0.97 예전 저화질 바위(타일셋 v2 작은 바위) 대신 HD-2D 팩 바위를 캐릭터 키에 맞게 줄여서 */
     const tf = n.scenery === 'tree' && env.trees ? HD2D_TREES.frames[treeName(env.map, n)] : null, fk = n.scenery === 'flower' && env.cards ? flowerName(env.map, n, env.season, !!env.story) : null, ff = fk ? cardFrame(fk) : null, fimg = fk && STORY_ATLAS.frames[fk] ? env.story : env.cards;
     if (tf) A.g.drawImage(env.trees, tf[0], tf[1], tf[2], tf[3], Math.round(f.x - tf[2] / 2), f.y - tf[3] + 3, tf[2], tf[3]); // HD-2D 나무(발 = 줄기 밑동)
     else if (ff && fimg) A.g.drawImage(fimg, ff[0], ff[1], ff[2], ff[3], Math.round(f.x - ff[2] / 2), f.y - ff[3] + 2, ff[2], ff[3]); // 꽃 덤불(에셋팩 · v0.81 팩)
@@ -621,6 +644,8 @@ export function createGL(canvas) {
     if (kind === 'ul_neodo' && win) kind = 'ul_hubak';
     if (kind === 'ul_camellia' && (season === 'summer' || season === 'autumn')) kind = 'ul_hubak';
     return `${kind}_${kind === 'ul_neodo' ? season : sw}_${v % 2 + 1}`; };
+  // v0.97 바위 칸: 독도는 갯바위·작은 바위 무더기, 울릉도는 산 바위(모두 HD-2D 팩 그림)
+  const rockName = (map, n) => { const h = (n.x * 7 + n.y * 3) % 3; return map.def?.island === '울릉도' ? ['hn_rocks_a', 'hn_rocks_b', 'hn_rocks_a'][h] : ['dd_shore_rock', 'dd_small_rocks', 'hn_rocks_b'][h]; };
   const treeName = (map, n) => { const h = (n.x * 5 + n.y * 3) % 5; return `${map.def?.island !== '울릉도' ? 'broad' : h < 2 ? 'pine' : h < 4 ? 'broad' : 'camellia'}_${(n.x * 7 + n.y * 13) % 3}`; };
   // 꽃 칸: 울릉도 마을은 수국·들꽃, 울릉도 들길은 억새도 · 독도는 해국·섬기린초·땅채송화·바닷가 풀(v0.82, 여름·가을 그림 · 겨울은 가을 그림에 눈 색)
   const flowerName = (map, n, season = 'summer', story = true) => { const h = (n.x * 3 + n.y * 7) % 4, sfx = season === 'autumn' || season === 'winter' ? '_autumn' : '_summer';
@@ -653,7 +678,7 @@ export function createGL(canvas) {
     return out;
   }
   function buildStatics(map, env, items, opt = {}) { // 한 번 그려 두고 다시 써요(같은 모양은 칸 하나)
-    const A = atlas(2048), keyOf = n => env.flora && (n.scenery === 'tree' || (n.scenery === 'tuft' && map.def?.island !== '울릉도')) ? `flora|${floraName(map, n, env.season)}` : n.scenery === 'tree' ? `tree|${env.trees ? treeName(map, n) : (n.x * 7 + n.y * 13) % 3}` : n.scenery === 'flower' && env.cards ? `flower|${flowerName(map, n, env.season, !!env.story)}` : n.scenery === 'tuft' ? `tuft|${n.v}` : ['rock', 'tetrapods', 'planter', 'beacon', 'barrier'].includes(n.scenery) ? n.scenery : `${n.scenery}|${n.x},${n.y}|${n.w || ''}`;
+    const A = atlas(2048), keyOf = n => env.flora && (n.scenery === 'tree' || (n.scenery === 'tuft' && map.def?.island !== '울릉도')) ? `flora|${floraName(map, n, env.season)}` : n.scenery === 'tree' ? `tree|${env.trees ? treeName(map, n) : (n.x * 7 + n.y * 13) % 3}` : n.scenery === 'flower' && env.cards ? `flower|${flowerName(map, n, env.season, !!env.story)}` : n.scenery === 'tuft' ? `tuft|${n.v}` : n.scenery === 'rock' && env.cards ? `rock|${rockName(map, n)}` : ['rock', 'tetrapods', 'planter', 'beacon', 'barrier'].includes(n.scenery) ? n.scenery : `${n.scenery}|${n.x},${n.y}|${n.w || ''}`;
     const cells = new Map(), arr = [], flats = [], blobs = new Batch(), todo = [], wallDecor = [];
     for (const n of [...items, ...tufts(map)]) {
       if (n.scenery === 'boat' || n.scenery === 'ferry') { if (map.diving) continue; /* v0.87 바닷속엔 배가 없어요 */ if (!(opt.hd2d && n.scenery === 'ferry')) flats.push(n); continue; } // HD-2D 지도의 여객선은 옆모습 판으로
@@ -729,7 +754,7 @@ export function createGL(canvas) {
     const env = { map, state: o.state, time: o.now, motion: o.motion, wanted: o.wanted, seen: o.seen, season: o.season };
     const order = sceneDrawOrder(o.people, o.viewPos, map);
     if (!scene.statics || scene.statics.season !== o.season || (scene.statics.noTrees && frames % 30 === 0 && assetImage(HD2D_TREES.key) && assetImage(PACK96.flora.key))) {
-      const trees = assetImage(HD2D_TREES.key), flora = assetImage(PACK96.flora.key), cards = scene.hd2d ? assetImage(HD2D_ATLAS.key) : null, story = scene.hd2d ? assetImage(STORY_ATLAS.key) : null; scene.statics = scene.uw ? { buf: null, n: 0, atlas: null, flat: { n: 0 }, blobs: { n: 0 } } : buildStatics(map, { ...env, time: 0, trees, flora, cards, story }, order, { hd2d: scene.hd2d, hd: !!V.hd, water: !!scene.water, hide: scene.hideStatic, interior: scene.interior }); scene.statics.season = o.season; scene.statics.noTrees = !trees || !flora || (scene.hd2d && !story); if (!scene.uw) { texture(scene.statics.atlas, true); texture(scene.statics.flat.tex, true); } }
+      const trees = assetImage(HD2D_TREES.key), flora = assetImage(PACK96.flora.key), cards = scene.hd2d ? assetImage(HD2D_ATLAS.key) : null, story = scene.hd2d ? assetImage(STORY_ATLAS.key) : null; scene.statics = scene.uw ? { buf: null, n: 0, atlas: null, flat: { n: 0 }, blobs: { n: 0 } } : buildStatics(map, { ...env, time: 0, trees, flora, cards, story }, order, { hd2d: scene.hd2d, hd: !!V.hd, water: !!scene.water, hide: scene.hideStatic, interior: scene.interior }); scene.statics.season = o.season; scene.statics.noTrees = !trees || !flora || (scene.hd2d && !story); if (!scene.uw) { texture(scene.statics.atlas, true, 0, sharpOK ? 'sprite' : false); texture(scene.statics.flat.tex, true); } }
     let A = dyn.A; A.g.clearRect(0, 0, A.size, A.h); A.x = A.y = A.row = 0; const arr = [], sh = new Batch(); let player = null;
     // v0.82 고침: 사람·우산몬이 많으면(나리분지처럼) 그림 칸이 모자라 내 캐릭터가 빠지던 것 → 내 캐릭터를 먼저 그리고,
     //   화면에서 먼 것은 건너뛰고, 그래도 모자라면 그림 칸을 두 배로 늘려요. 그리는 순서(깊이)는 깊이 버퍼가 정하니 바뀌어도 괜찮아요.
@@ -746,7 +771,7 @@ export function createGL(canvas) {
       pushSprite(arr, map, it, c, [0, 0], 0, swim ? -14 : 0);
       if (!swim && (n.player || !(PROP_KINDS.includes(n.kind) || n.kind === 'board'))) blob(sh, map, it);
     }
-    dyn.buf = upload(arr, dyn.buf); dyn.n = arr.length / 10; texture(A.c, true); dyn.sh = upload(sh.v, dyn.sh); dyn.shn = sh.v.length / 8;
+    dyn.buf = upload(arr, dyn.buf); dyn.n = arr.length / 10; texture(A.c, true, 0, sharpOK ? 'sprite' : false); dyn.sh = upload(sh.v, dyn.sh); dyn.shn = sh.v.length / 8;
     // 내 캐릭터의 화면 자리(가림 판단): 프레임버퍼 픽셀 · 깊이(w)
     let cutU = [0, 0, 0, 0], cutY = 1e6;
     if (player) { const f = footOf(player), h = groundAt(map, f.x, f.y) + 24; cutY = h - 24 + 6; const M = V.M, p = [f.x, h, f.y, 1], cl = [0, 1, 2, 3].map(r => M[r] * p[0] + M[4 + r] * p[1] + M[8 + r] * p[2] + M[12 + r] * p[3]);
@@ -768,7 +793,7 @@ export function createGL(canvas) {
     for (const m of scene.meshes) {
       gl.uniform1f(mesh.u.uCutOn, 1); gl.uniform1f(mesh.u.uCutG, m.ground ? 1 : 0); gl.uniform1f(mesh.u.uCutY, cutY); gl.uniform1f(mesh.u.uAO, m.ao ? 1 : 0); gl.uniform1f(mesh.u.uGround, m.mat ? 1 : 0);
       if (m.mat) { // 땅 재질: 재질 지도(1) · 재질 그림(2) · 잡음(3)
-        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texture(m.mat.canvas)); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, texture(assetImage(HD2D_GROUND.seasons?.[o.season] || HD2D_GROUND.key) || assetImage(HD2D_GROUND.key))); /* v0.96 계절별 땅 그림(03 땅 재질) */
+        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texture(m.mat.canvas)); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, texture(assetImage(HD2D_GROUND.seasons?.[o.season] || HD2D_GROUND.key) || assetImage(HD2D_GROUND.key), false, 0, true)); /* v0.97 부드럽게(걸을 때 땅 무늬가 지지직거리지 않게) */ /* v0.96 계절별 땅 그림(03 땅 재질) */
         gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, texture(assetImage(HD2D_GROUND.noise), false, 1)); gl.activeTexture(gl.TEXTURE0);
         gl.uniform1i(mesh.u.uMat, 1); gl.uniform1i(mesh.u.uMatTex, 2); gl.uniform1i(mesh.u.uNoise, 3); gl.uniform2fv(mesh.u.uMapSize, [m.mat.W, m.mat.H]);
       }
@@ -803,12 +828,13 @@ export function createGL(canvas) {
     gl.useProgram(sprite.p); common(sprite); gl.uniform3fv(sprite.u.uRight, V.right); gl.uniform2fv(sprite.u.uFwd, V.fwd); gl.uniform1f(sprite.u.uTilt, V.tilt); gl.uniform1f(sprite.u.uTime, o.now / 1000);
     gl.uniform1f(sprite.u.uCutOn, 1);
     gl.uniform1f(sprite.u.uGlow, 0);
-    if (scene.statics.n) { gl.bindTexture(gl.TEXTURE_2D, texture(scene.statics.atlas)); bindSprite(scene.statics.buf); gl.drawArrays(gl.TRIANGLES, 0, scene.statics.n); draws++; }
+    const spriteTex = (img, update = false) => { const sh = sharpOK && !!img; gl.uniform1f(sprite.u.uSharp, sh ? 1 : 0); if (sh) gl.uniform2f(sprite.u.uTexSize, img.width, img.height); gl.bindTexture(gl.TEXTURE_2D, texture(img, update, 0, sh ? 'sprite' : false)); }; // v0.97 또렷한 쌍선형
+    if (scene.statics.n) { spriteTex(scene.statics.atlas); bindSprite(scene.statics.buf); gl.drawArrays(gl.TRIANGLES, 0, scene.statics.n); draws++; }
     for (const [cb, key] of [[scene.cards, HD2D_ATLAS.key], [scene.cards.story, STORY_ATLAS.key], [scene.cards.uw, UW_ATLAS.key], [scene.cards.region, REGION_ATLAS.key]]) if (cb?.n && assetImage(key)) { // 그림 판: 카메라와 수직(깊이 = 아랫변 줄) · 내 캐릭터를 가리면 도트 무늬로 비쳐요
-      gl.uniform1f(sprite.u.uTilt, V.fp ? 0 : HD.pitch); gl.bindTexture(gl.TEXTURE_2D, texture(assetImage(key))); bindSprite(cb.buf); gl.drawArrays(gl.TRIANGLES, 0, cb.n); draws++; gl.uniform1f(sprite.u.uTilt, V.tilt);
+      gl.uniform1f(sprite.u.uTilt, V.fp ? 0 : HD.pitch); spriteTex(assetImage(key)); bindSprite(cb.buf); gl.drawArrays(gl.TRIANGLES, 0, cb.n); draws++; gl.uniform1f(sprite.u.uTilt, V.tilt);
     }
     gl.uniform1f(sprite.u.uCutOn, 0);
-    if (dyn.n) { gl.bindTexture(gl.TEXTURE_2D, texture(A.c)); bindSprite(dyn.buf); gl.drawArrays(gl.TRIANGLES, 0, dyn.n); draws++; }
+    if (dyn.n) { spriteTex(A.c); bindSprite(dyn.buf); gl.drawArrays(gl.TRIANGLES, 0, dyn.n); draws++; }
     disableAll();
     // 밤: 가로등 불빛(더하기 섞기)
     const night = o.night || 0;

@@ -12,11 +12,11 @@
 import { TRACKS, JINGLES, compileTrack, freq } from './music-data.js';
 
 const PREF_KEY = 'dokdo-audio';
-const prefs = { on: true, music: .7, sfx: .8 };
+const prefs = { on: true, music: .7, sfx: .8, amb: .7 }; // amb: v0.97 주변 소리(바람·파도·비·발소리)
 try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREF_KEY) || '{}')); } catch { /* 저장소를 못 쓰면 기본값 */ }
 const savePrefs = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch { /* 무시 */ } };
 
-let ctx = null, master = null, musicBus = null, duckBus = null, sfxBus = null, noise = null, pulseWave = null;
+let ctx = null, master = null, musicBus = null, duckBus = null, sfxBus = null, ambBus = null, noise = null, pulseWave = null, amb = null;
 let wanted = null, playing = null, timer = 0, duckUntil = 0, woke = false;
 const compiled = {};
 const track = id => (compiled[id] ??= compileTrack(TRACKS[id]));
@@ -39,6 +39,7 @@ function build(context) {
   musicBus = ctx.createGain(); musicBus.gain.value = prefs.music * .4;
   duckBus = ctx.createGain(); duckBus.gain.value = 1; musicBus.connect(duckBus); duckBus.connect(master);
   sfxBus = ctx.createGain(); sfxBus.gain.value = prefs.sfx * .9; sfxBus.connect(master);
+  ambBus = ctx.createGain(); ambBus.gain.value = prefs.amb; ambBus.connect(master); amb = null;
   const len = ctx.sampleRate; noise = ctx.createBuffer(1, len, ctx.sampleRate);
   const d = noise.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
   // 25% 펄스(옛날 게임기 소리): 푸리에 계수로 만들어요
@@ -49,7 +50,7 @@ function build(context) {
 }
 // 검사용: 곡이나 알림 노래를 소리 없이 seconds초 만들어 파형(Float32Array)을 돌려줘요(tests/audio-render).
 export async function renderOffline(id, seconds = 12, rate = 22050) {
-  const keep = { ctx, master, musicBus, duckBus, sfxBus, noise, pulseWave };
+  const keep = { ctx, master, musicBus, duckBus, sfxBus, ambBus, noise, pulseWave, amb };
   build(new OfflineAudioContext(1, Math.ceil(rate * seconds), rate));
   try {
     const t = TRACKS[id] ? track(id) : compileTrack(JINGLES[id]), step = 1 / t.speed, loopLen = t.length * step, out = ctx.createGain();
@@ -57,12 +58,12 @@ export async function renderOffline(id, seconds = 12, rate = 22050) {
     for (let loop = 0; loop * loopLen < seconds && (TRACKS[id] || loop === 0); loop++)
       for (const part of t.parts) for (const ev of part.events) { const at = loop * loopLen + ev.at * step; if (at < seconds) play(part, ev, at, step, out); }
     return (await ctx.startRendering()).getChannelData(0);
-  } finally { ({ ctx, master, musicBus, duckBus, sfxBus, noise, pulseWave } = keep); }
+  } finally { ({ ctx, master, musicBus, duckBus, sfxBus, ambBus, noise, pulseWave, amb } = keep); }
 }
 export async function renderSfx(name, seconds = 1.5, rate = 22050) {
-  const keep = { ctx, master, musicBus, duckBus, sfxBus, noise, pulseWave };
+  const keep = { ctx, master, musicBus, duckBus, sfxBus, ambBus, noise, pulseWave, amb };
   build(new OfflineAudioContext(1, Math.ceil(rate * seconds), rate));
-  try { SFX[name](); return (await ctx.startRendering()).getChannelData(0); } finally { ({ ctx, master, musicBus, duckBus, sfxBus, noise, pulseWave } = keep); }
+  try { SFX[name](); return (await ctx.startRendering()).getChannelData(0); } finally { ({ ctx, master, musicBus, duckBus, sfxBus, ambBus, noise, pulseWave, amb } = keep); }
 }
 // 처음 누르거나 키를 칠 때 소리를 깨워요
 export function unlock() {
@@ -81,6 +82,7 @@ export function setVolume(kind, v) {
   if (!ensure()) return;
   if (kind === 'music') musicBus.gain.setTargetAtTime(prefs.music * .4, ctx.currentTime, .05);
   if (kind === 'sfx') sfxBus.gain.setTargetAtTime(prefs.sfx * .9, ctx.currentTime, .05);
+  if (kind === 'amb') ambBus.gain.setTargetAtTime(prefs.amb, ctx.currentTime, .05);
 }
 export const isOn = () => prefs.on;
 if (typeof document !== 'undefined') {
@@ -209,10 +211,10 @@ function tone(type, f0, f1, len, vol, at = 0, dest = sfxBus) {
   const end = env(g, t, vol, .004, len * .3, len * .7); const o = osc(type, f0, t, end, g);
   if (f1 && f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + len);
 }
-function hiss(len, vol, from, to, at = 0, type = 'bandpass') {
+function hiss(len, vol, from, to, at = 0, type = 'bandpass', dest = sfxBus) {
   const t = ctx.currentTime + at, n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
   n.buffer = noise; f.type = type; f.frequency.setValueAtTime(from, t); f.frequency.exponentialRampToValueAtTime(to, t + len); f.Q.value = 1.5;
-  n.connect(f); f.connect(g); g.connect(sfxBus); env(g, t, vol, .005, len * .2, len * .8); n.start(t, Math.random() * .5); n.stop(t + len + .1);
+  n.connect(f); f.connect(g); g.connect(dest); env(g, t, vol, .005, len * .2, len * .8); n.start(t, Math.random() * .5); n.stop(t + len + .1);
 }
 const N = n => freq(n);
 export const SFX = {
@@ -246,4 +248,43 @@ export function sfx(name, arg) {
   if (!prefs.on || !SFX[name] || !woke || !ensure()) return;
   if (ctx.state === 'suspended') ctx.resume().catch(() => {});
   try { SFX[name](arg); } catch (e) { console.warn('sfx', name, e); }
+}
+
+// ── v0.97 주변 소리 ─────────────────────────────────────────────────────────────
+// 바람·파도·비·바닷속 웅웅거림은 잡음을 거르고(필터) 크기를 천천히 바꿔 만들어요(녹음 파일 없음). 발소리는 걸을 때 한 걸음마다.
+// ambience({ wind, sea, rain, under })  각각 0~1. 게임이 0.25초마다 불러요(곁에 바다가 있으면 sea, 비 오면 rain, 잠수하면 under).
+function layer(type, f0, q) {
+  const n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+  n.buffer = noise; n.loop = true; f.type = type; f.frequency.value = f0; f.Q.value = q; g.gain.value = 0;
+  n.connect(f); f.connect(g); g.connect(ambBus); n.start(0, Math.random()); return { n, f, g };
+}
+let ambState = { wind: 0, sea: 0, rain: 0, under: 0 };
+export const ambienceState = () => ({ ...ambState, ready: !!amb });
+export function ambience(s = {}) {
+  ambState = { wind: +s.wind || 0, sea: +s.sea || 0, rain: +s.rain || 0, under: +s.under || 0 };
+  if (!prefs.on || !woke || !ensure() || ctx.state !== 'running') return;
+  if (!amb) amb = { wind: layer('lowpass', 500, .7), sea: layer('lowpass', 700, .4), surf: layer('bandpass', 1800, .6), rain: layer('highpass', 2600, .4), drip: layer('bandpass', 5200, 2.5), under: layer('lowpass', 200, 1.2) };
+  const t = ctx.currentTime, A = ambState;
+  const gust = .55 + .45 * Math.sin(t * .37) * Math.sin(t * .131 + 1.3);                 // 바람: 세졌다 약해졌다
+  amb.wind.g.gain.setTargetAtTime(A.wind * .2 * gust, t, .7); amb.wind.f.frequency.setTargetAtTime(280 + 520 * gust * Math.max(.3, A.wind), t, .9);
+  const swell = Math.pow(.5 + .5 * Math.sin(t * 2 * Math.PI / 7.2), 1.6);                  // 파도: 7초쯤마다 밀려왔다 빠져요
+  amb.sea.g.gain.setTargetAtTime(A.sea * (.08 + .26 * swell), t, .45); amb.sea.f.frequency.setTargetAtTime(380 + 900 * swell, t, .5);
+  amb.surf.g.gain.setTargetAtTime(A.sea * .07 * swell * swell, t, .35);                   // 부서지는 거품 소리
+  amb.rain.g.gain.setTargetAtTime(A.rain * .13, t, 1.2); amb.drip.g.gain.setTargetAtTime(A.rain * .05 * (.6 + .4 * Math.random()), t, .15);
+  amb.under.g.gain.setTargetAtTime(A.under * .3 * (.85 + .15 * Math.sin(t * 1.7)), t, .4);
+}
+// 발소리: 눈(뽀드득 저벅)·풀·모래·돌길·나무 바닥·물(첨벙)·실내 바닥
+export const STEP_SURFACES = ['snow', 'grass', 'sand', 'stone', 'wood', 'water', 'floor'];
+export function footstep(surface = 'stone') {
+  if (!prefs.on || !woke || !ensure() || ctx.state !== 'running') return;
+  const r = () => .85 + Math.random() * .3, B = ambBus;
+  switch (surface) {
+    case 'snow': for (let i = 0; i < 4; i++) hiss(.045 * r(), .2 * r(), (2200 + Math.random() * 2200), 700, i * .022, 'bandpass', B); hiss(.12, .1, 600, 250, .01, 'lowpass', B); break; // 뽀드득 + 저벅
+    case 'grass': hiss(.09 * r(), .09, 2200 * r(), 900, 0, 'bandpass', B); break;
+    case 'sand': hiss(.11 * r(), .1, 1400 * r(), 500, 0, 'bandpass', B); break;
+    case 'wood': hiss(.03, .06, 2500, 1200, 0, 'bandpass', B); tone('triangle', 170 * r(), 110, .07, .14, 0, B); break;
+    case 'water': hiss(.16 * r(), .16, 700, 2600, 0, 'bandpass', B); hiss(.1, .07, 3000, 1500, .05, 'bandpass', B); break;
+    case 'floor': hiss(.03, .05, 3000, 1600, 0, 'bandpass', B); tone('sine', 140 * r(), 90, .05, .07, 0, B); break;
+    default: hiss(.04 * r(), .11, 3600 * r(), 1500, 0, 'bandpass', B); tone('sine', 150 * r(), 95, .04, .07, 0, B);  // 돌길·자갈
+  }
 }

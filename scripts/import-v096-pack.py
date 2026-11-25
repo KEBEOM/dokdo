@@ -41,6 +41,8 @@ def fix_ground(slot, t):
         big = Image.fromarray(np.clip(np.tile(a, (3, 3, 1)) + .5, 0, 255).astype(np.uint8), 'RGB').resize((192, 192), Image.LANCZOS)
         h = np.asarray(big).astype(np.float32)[64:128, 64:128]
         a = np.tile(h, (2, 2, 1))
+    if slot in ('grass', 'tall', 'dirt'):  # v0.97 풀밭의 흰 꽃·밝은 잎 점을 살짝 눌러요(햇빛·번짐이 더해지면 하얗게 터져 걸을 때 반짝여요)
+        a = knee(a, 165.0, .5)
     return Image.fromarray(np.clip(a + .5, 0, 255).astype(np.uint8), 'RGB')
 
 
@@ -110,6 +112,36 @@ def clean_sprite(t, keep=.05):
     return Image.fromarray(a[y0:H, max(0, x0):min(W, x1)], 'RGBA')
 
 
+def defringe(t, passes=2, lift=38):
+    """v0.97 걸을 때 반짝임 줄이기(모양·알파 테두리는 그대로):
+    1) 잎 속 작은 구멍(둘러싸인 투명 칸, 40점 이하)을 둘레 색으로 메워요 — 구멍 사이로 뒤 땅이 반짝이며 보이던 것
+    2) 배경을 지울 때 남은 밝은 테두리 점(안쪽 이웃보다 훨씬 밝은 점)을 안쪽 이웃 색으로
+    3) 밝기 150 넘는 잎 점을 부드럽게 눌러요 — 게임의 햇빛·번짐(블룸)이 더해지면 노랗게 하얗게 터져(255) 반짝였어요"""
+    from scipy import ndimage
+    a = np.asarray(t).astype(np.float32).copy(); m = a[..., 3] > 0; k = np.ones((3, 3), np.float32)
+    holes = ndimage.binary_fill_holes(m) & ~m; lab, n = ndimage.label(holes)
+    if n:
+        sizes = ndimage.sum(holes, lab, range(1, n + 1)); todo = np.isin(lab, [i + 1 for i, sz in enumerate(sizes) if sz <= 40])
+        while todo.any():
+            w = (m & ~todo).astype(np.float32); cnt = ndimage.convolve(w, k, mode='constant'); ring = todo & (cnt > 0)
+            if not ring.any(): break
+            for c in range(3): a[..., c] = np.where(ring, ndimage.convolve(a[..., c] * w, k, mode='constant') / np.maximum(cnt, 1), a[..., c])
+            a[ring, 3] = 255; m = m | ring; todo &= ~ring
+    L = np.array([.3, .59, .11], np.float32)
+    for _ in range(passes):
+        edge = m & ~ndimage.binary_erosion(m); w = (m & ~edge).astype(np.float32)
+        cnt = ndimage.convolve(w, k, mode='constant'); mean = np.stack([ndimage.convolve(a[..., c] * w, k, mode='constant') for c in range(3)], -1) / np.maximum(cnt, 1)[..., None]
+        fix = edge & (cnt > 0) & (a[..., :3] @ L > mean @ L + lift); a[fix, :3] = mean[fix]
+    a[..., :3] = knee(a[..., :3], 150.0, .4)
+    return Image.fromarray(np.clip(a + .5, 0, 255).astype(np.uint8), 'RGBA')
+
+
+def knee(rgb, at, slope):
+    """밝기가 at을 넘는 곳만 기울기 slope로 눌러요(색은 그대로)"""
+    lum = rgb @ np.array([.3, .59, .11], np.float32)
+    return rgb * np.where(lum > at, (at + (lum - at) * slope) / np.maximum(lum, 1), 1.0)[..., None]
+
+
 def pack_atlas(items, name, width=1024, pad=2):
     """그림들을 한 장에 차례로(줄 바꿈) 놓아요 → {id: [x, y, w, h]}"""
     items = sorted(items, key=lambda kv: -kv[1].height)
@@ -126,7 +158,7 @@ def pack_atlas(items, name, width=1024, pad=2):
 def flora(pack):
     """04 식생: 세운 그림(발 = 아랫변 가운데). 울릉도 나무 6종(계절) · 독도 사철나무·바위틈 덤불·풀포기."""
     src = os.path.join(pack, '04_flora', 'assets')
-    items = [(f[:-4], clean_sprite(unscale(os.path.join(src, f)))) for f in sorted(os.listdir(src)) if f.endswith('.png')]
+    items = [(f[:-4], defringe(clean_sprite(unscale(os.path.join(src, f))))) for f in sorted(os.listdir(src)) if f.endswith('.png')]
     return pack_atlas(items, 'flora96')
 
 
