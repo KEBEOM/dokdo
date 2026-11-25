@@ -25,6 +25,9 @@ assert.ok(/n\.scenery === 'tree' \? 0 : n\.scenery === 'flower' \|\| n\.scenery 
 assert.ok(/arr\.push\(f\.x, h, f\.y - zj,/.test(gl) && /% 7\) \* 1\.0/.test(gl), '깊이 다툼');
 assert.ok(/const FS_DOWN = /.test(gl) && /useProgram\(down\.p\)/.test(gl), '고르게 줄이기');
 
+// 1-3) 어디로 올라가는지: 계단·사다리마다 노란 ▲▲ 표시 · 계단은 나무색
+assert.ok(/scenery: 'stairmark'/.test(gl) && /map\.cliff\.ladders/.test(gl) && /tint: \[\.86, \.62, \.38\]/.test(gl), '오르는 길 표시');
+
 // 2) 바위: 한 칸 바위는 HD-2D 팩 바위 그림(캐릭터 키에 맞게) · 바위 무더기는 가운데로 갈수록 높게 + 위에 HD 바위 그림
 const rockSrc = gl.slice(gl.indexOf('const rockName = '), gl.indexOf('const treeName = ')); const rockName = new Function(`${rockSrc}; return rockName;`)();
 const { HD2D_ATLAS } = await import('../dist/hd2d-atlas.js');

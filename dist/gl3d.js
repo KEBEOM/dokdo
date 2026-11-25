@@ -398,11 +398,11 @@ export function createGL(canvas) {
     // ── GLB 모델 놓기 ──
     const mv = [], hideStatic = new Set(), hideLandmarks = new Set(), lmk = {}, rockSpots = []; // rockSpots: v0.97 바위 무더기 위 HD 바위 그림 자리 // lmk: 지명 → GLB 가운데·높이(1인칭으로 바라볼 곳)
     const put = (id, o2) => { // o2: { x, z, h(바닥 높이), yaw, sx, sy, sz } — 모델 원점(바닥 가운데)을 (x, h, z)에
-      const m = glbModel(id); if (!m) return null; const { x, z, h = 0, yaw = 0, sx = 1, sy = sx, sz = sx } = o2, cs = Math.cos(yaw), sn = Math.sin(yaw);
+      const m = glbModel(id); if (!m) return null; const { x, z, h = 0, yaw = 0, sx = 1, sy = sx, sz = sx, tint = [1, 1, 1] } = o2, cs = Math.cos(yaw), sn = Math.sin(yaw);
       for (let i = 0; i < m.n; i++) {
         const px = m.pos[i * 3] * sx, py = m.pos[i * 3 + 1] * sy, pz = m.pos[i * 3 + 2] * sz;
         let nx = m.nrm[i * 3] / 127 / sx, ny = m.nrm[i * 3 + 1] / 127 / sy, nz = m.nrm[i * 3 + 2] / 127 / sz; const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
-        mv.push(x + px * cs + pz * sn, h + py, z - px * sn + pz * cs, nx * cs + nz * sn, ny, -nx * sn + nz * cs, m.col[i * 4] / 255, m.col[i * 4 + 1] / 255, m.col[i * 4 + 2] / 255, m.col[i * 4 + 3]);
+        mv.push(x + px * cs + pz * sn, h + py, z - px * sn + pz * cs, nx * cs + nz * sn, ny, -nx * sn + nz * cs, m.col[i * 4] / 255 * tint[0], m.col[i * 4 + 1] / 255 * tint[1], m.col[i * 4 + 2] / 255 * tint[2], m.col[i * 4 + 3]);
       }
       return m;
     };
@@ -457,7 +457,7 @@ export function createGL(canvas) {
     for (const k of map.cliff?.stairs || []) {
       const [x, y] = k.split(',').map(Number), c = cornerHeights(map, x, y), N = c.nw + c.ne, S = c.sw + c.se, Wv = c.nw + c.sw, E = c.ne + c.se, hi = Math.max(c.nw, c.ne, c.sw, c.se), lo = Math.min(c.nw, c.ne, c.sw, c.se); if (hi - lo < 2) continue;
       const yaw = N - S >= Math.abs(Wv - E) ? 0 : S - N >= Math.abs(Wv - E) ? Math.PI : Wv > E ? Math.PI / 2 : -Math.PI / 2, sz = 32 / 4.51, off = 2.025 * sz; // 모델 원점은 낮은 쪽 끝 → 칸 가운데로 옮겨요
-      put('stairs', { x: x * T + 16 + off * Math.sin(yaw), z: y * T + 16 + off * Math.cos(yaw), h: lo, yaw, sx: 32 / 1.62, sy: (hi - lo) / 3.03, sz });
+      put('stairs', { x: x * T + 16 + off * Math.sin(yaw), z: y * T + 16 + off * Math.cos(yaw), h: lo, yaw, sx: 32 / 1.62, sy: (hi - lo) / 3.03, sz, tint: [.86, .62, .38] }); // v0.97 나무 계단 색(바위 절벽과 한눈에 구별)
     }
     if (map.kind === 'room') for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (map[y][x] === TC.UP) put('stairs', { x: x * T + 16, z: y * T + 30, h: 0, sx: 30 / 1.62, sy: 40 / 3.03, sz: 30 / 4.51 });
     // v0.84 못 지나가는 칸을 눈에 보이게: 바위 칸(맨바위 산·갯바위)은 울퉁불퉁한 바위 덩어리, 절벽 끝 턱(막힌 가장자리)은 낮은 바위 턱.
@@ -608,6 +608,7 @@ export function createGL(canvas) {
     if (FURNITURE.has(n.scenery)) { const w = (n.w || 1) * 32 + 64, h = (n.h || 1) * 32 + 112; return { w, h, ax: w / 2, ay: h - 24 }; }
     if (n.scenery === 'fence' || n.scenery === 'rail') return { w: (n.w || 2) * 32 + 8, h: 64, ax: (n.w || 2) * 16 + 4, ay: 56 };
     if (n.kind === 'legend') return { w: 128, h: 160, ax: 64, ay: 136 };
+    if (n.scenery === 'stairmark') return { w: 30, h: 44, ax: 15, ay: 40 }; // v0.97 오르는 길 표시
     return { w: 112, h: 144, ax: 56, ay: 124 };
   }
   const footOf = n => ({ x: n.x * T + (n.w ? n.w * 16 : 16), y: n.depth });
@@ -617,6 +618,10 @@ export function createGL(canvas) {
     A.g.translate(r.x + c.ax - f.x, r.y + c.ay - f.y);
     const fl = env.flora && PACK96.flora, fkey = fl && (n.scenery === 'tree' || (n.scenery === 'tuft' && env.map.def?.island !== '울릉도')) ? floraName(env.map, n, env.season) : null, flf = fkey && fl.frames[fkey];
     if (flf) { A.g.drawImage(env.flora, flf[0], flf[1], flf[2], flf[3], Math.round(f.x - flf[2] / 2), f.y - flf[3] + 2, flf[2], flf[3]); A.g.restore(); return { ...c, u0: r.x / A.size, v0: r.y / A.h, u1: (r.x + c.w) / A.size, v1: (r.y + c.h) / A.h }; } /* v0.96 식생(04): 발 = 아랫변 가운데 */
+    if (n.scenery === 'stairmark') { const g = A.g, X = Math.round(f.x), Y = f.y; // v0.97 오르는 길(계단·사다리) 표시: 노란 겹화살표 ▲▲ — 어디로 올라가는지 멀리서도 보이게
+      const chev = (y0, col) => { g.fillStyle = '#3a2a10'; g.beginPath(); g.moveTo(X, y0 - 13); g.lineTo(X + 13, y0); g.lineTo(X + 7, y0); g.lineTo(X, y0 - 7); g.lineTo(X - 7, y0); g.lineTo(X - 13, y0); g.closePath(); g.fill();
+        g.fillStyle = col; g.beginPath(); g.moveTo(X, y0 - 10); g.lineTo(X + 9, y0 - 1); g.lineTo(X + 6, y0 - 1); g.lineTo(X, y0 - 7 - 0); g.lineTo(X - 6, y0 - 1); g.lineTo(X - 9, y0 - 1); g.closePath(); g.fill(); };
+      chev(Y - 22, '#ffe066'); chev(Y - 10, '#ffc93c'); g.restore(); return { ...c, u0: r.x / A.size, v0: r.y / A.h, u1: (r.x + c.w) / A.size, v1: (r.y + c.h) / A.h }; }
     const rk = n.scenery === 'rock' && env.cards ? rockName(env.map, n) : null, rf = rk && HD2D_ATLAS.frames[rk];
     if (rf) { const w = 46, h = Math.round(rf[3] * w / rf[2]); A.g.imageSmoothingEnabled = true; A.g.drawImage(env.cards, rf[0], rf[1], rf[2], rf[3], Math.round(f.x - w / 2), f.y - h + 3, w, h); A.g.restore(); return { ...c, u0: r.x / A.size, v0: r.y / A.h, u1: (r.x + c.w) / A.size, v1: (r.y + c.h) / A.h }; } /* v0.97 예전 저화질 바위(타일셋 v2 작은 바위) 대신 HD-2D 팩 바위를 캐릭터 키에 맞게 줄여서 */
     const tf = n.scenery === 'tree' && env.trees ? HD2D_TREES.frames[treeName(env.map, n)] : null, fk = n.scenery === 'flower' && env.cards ? flowerName(env.map, n, env.season, !!env.story) : null, ff = fk ? cardFrame(fk) : null, fimg = fk && STORY_ATLAS.frames[fk] ? env.story : env.cards;
@@ -697,8 +702,15 @@ export function createGL(canvas) {
       todo.push([n, cell, axis, n.scenery === 'tree' ? 0 : n.scenery === 'flower' || n.scenery === 'tuft' ? .3 : 0]); // v0.97 나무는 바람에 흔들지 않아요: 잎이 촘촘한 새 나무 그림을 매 장면 기울이면 잎 점이 들썩이며 지지직거렸어요(겹친 숲에서 특히). 풀·꽃은 살짝만
       if (n.scenery === 'tree' || n.scenery === 'rock' || n.scenery === 'crag') blob(blobs, map, n, n.scenery === 'tree' ? 24 : 16);
     }
+    // v0.97 오르는 길 표시: 계단 칸 위와 사다리 앞 칸 위(올라선 높이보다 조금 위)에 노란 ▲▲
+    const marks = []; if (map.kind !== 'room' && !map.diving && map.cliff) { const mk = { scenery: 'stairmark', x: 0, y: 0, depth: 16 }, mc = drawCell(A, mk, env);
+      if (mc) { cells.set('stairmark', mc);
+        const near = (x, y) => marks.some(([m]) => Math.abs(m.x - x) <= 1 && Math.abs(m.y - y) <= 1); // 붙은 계단 칸은 하나만 표시
+        for (const k of [...(map.cliff.stairs || [])].sort()) { const [x, y] = k.split(',').map(Number); if (near(x, y)) continue; marks.push([{ scenery: 'stairmark', x, y, depth: y * T + 16 }, Math.max(...[[0, 0], [32, 0], [0, 32], [32, 32]].map(([a, b]) => groundAt(map, x * T + a, y * T + b))) + 10]); }
+        for (const k of map.cliff.ladders || []) { const [x, y] = k.split(',').map(Number); marks.push([{ scenery: 'stairmark', x, y, depth: y * T + 16 }, groundAt(map, x * T + 16, (y - 1) * T + 16) + 10]); } } }
     trimCells(A, cells.values()); // 판을 그림이 있는 자리만큼으로 줄여요(투명한 빈칸을 그리지 않게 → 나무가 빽빽한 숲에서 훨씬 가벼워요)
     for (const [n, cell, axis, sw] of todo) pushSprite(arr, map, n, cell, axis, sw);
+    for (const [n, top] of marks) pushSprite(arr, map, n, cells.get('stairmark'), [0, 0], 0, Math.max(14, top - groundAt(map, n.x * T + 16, n.depth)));
     for (const n of wallDecor) { // 건물 안 창문: 북쪽 벽 앞면에 붙여요(벽 칸 그림과 같은 비율로 늘려서)
       const c = drawCell(A, n, env); if (!c) continue; const f = footOf(n), px = n.x * T - f.x + c.ax, py = n.y * T - f.y + c.ay; // 칸 그림의 왼쪽 위(그림 칸 안 자리)
       const u0 = c.u0 + px / A.size, u1 = u0 + T / A.size, v0 = c.v0 + py / A.h, v1 = v0 + T / A.h, z = (n.y + 1) * T + .6;
