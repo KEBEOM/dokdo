@@ -25,8 +25,10 @@ assert.ok(/n\.scenery === 'tree' \? 0 : n\.scenery === 'flower' \|\| n\.scenery 
 assert.ok(/arr\.push\(f\.x, h, f\.y - zj,/.test(gl) && /% 7\) \* 1\.0/.test(gl), '깊이 다툼');
 assert.ok(/const FS_DOWN = /.test(gl) && /useProgram\(down\.p\)/.test(gl), '고르게 줄이기');
 
-// 1-3) 어디로 올라가는지: 계단·사다리마다 노란 ▲▲ 표시 · 계단은 나무색
-assert.ok(/scenery: 'stairmark'/.test(gl) && /map\.cliff\.ladders/.test(gl) && /tint: \[\.86, \.62, \.38\]/.test(gl), '오르는 길 표시');
+// 1-3) 어디로 올라가는지: 떠 있는 화살표 대신 ‘⤴ 계단·사다리’ 이름표(가까이 가거나 절벽에 막히면) · 작은 지도에 높이·계단 · 계단은 나무색
+assert.ok(!/stairmark/.test(gl) && /tint: \[\.86, \.62, \.38\]/.test(gl), '화살표 없음 · 나무 계단');
+assert.ok(/function climbLabels\(\)/.test(game) && /function climbHint\(nx, ny\)/.test(game) && (game.match(/climbHint\(/g) || []).length >= 3 && /'climb-label'/.test(game), '오르는 길 이름표');
+assert.ok(/climb \? '#e8892b'/.test(game), '작은 지도의 계단');
 
 // 2) 바위: 한 칸 바위는 HD-2D 팩 바위 그림(캐릭터 키에 맞게) · 바위 무더기는 가운데로 갈수록 높게 + 위에 HD 바위 그림
 const rockSrc = gl.slice(gl.indexOf('const rockName = '), gl.indexOf('const treeName = ')); const rockName = new Function(`${rockSrc}; return rockName;`)();

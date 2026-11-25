@@ -149,15 +149,34 @@ function exitLabels() {
   }
   return out;
 }
+// v0.97 오르는 길(계단·사다리) 이름표: 언덕 위로 가는 길이 어디인지. 4칸 안에 오면 보이고, 절벽에 막혀 부딪히면 12칸 안의 것을 몇 초 동안 모두 띄워요
+let climbHintUntil = 0;
+function climbLabels() {
+  const c = map.cliff; if (!c || map.kind === 'room') return [];
+  const out = [], seen = new Set(), stairs = new Set(c.stairs || []);
+  for (const k of stairs) { if (seen.has(k)) continue; const q = [k], grp = []; seen.add(k);
+    while (q.length) { const cur = q.pop(); grp.push(cur.split(',').map(Number)); const [x, y] = grp.at(-1); for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nk = `${x + a},${y + b}`; if (stairs.has(nk) && !seen.has(nk)) { seen.add(nk); q.push(nk); } } }
+    const gx = grp.reduce((t, p) => t + p[0], 0) / grp.length, gy = grp.reduce((t, p) => t + p[1], 0) / grp.length;
+    out.push({ name: '계단', x: gx * TILE + 16, y: gy * TILE + 16, lift: 30, climb: { x: gx, y: gy } }); }
+  for (const k of c.ladders || []) { const [x, y] = k.split(',').map(Number); out.push({ name: '사다리', x: x * TILE + 16, y: y * TILE + 4, lift: 40, climb: { x, y } }); }
+  return out;
+}
+function climbHint(nx, ny) { // 절벽에 부딪혔을 때(높이가 다른 칸으로 가려 할 때)
+  const c = map.cliff; if (!c || map.kind === 'room' || !(c.stairs?.size || c.ladders?.size)) return;
+  const lv = (x, y) => c.base.get(`${x},${y}`) || 0, fx = Math.round(view.x), fy = Math.round(view.y);
+  if (lv(nx, ny) === lv(fx, fy) && !c.face?.has?.(`${nx},${ny}`)) return;
+  const now = performance.now(), first = climbHintUntil < now - 6000; climbHintUntil = now + 4500;
+  if (first && !climbHint.toldOn?.has(map.id)) { (climbHint.toldOn ||= new Set()).add(map.id); toast('높은 곳으로는 ‘계단’이나 ‘사다리’로 올라가요. 가까운 곳에 이름표를 띄웠어요.'); }
+}
 function paintWorldLabels(people = liveNPCs()) {
   const key = map.id + state.badges.length + '|' + people.map(n => n.uid).join('|');
   if (labelKey !== key) {
     labelKey = key; const layer = $('#worldLabels'); layer.replaceChildren();
     // 건물 이름은 문 위 간판처럼, 사람 이름은 머리 위에 — 가까이 갔을 때만 나타나서 다른 캐릭터를 가리지 않아요.
-    const fixed = [...(map.kind === 'town' ? enterable() : []).map(b => { const c = doorCols(b), dx = (c[0] + c[c.length - 1]) / 2; return { name: b.name, x: dx * TILE + 16, y: (b.y + b.h) * TILE - 2, lift: 44, door: { x: dx, y: b.y + b.h }, building: true }; }), ...exitLabels(), ...(map.kind === 'room' ? [] : map.parsed.objects.filter(o => o.type === 'sign' && !o.furniture && o.name).map(o => ({ name: o.name, x: o.x * TILE + 16, y: o.y * TILE + 30, lift: 54, sign: { x: o.x, y: o.y } })))]; /* v0.88 빈 안내판 위 이름표(가까운 한 개) */ // v0.84 간판은 진짜 문 바로 위에(집·가게·터미널도)
+    const fixed = [...(map.kind === 'town' ? enterable() : []).map(b => { const c = doorCols(b), dx = (c[0] + c[c.length - 1]) / 2; return { name: b.name, x: dx * TILE + 16, y: (b.y + b.h) * TILE - 2, lift: 44, door: { x: dx, y: b.y + b.h }, building: true }; }), ...exitLabels(), ...climbLabels(), ...(map.kind === 'room' ? [] : map.parsed.objects.filter(o => o.type === 'sign' && !o.furniture && o.name).map(o => ({ name: o.name, x: o.x * TILE + 16, y: o.y * TILE + 30, lift: 54, sign: { x: o.x, y: o.y } })))]; /* v0.88 빈 안내판 위 이름표(가까운 한 개) */ // v0.84 간판은 진짜 문 바로 위에(집·가게·터미널도)
     labelNodes = [...fixed, ...people.filter(n => n.actor).map(n => ({ name: n.name, uid: n.uid }))].map(n => {
       const el = document.createElement('span');
-      el.className = n.exit ? `exit-label${n.locked ? ' locked' : ''}` : n.building ? 'building-label' : n.sign ? 'sign-label' : 'world-nameplate';
+      el.className = n.climb ? 'climb-label' : n.exit ? `exit-label${n.locked ? ' locked' : ''}` : n.building ? 'building-label' : n.sign ? 'sign-label' : 'world-nameplate';
       if (n.building) { el.innerHTML = '<i class="door-ico" aria-hidden="true"></i>'; el.append(n.name); } else el.textContent = n.name; layer.append(el); return { ...n, el };
     });
   }
@@ -171,12 +190,12 @@ function paintWorldLabels(people = liveNPCs()) {
   let signNear = null, signBest = Infinity; // v0.88 안내판 이름표도 한 개만: 2칸 안에서 가장 가까운 안내판
   for (const n of labelNodes) if (n.sign && near(n.sign.x, n.sign.y, 2)) { const d = Math.abs(n.sign.x - view.x) + Math.abs(n.sign.y - view.y); if (d < signBest) { signBest = d; signNear = n; } }
   for (const n of labelNodes) {
-    const live = positions.get(n.uid), fixed = n.building || n.exit || n.sign;
+    const live = positions.get(n.uid), fixed = n.building || n.exit || n.sign || n.climb;
     const px = live?.drawX ?? live?.x ?? 0, py = live?.drawY ?? live?.y ?? 0;
     const at = fixed ? toScreen(n.x, n.y, n.lift || 0) : toScreen(px * TILE + 16, py * TILE + 28, 48 + 24); // 48 = 캐릭터 키, 그 위 ‘!’ 표시보다 위쪽
     const x = Math.round(at.x * sceneScale), y = Math.round(at.y * sceneScale);
     const onScreen = x >= 0 && x <= sceneWidth * sceneScale && y >= 20 && y < sceneHeight * sceneScale - 25;
-    const shown = onScreen && (n.exit || (!talking && (n.building ? n === doorNear : n.sign ? n === signNear && !map.diving : n.uid === closest && !map.diving)));
+    const shown = onScreen && (n.exit || (n.climb && !talking && !map.diving && (near(n.climb.x, n.climb.y, 4) || (performance.now() < climbHintUntil && near(n.climb.x, n.climb.y, 12)))) || (!n.climb && !talking && (n.building ? n === doorNear : n.sign ? n === signNear && !map.diving : n.uid === closest && !map.diving)));
     n.el.hidden = !onScreen; n.el.classList.toggle('show', shown);
     if (onScreen) { const half = (n.el.offsetWidth || n.name.length * 14 + 20) / 2; n.el.style.left = Math.round(Math.max(half + 5, Math.min(sceneWidth * sceneScale - half - 5, x))) + 'px'; n.el.style.top = y + 'px'; }
   }
@@ -561,7 +580,7 @@ function move(dx, dy, now, keepDir = false) {
   if (exitLocked(nx, ny)) { if (!move.warned || now - move.warned > 1500) { toast(lockedMessage()); move.warned = now; } return false; }
   if (dy === -1 && !keepDir) { const b = buildingDoorAt(nx, ny); if (b) { enterBuilding(b); return true; } } // walking up into a door
   const wild = roamers.at(nx, ny); if (wild?.kind === 'friend') return false; if (wild) { path = []; pathAction = null; startBattle('wild', wild.species, { roamer: wild.uid }); return false; } // 걸어 다니는 우산몬과 부딪히면 결투
-  if (blocked(map, nx, ny, liveNPCs()) || diveWall(nx, ny)) { if (!move.bumped || now - move.bumped > 380) { sfx('bump'); move.bumped = now; } if (diveWall(nx, ny) && (!move.warned || now - move.warned > 2500)) { toast('물 밖으로 나가려면 먼저 ‘물 위로’(Q)로 올라와요.'); move.warned = now; } return false; }
+  if (blocked(map, nx, ny, liveNPCs()) || diveWall(nx, ny)) { if (!move.bumped || now - move.bumped > 380) { sfx('bump'); move.bumped = now; climbHint(nx, ny); } if (diveWall(nx, ny) && (!move.warned || now - move.warned > 2500)) { toast('물 밖으로 나가려면 먼저 ‘물 위로’(Q)로 올라와요.'); move.warned = now; } return false; }
   moving = { fromX: state.x, fromY: state.y, toX: nx, toY: ny, start: now }; return true;
 }
 // 한 걸음: 2D에서는 누른 쪽으로, 3D 보기에서는 ‘보는 방향’을 기준으로 앞(W)·왼쪽(A)·뒤(S)·오른쪽(D) 칸으로 걸어요
@@ -771,7 +790,7 @@ function freeWalk(vx, vy, dt, now) {
   if (vx && !freeBlocked(ox, oy, nx, oy, vy, now)) p.x = nx; if (battle || transition || busy()) return false;
   if (vy && !freeBlocked(p.x, oy, p.x, ny, vy, now)) p.y = ny; if (battle || transition || busy()) { p.x = ox; p.y = oy; return false; }
   const d = Math.hypot(p.x - ox, p.y - oy);
-  if (d < 1e-5) { if (!move.bumped || now - move.bumped > 380) { sfx('bump'); move.bumped = now; } return false; }
+  if (d < 1e-5) { if (!move.bumped || now - move.bumped > 380) { sfx('bump'); move.bumped = now; climbHint(Math.round(ox + Math.sign(vx) * .6), Math.round(oy + Math.sign(vy) * .6)); } return false; }
   walkDistance += d * 32; freeWalking = true; view = { x: p.x, y: p.y };
   const tx = Math.round(p.x), ty = Math.round(p.y); if (tx !== state.x || ty !== state.y) { state.x = tx; state.y = ty; landed(); }
   return true;
@@ -1738,7 +1757,9 @@ function paintMiniMap(now, people) {
   g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, 120, 120);
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
     const x = cx - 7 + i, y = cy - 7 + j, out = x < 0 || y < 0 || x >= map[0].length || y >= map.length, t = out ? 0 : map[y][x];
-    g.fillStyle = out || t === 0 ? '#4a9fbd' : blocked(map, x, y, [], true) ? '#5c7a4c' : '#efe6c4'; g.fillRect(i * S, j * S, S, S);
+    const k = `${x},${y}`, lvl = map.cliff?.base?.get(k) || 0, climb = map.cliff?.stairs?.has(k) || map.cliff?.ladders?.has(k);
+    g.fillStyle = out || t === 0 ? '#4a9fbd' : climb ? '#e8892b' : blocked(map, x, y, [], true) ? '#5c7a4c' : ['#efe6c4', '#d9ce9e', '#c2b47a', '#ab9b5c'][Math.min(3, lvl)]; g.fillRect(i * S, j * S, S, S); // v0.97 높은 땅일수록 진하게 · 계단·사다리는 주황
+    if (climb) { g.fillStyle = '#7a4210'; g.fillRect(i * S + 1, j * S + 2, S - 2, 1); g.fillRect(i * S + 1, j * S + 5, S - 2, 1); }
   }
   for (const n of people) { const x = Math.round(n.drawX ?? n.x) - cx + 7, y = Math.round(n.drawY ?? n.y) - cy + 7; if (x < 0 || y < 0 || x >= N || y >= N || n.scenery || n.player) continue; g.fillStyle = n.kind === 'wild' || n.kind === 'friend' || n.kind === 'legend' ? '#7a3fb0' : n.actor ? '#e2702a' : '#8a6a3c'; g.fillRect(x * S + 2, y * S + 2, S - 4, S - 4); }
   g.translate(7 * S + S / 2, 7 * S + S / 2); g.rotate(in3d() ? (yaw ?? 0) : (DIR_ANGLE[state.dir] ?? 0)); g.fillStyle = '#d62828'; g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, -7); g.lineTo(5, 6); g.lineTo(0, 3); g.lineTo(-5, 6); g.closePath(); g.fill(); g.stroke();
