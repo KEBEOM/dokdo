@@ -8,7 +8,7 @@ const gl = read('gl3d.js'), game = read('game.js'), audio = read('audio.js');
 // 1) 지지직거림: 그림 판은 ‘또렷한 쌍선형’(미리 곱한 알파) · 땅 재질은 부드럽게 · 식생 그림은 구멍 메우고 밝은 점 누르기
 assert.ok(/#extension GL_OES_standard_derivatives : enable/.test(gl) && /fwidth\(t\)/.test(gl) && /c\.rgb \/ max\(c\.a, 1e-3\)/.test(gl), '또렷한 쌍선형');
 assert.ok(/UNPACK_PREMULTIPLY_ALPHA_WEBGL, smooth === 'sprite'/.test(gl) && /const spriteTex = /.test(gl) && /spriteTex\(scene\.statics\.atlas\)/.test(gl));
-assert.ok(/clamp\(fract\(vWP\.xz \/ 128\.0\), \.5 \/ 128\.0, 1\.0 - \.5 \/ 128\.0\)/.test(gl) && /HD2D_GROUND\.key\), false, 0, true\)/.test(gl), '땅 재질 부드럽게');
+assert.ok(/clamp\(fract\(vWP\.xz \/ 128\.0\), \.5 \/ 128\.0, 1\.0 - \.5 \/ 128\.0\)/.test(gl) && /HD2D_GROUND\.key\), false, 0, sharpOK\)/.test(gl), '땅 재질 부드럽게');
 const py = `
 import numpy as np, json, sys
 from PIL import Image

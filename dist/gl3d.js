@@ -794,7 +794,7 @@ export function createGL(canvas) {
     for (const m of scene.meshes) {
       gl.uniform1f(mesh.u.uCutOn, 1); gl.uniform1f(mesh.u.uCutG, m.ground ? 1 : 0); gl.uniform1f(mesh.u.uCutY, cutY); gl.uniform1f(mesh.u.uAO, m.ao ? 1 : 0); gl.uniform1f(mesh.u.uGround, m.mat ? 1 : 0);
       if (m.mat) { // 땅 재질: 재질 지도(1) · 재질 그림(2) · 잡음(3)
-        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texture(m.mat.canvas)); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, texture(assetImage(HD2D_GROUND.seasons?.[o.season] || HD2D_GROUND.key) || assetImage(HD2D_GROUND.key), false, 0, true)); /* v0.97 부드럽게(걸을 때 땅 무늬가 지지직거리지 않게) */ /* v0.96 계절별 땅 그림(03 땅 재질) */
+        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texture(m.mat.canvas)); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, texture(assetImage(HD2D_GROUND.seasons?.[o.season] || HD2D_GROUND.key) || assetImage(HD2D_GROUND.key), false, 0, sharpOK)); /* v0.97 부드럽게(걸을 때 땅 무늬가 지지직거리지 않게) · 그래픽 카드 없이 그리는 기기는 예전처럼 */ /* v0.96 계절별 땅 그림(03 땅 재질) */
         gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, texture(assetImage(HD2D_GROUND.noise), false, 1)); gl.activeTexture(gl.TEXTURE0);
         gl.uniform1i(mesh.u.uMat, 1); gl.uniform1i(mesh.u.uMatTex, 2); gl.uniform1i(mesh.u.uNoise, 3); gl.uniform2fv(mesh.u.uMapSize, [m.mat.W, m.mat.H]);
       }
