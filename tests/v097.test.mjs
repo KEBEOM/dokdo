@@ -20,6 +20,11 @@ print(json.dumps({'small_holes': int(sum(1 for v in s if v <= 40)), 'bright': fl
 const f = JSON.parse(execFileSync('python3', ['-c', py, new URL('assets/scenery/flora96.png', dist).pathname]).toString());
 assert.equal(f.small_holes, 0, '잎 속 작은 구멍 없음'); assert.ok(f.bright < .002, `아주 밝은 잎 점 ${f.bright}`);
 
+// 1-2) 겹친 숲의 지지직거림: 나무는 바람에 기울이지 않아요(풀·꽃만 살짝) · 같은 줄 그림 판은 살짝 뒤로 비켜 세워 깊이 다툼 없게 · 작은 화면 효과 그림은 4×4칸을 고르게 섞어 줄여요
+assert.ok(/n\.scenery === 'tree' \? 0 : n\.scenery === 'flower' \|\| n\.scenery === 'tuft' \? \.3 : 0/.test(gl), '나무 흔들림 끔');
+assert.ok(/arr\.push\(f\.x, h, f\.y - zj,/.test(gl) && /% 7\) \* 1\.0/.test(gl), '깊이 다툼');
+assert.ok(/const FS_DOWN = /.test(gl) && /useProgram\(down\.p\)/.test(gl), '고르게 줄이기');
+
 // 2) 바위: 한 칸 바위는 HD-2D 팩 바위 그림(캐릭터 키에 맞게) · 바위 무더기는 가운데로 갈수록 높게 + 위에 HD 바위 그림
 const rockSrc = gl.slice(gl.indexOf('const rockName = '), gl.indexOf('const treeName = ')); const rockName = new Function(`${rockSrc}; return rockName;`)();
 const { HD2D_ATLAS } = await import('../dist/hd2d-atlas.js');

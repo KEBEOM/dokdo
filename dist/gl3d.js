@@ -199,6 +199,10 @@ void main(){
   c *= mix(.7, 1.0, smoothstep(.9, .3, length((vUV - .5) * vec2(1.15, 1.0))));         // 비네트
   gl_FragColor = vec4(c, max(s.a, b.a * dof)); }`;
 const VS_COPY = VS_POST, FS_COPY = `precision mediump float; uniform sampler2D uScene; varying vec2 vUV; void main(){ gl_FragColor = texture2D(uScene, vUV); }`;
+// v0.97 화면 효과용 작은 그림(1/4)을 만들 때 4×4칸을 고르게 섞어요. 예전엔 한 점만 골라 작게 줄여서, 밝은 꽃·잎 점이 카메라가 움직일 때마다
+//   작은 그림에 들어갔다 빠졌다 하며 번짐(블룸)·흐림(심도)이 깜빡였어요(밝은 초원에서 가장 심하게 ‘지지직’).
+const FS_DOWN = `precision mediump float; uniform sampler2D uScene; uniform vec2 uSrc; varying vec2 vUV;
+void main(){ vec2 t = uSrc; gl_FragColor = (texture2D(uScene, vUV + vec2(-t.x, -t.y)) + texture2D(uScene, vUV + vec2(t.x, -t.y)) + texture2D(uScene, vUV + vec2(-t.x, t.y)) + texture2D(uScene, vUV + vec2(t.x, t.y))) * .25; }`;
 
 function hex(c) { const n = parseInt(String(c).replace('#', '').slice(0, 6), 16); return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; }
 const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -253,10 +257,10 @@ export function createGL(canvas) {
   const program = (vs, fs, attrs) => { const p = gl.createProgram(); gl.attachShader(p, compile(gl.VERTEX_SHADER, vs)); gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(p); if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
     const a = {}, u = {}; for (const n of attrs) a[n] = gl.getAttribLocation(p, n);
     const cnt = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS); for (let i = 0; i < cnt; i++) { const n = gl.getActiveUniform(p, i).name; u[n] = gl.getUniformLocation(p, n); } return { p, a, u }; };
-  let mesh, sprite, mote, post, copy, water, model, sharpOK = false;
+  let mesh, sprite, mote, post, copy, down, water, model, sharpOK = false;
   try {
     mesh = program(VS_MESH, FS_MESH, ['aPos', 'aUV', 'aNrm']); sprite = null; if (gl.getExtension('OES_standard_derivatives')) try { sprite = program(VS_SPRITE, FS_SPRITE_EXT + '#define SHARP 1\n' + FS_SPRITE, ['aFoot', 'aOff', 'aUV', 'aAxis']); sharpOK = true; } catch (e) { console.warn('gl3d sharp', e); } if (!sprite) sprite = program(VS_SPRITE, FS_SPRITE, ['aFoot', 'aOff', 'aUV', 'aAxis']); water = program(VS_WATER, FS_WATER, ['aPos', 'aUV']); model = program(VS_MODEL, FS_MODEL, ['aPos', 'aNrm', 'aCol', 'aCls']);
-    mote = program(VS_MOTE, FS_MOTE, ['aSeed']); post = program(VS_POST, FS_POST, ['aP']); copy = program(VS_COPY, FS_COPY, ['aP']);
+    mote = program(VS_MOTE, FS_MOTE, ['aSeed']); post = program(VS_POST, FS_POST, ['aP']); copy = program(VS_COPY, FS_COPY, ['aP']); down = program(VS_POST, FS_DOWN, ['aP']);
   } catch (e) { console.warn('gl3d', e); return off; }
 
   // ── 그림 → 텍스처 ──
@@ -665,7 +669,10 @@ export function createGL(canvas) {
     if (cell.empty) return;
     const f = footOf(n), h = groundAt(map, f.x, f.y) + lift, L = -cell.ax, R = cell.w - cell.ax, D = -(cell.h - cell.ay), U = cell.ay;
     const c = [[L, D, cell.u0, cell.v1], [R, D, cell.u1, cell.v1], [R, U, cell.u1, cell.v0], [L, U, cell.u0, cell.v0]];
-    for (const i of [0, 1, 2, 0, 2, 3]) arr.push(f.x, h, f.y, c[i][0], c[i][1], c[i][2], c[i][3], axis[0], axis[1], swayW);
+    // v0.97 같은 줄에 선 나무·풀 그림 판은 깊이가 똑같아(한 평면) 겹친 곳에서 어느 쪽이 앞인지 매 장면 바뀌며 지지직거렸어요(깊이 다툼).
+    //   이웃끼리 다른 만큼(0~6px) 살짝 뒤로 비켜 세워 늘 같은 쪽이 앞에 보이게 해요(눈에 띄지 않는 거리 · 사람보다 앞으로 나오지 않게 뒤로만).
+    const zj = axis[0] === 0 && axis[1] === 0 && !n.building ? (((n.x | 0) * 5 + (n.y | 0) * 3) % 7) * 1.0 : 0;
+    for (const i of [0, 1, 2, 0, 2, 3]) arr.push(f.x, h, f.y - zj, c[i][0], c[i][1], c[i][2], c[i][3], axis[0], axis[1], swayW);
   }
   const FURNITURE = new Set(['shelf', 'crates', 'plant', 'table', 'sofa', 'desk', 'trophy', 'counter', 'bed']); // 건물 안 가구
   const STATIC = new Set(['tree', 'rock', 'flower', 'tuft', 'crag', 'fence', 'rail', 'railv', 'tetrapods', 'planter', 'monument', 'beacon', 'barrier', ...FURNITURE]);
@@ -687,7 +694,7 @@ export function createGL(canvas) {
       const key = keyOf(n); let cell = cells.get(key);
       if (!cell) { cell = drawCell(A, n.scenery === 'railv' ? { ...n, scenery: 'rail', w: 1 } : n, env); if (!cell) continue; cells.set(key, cell); }
       const axis = n.scenery === 'fence' || n.scenery === 'rail' || n.scenery === 'barrier' ? [1, 0] : n.scenery === 'railv' && !opt.hd ? [0, 1] : [0, 0]; // HD-2D(카메라 고정)에선 세로 난간도 카메라를 봐요
-      todo.push([n, cell, axis, n.scenery === 'tree' ? 1 : n.scenery === 'flower' || n.scenery === 'tuft' ? .6 : 0]);
+      todo.push([n, cell, axis, n.scenery === 'tree' ? 0 : n.scenery === 'flower' || n.scenery === 'tuft' ? .3 : 0]); // v0.97 나무는 바람에 흔들지 않아요: 잎이 촘촘한 새 나무 그림을 매 장면 기울이면 잎 점이 들썩이며 지지직거렸어요(겹친 숲에서 특히). 풀·꽃은 살짝만
       if (n.scenery === 'tree' || n.scenery === 'rock' || n.scenery === 'crag') blob(blobs, map, n, n.scenery === 'tree' ? 24 : 16);
     }
     trimCells(A, cells.values()); // 판을 그림이 있는 자리만큼으로 줄여요(투명한 빈칸을 그리지 않게 → 나무가 빽빽한 숲에서 훨씬 가벼워요)
@@ -855,8 +862,8 @@ export function createGL(canvas) {
     // 화면 합성
     if (usePost) {
       gl.disable(gl.DEPTH_TEST);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.b.fb); gl.viewport(0, 0, fbo.b.W, fbo.b.H); gl.useProgram(copy.p); gl.bindTexture(gl.TEXTURE_2D, fbo.a.tex); gl.uniform1i(copy.u.uScene, 0);
-      gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf); gl.enableVertexAttribArray(copy.a.aP); gl.vertexAttribPointer(copy.a.aP, 2, gl.FLOAT, false, 8, 0); gl.drawArrays(gl.TRIANGLES, 0, 6);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.b.fb); gl.viewport(0, 0, fbo.b.W, fbo.b.H); gl.useProgram(down.p); gl.bindTexture(gl.TEXTURE_2D, fbo.a.tex); gl.uniform1i(down.u.uScene, 0); gl.uniform2f(down.u.uSrc, 1 / fbo.a.W, 1 / fbo.a.H);
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf); gl.enableVertexAttribArray(down.a.aP); gl.vertexAttribPointer(down.a.aP, 2, gl.FLOAT, false, 8, 0); gl.drawArrays(gl.TRIANGLES, 0, 6);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, fbw, fbh); gl.clear(gl.COLOR_BUFFER_BIT);
       gl.useProgram(post.p); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, fbo.b.tex); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, fbo.a.tex);
       gl.uniform1i(post.u.uScene, 0); gl.uniform1i(post.u.uSmall, 1); gl.uniform2fv(post.u.uTexel, [1 / fbo.b.W, 1 / fbo.b.H]);
