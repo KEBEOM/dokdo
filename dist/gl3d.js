@@ -503,7 +503,7 @@ export function createGL(canvas) {
     if (uwImg) for (const it of seabedLayout(map).items) { const f = UW_ATLAS.frames[it.id]; if (f) cards.push({ key: it.id, f, x: (it.x + (it.w || 1) / 2) * T + (it.big || it.edge ? 0 : (((it.x * 7 + it.y * 3) % 9) - 4)), z: it.y * T + (it.edge ? 6 : it.big ? 30 : 24), h: lv(map, it.x, it.y), uw: true }); } // v0.87 바닷속 판
     if (o.hd2d && !map.diving) for (const ob of map.parsed?.objects || []) { // v0.88 실제 시설의 관찰용 외관(「지상·수중 v2」): 지명 자리 칸 위에 그림 판 하나 · 들어가는 문 없음
       const f = ob.region && REGION_ATLAS.frames[ob.region]; if (!f) continue; if (!assetImage(REGION_ATLAS.key)) { missing++; continue; }
-      const r = ob.rock || [ob.x - 1, ob.y - 1, ob.x + 1, ob.y], cx = (r[0] + r[2] + 1) / 2 * T, cz = (r[3] + 1) * T - 2, L = ob.onTop ? Math.max(...[...Array(r[2] - r[0] + 1).keys()].map(i => lv(map, r[0] + i, r[3]))) : lv(map, ob.x, ob.y); /* v0.96 onTop: 산·언덕 위 명소는 상자 앞줄 높이에 세워요 */
+      const r = ob.rock || [ob.x - 1, ob.y - 1, ob.x + 1, ob.y], cx = (r[0] + r[2] + 1) / 2 * T, cz = (r[3] + 1) * T - 2, L = (ob.lift || 0) + (ob.onTop ? Math.max(...[...Array(r[2] - r[0] + 1).keys()].map(i => lv(map, r[0] + i, r[3]))) : lv(map, ob.x, ob.y)); /* v0.97 lift: 원경은 숲 위로 띄워 밑동이 나무 뒤에 숨게 · v0.96 onTop: 산·언덕 위 명소는 상자 앞줄 높이에 세워요 */
       if (ob.onTop) for (let y = r[1] - 2; y <= r[3]; y++) for (let x = r[0] - 1; x <= r[2] + 1; x++) hideStatic.add(`tree|${x},${y}`); /* v0.96 숲 위 명소: 상자와 둘레 나무를 비워 그림이 가리지 않게 */
       cards.push({ key: ob.region, f, x: cx, z: cz, h: L, rg: true }); hideLandmarks.add(ob.name); lmk[ob.name] = { x: cx, z: (r[1] + r[3] + 1) / 2 * T, h: L, top: f[3] * .8 };
       boxShadow(r[0] * T, r[1] * T, (r[2] + 1) * T, (r[3] + 1) * T, f[3] * .35, Math.max(0, L)); }

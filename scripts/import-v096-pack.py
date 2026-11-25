@@ -236,6 +236,14 @@ def furniture(pack, prev):
     return {'baseH': baseH, 'ids': FURN96}
 
 
+def far_treeline(t, keep, seed=7):
+    """v0.97 원경(알봉·성인봉): 그림 아래쪽 숲 띠는 게임 속 나무 사이로 네모난 창처럼 보였어요 → 들쭉날쭉한 나무 선 아래를 지워요(게임 속 숲이 그 앞을 가려요)"""
+    a = np.asarray(t).copy(); h, w = a.shape[:2]; xs = np.arange(w); rng = np.random.default_rng(seed)
+    line = h * keep + h * .06 * np.sin(xs / w * np.pi * 3.1 + 1.3) + h * .035 * np.sin(xs / w * np.pi * 11 + .4) + rng.normal(0, h * .012, w)
+    line = np.convolve(line, np.ones(3) / 3, mode='same'); a[np.arange(h)[:, None] >= line[None, :].astype(int), 3] = 0
+    return Image.fromarray(a, 'RGBA')
+
+
 def landmark(pack, prev):
     """07 울릉도 명소: region-atlas.png 아래에 덧붙이고 REGION_ATLAS·REGION_META에 더해요(관찰용 외관 그림 · 문/포탈 없음).
     게임에 세우는 자리는 maps.js 지도의 landmark 칸(region · rock)이 정해요. 충돌은 원래 막힌 칸(rock 상자) 그대로."""
@@ -248,6 +256,7 @@ def landmark(pack, prev):
     atlas = atlas.crop((0, 0, RA['width'], baseH)); ims = []
     for k in ids:
         t = clean_sprite(unscale(os.path.join(src, k + '.png')))
+        if k.endswith('_far'): t = far_treeline(t, .56 if 'albong' in k else .62)
         pad = Image.new('RGBA', (t.width + 2, t.height + 2), (0, 0, 0, 0)); pad.paste(t, (1, 1)); ims.append((k, pad))
     ims.sort(key=lambda kv: -kv[1].height)
     x, y, rowh = 0, baseH + 2, 0; pos = {}
